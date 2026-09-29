@@ -13,7 +13,7 @@ Bắt tay WebSocket, định dạng thân yêu cầu, phân tích gói tin phả
 **Để đạt tới `v1.0.0` chỉ còn thiếu một lần kiểm chứng "tạo nội dung thành công trên thực tế"** — tài khoản dùng để hiệu chuẩn trước đây không có giấy phép (license) Copilot hợp lệ,
 nên sau khi giao thức hoàn toàn chuẩn xác, phía dịch vụ upstream đã từ chối ở tầng nghiệp vụ (`InvalidCopilotLicense`). Do đó, hình thái thực tế của dữ liệu luồng (stream chunk),
 trường gọi công cụ (tool call), vị trí nhập ảnh, đo lường usage và trích dẫn tham chiếu **vẫn chưa qua kiểm chứng bằng nội dung thật**.
-Chi tiết xem [Hướng dẫn triển khai và nghiệm thu](docs/部署与验收.md).
+Chi tiết xem [Hướng dẫn triển khai và nghiệm thu](docs/trien-khai-va-nghiem-thu.md).
 
 ---
 
@@ -144,7 +144,7 @@ Ba nhóm đường dẫn được tách biệt rõ ràng, thuận tiện cho vi�
 | `/admin/*` | JSON API quản trị | Session token quản trị |
 | `/v1/*` | Giao diện tương thích cho Codex và các client khác | `sk-` API Key |
 
-Ủy quyền tài khoản, tạo API Key, sinh cấu hình Codex, xem trạng thái yêu cầu và tài khoản, nhóm proxy, sao lưu và phục hồi đều được thực hiện trên giao diện quản trị. Chi tiết các bước xem tại [Hướng dẫn triển khai và nghiệm thu](docs/部署与验收.md).
+Ủy quyền tài khoản, tạo API Key, sinh cấu hình Codex, xem trạng thái yêu cầu và tài khoản, nhóm proxy, sao lưu và phục hồi đều được thực hiện trên giao diện quản trị. Chi tiết các bước xem tại [Hướng dẫn triển khai và nghiệm thu](docs/trien-khai-va-nghiem-thu.md).
 
 ### 4. Chạy trong môi trường phát triển cục bộ (Local Dev)
 

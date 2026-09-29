@@ -73,11 +73,11 @@ export function createApiKeyGuard(context: AppContext) {
     const presented = extractApiKey(request);
     if (presented === null) {
       throw ApiError.unauthorized(
-        `缺少 API Key，请通过 Authorization: Bearer ${API_KEY_PREFIX}… 或 X-API-Key 提供`,
+        `Thiếu API Key, vui lòng cung cấp qua Authorization: Bearer ${API_KEY_PREFIX}… hoặc X-API-Key`,
       );
     }
     if (!isWellFormedApiKey(presented)) {
-      throw ApiError.unauthorized('API Key 格式不正确');
+      throw ApiError.unauthorized('Định dạng API Key không hợp lệ');
     }
 
     const candidates = context.apiKeys.findByPrefix(apiKeyLookupPrefix(presented));
@@ -89,7 +89,7 @@ export function createApiKeyGuard(context: AppContext) {
       }
     }
     if (matched === undefined) {
-      throw ApiError.unauthorized('API Key 无效');
+      throw ApiError.unauthorized('API Key không hợp lệ');
     }
 
     const usability = evaluateApiKeyUsability(matched);
@@ -117,7 +117,7 @@ export function createApiKeyGuard(context: AppContext) {
       recordRestrictionHit(context, matched.id, endpoint, 'api_key.rate_limited', consumed.reason, clientIpFor(context, request));
       reply.header('Retry-After', String(consumed.retryAfterSeconds));
       throw ApiError.rateLimited(
-        `已达到该 API Key 的${rateLimitReasonLabel(consumed.reason)}限额，请在 ${consumed.retryAfterSeconds} 秒后重试`,
+        `Đã đạt giới hạn ${rateLimitReasonLabel(consumed.reason)} của API Key này, vui lòng thử lại sau ${consumed.retryAfterSeconds} giây`,
       );
     }
     // Hạn mức đồng thời được giải phóng qua sự kiện close của kết nối HTTP: response stream (SSE) sẽ hijack,
@@ -139,11 +139,11 @@ export function createApiKeyGuard(context: AppContext) {
 function rateLimitReasonLabel(reason: 'rpm' | 'daily' | 'concurrency'): string {
   switch (reason) {
     case 'rpm':
-      return '每分钟请求数';
+      return 'số yêu cầu mỗi phút (RPM)';
     case 'daily':
-      return '每日请求';
+      return 'số yêu cầu mỗi ngày';
     case 'concurrency':
-      return '并发请求数';
+      return 'số yêu cầu đồng thời';
   }
 }
 
@@ -171,11 +171,11 @@ export function createAdminGuard(context: AppContext) {
   return async function adminGuard(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     const token = extractBearerToken(request);
     if (token === null) {
-      throw ApiError.unauthorized('缺少管理端会话令牌');
+      throw ApiError.unauthorized('Thiếu token phiên quản trị');
     }
     const session = context.adminSessions.verify(token);
     if (session === undefined) {
-      throw ApiError.unauthorized('管理端会话无效或已过期');
+      throw ApiError.unauthorized('Phiên quản trị không hợp lệ hoặc đã hết hạn');
     }
     request.adminSession = session;
   };
@@ -209,7 +209,7 @@ export class LoginThrottle {
     }
     if (entry.count >= this.#maxAttempts) {
       const seconds = Math.ceil((entry.resetAt - now) / 1000);
-      throw ApiError.rateLimited(`登录失败次数过多，请在 ${seconds} 秒后重试`);
+      throw ApiError.rateLimited(`Đăng nhập thất bại quá nhiều lần, vui lòng thử lại sau ${seconds} giây`);
     }
   }
 
