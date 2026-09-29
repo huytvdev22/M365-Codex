@@ -1,14 +1,14 @@
 name: CodeQL
 
-# 静态安全分析（对应实施计划 §20.3 发布安全门禁）。
-# 只扫本仓库自己的 TypeScript/JavaScript 源码；构建产物与依赖不在范围内。
+# Phân tích bảo mật tĩnh (tương ứng với hàng rào an toàn phát hành trong kế hoạch thực thi §20.3).
+# Chỉ quét mã nguồn TypeScript/JavaScript của kho lưu trữ; các sản phẩm xây dựng và thư viện phụ thuộc nằm ngoài phạm vi quét.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    # 每周一次定时扫描，捕捉新披露的规则命中
+    # Quét định kỳ mỗi tuần một lần để bắt các cảnh báo theo quy tắc mới được công bố
     - cron: '17 3 * * 1'
   workflow_dispatch:
 
@@ -21,22 +21,22 @@ concurrency:
 
 jobs:
   analyze:
-    name: 分析 TypeScript / JavaScript
+    name: Phân tích TypeScript / JavaScript
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
-      # Action 一律按 commit SHA 固定，防止 tag 被重新指向
+      # Action luôn được cố định theo commit SHA nhằm ngăn chặn tag bị trỏ lại
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: 初始化 CodeQL
+      - name: Khởi tạo CodeQL
         uses: github/codeql-action/init@3b0bd1d116c0bde30213346b22d4f634d96a2fb0 # v3
         with:
           languages: javascript-typescript
           queries: security-and-quality
 
-      - name: 执行分析
+      - name: Thực thi phân tích
         uses: github/codeql-action/analyze@3b0bd1d116c0bde30213346b22d4f634d96a2fb0 # v3
         with:
           category: /language:javascript-typescript

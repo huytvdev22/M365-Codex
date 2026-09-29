@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
 #
-# M365-Codex 运行镜像。
-# 单进程单容器：端口 8080，数据目录 /data，非 root 运行，支持 SIGTERM 优雅退出。
-# 镜像内不包含开发依赖、账号文件、.env 或任何 Token。
+# Image vận hành M365-Codex.
+# Tiến trình đơn, container đơn: Cổng 8080, thư mục dữ liệu /data, chạy dưới quyền non-root, hỗ trợ thoát nhẹ nhàng (graceful exit) với SIGTERM.
+# Trong image không chứa phụ thuộc phát triển, tệp tài khoản, .env hay bất kỳ Token nào.
 
-# ---------- 构建阶段 ----------
+# ---------- Giai đoạn xây dựng (Builder) ----------
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-# 先只复制清单，最大化利用层缓存
+# Chỉ sao chép các tệp manifest trước để tối đa hóa bộ nhớ cache của các layer
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
@@ -17,27 +17,27 @@ RUN npm ci
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/server apps/server
-# 只构建服务端：根 build 脚本还会构建前端，而此时 apps/web 还没 COPY 进来
+# Chỉ xây dựng server: script build ở root sẽ xây dựng cả frontend, trong khi tại bước này apps/web chưa được COPY vào
 RUN npm run build:server
 
-# 管理界面单独装依赖、单独构建。它不在根 workspace 里，用自己的 lockfile——
-# 前端依赖树（React/Vite）和服务端毫无交集，混进同一个 lockfile 只会让
-# 两边互相牵制。分开也让「只改前端」时的镜像层缓存不被服务端改动打断。
+# Giao diện quản trị cài đặt phụ thuộc riêng và xây dựng độc lập. Nó không nằm trong workspace gốc, dùng lockfile riêng —
+# Cây phụ thuộc frontend (React/Vite) hoàn toàn độc lập với server, gộp chung vào cùng một lockfile chỉ gây
+# ràng buộc lẫn nhau. Việc tách riêng giúp layer cache của image khi "chỉ sửa frontend" không bị gián đoạn bởi các thay đổi từ phía server.
 COPY apps/web/package.json apps/web/package-lock.json apps/web/
 RUN npm ci --prefix apps/web
 COPY apps/web apps/web
 RUN npm run build --prefix apps/web
 
-# 只保留生产依赖
+# Chỉ giữ lại các phụ thuộc production
 RUN npm prune --omit=dev
 
-# workspace 依赖不一定都能提升到根 node_modules：根目录被某个版本占位时
-# （例如 eslint 依赖的 ajv@6），真正要用的版本会装在 apps/server/node_modules 下。
-# 运行阶段必须把这一层也带上，否则容器起来就 ERR_MODULE_NOT_FOUND。
-# 先建空目录，保证下面的 COPY 在依赖全部提升时也不会失败。
+# Các phụ thuộc workspace không phải lúc nào cũng được nâng lên node_modules ở thư mục gốc: khi thư mục gốc bị chiếm bởi một phiên bản nào đó
+# (ví dụ ajv@6 phụ thuộc bởi eslint), phiên bản thực tế cần dùng sẽ nằm dưới apps/server/node_modules.
+# Giai đoạn runtime bắt buộc phải bao gồm cả tầng này, nếu không container khởi động sẽ gặp lỗi ERR_MODULE_NOT_FOUND.
+# Tạo sẵn thư mục trống trước để đảm bảo lệnh COPY bên dưới không bị lỗi khi toàn bộ phụ thuộc đều được đưa lên root.
 RUN mkdir -p apps/server/node_modules packages/shared/node_modules
 
-# ---------- 运行阶段 ----------
+# ---------- Giai đoạn vận hành (Runtime) ----------
 FROM node:24-alpine AS runtime
 WORKDIR /app
 
@@ -45,7 +45,7 @@ ENV NODE_ENV=production \
     PORT=8080 \
     DATA_DIR=/data
 
-# tini 负责转发信号并回收僵尸进程
+# tini chịu trách nhiệm chuyển tiếp tín hiệu và thu dọn các tiến trình zombie
 RUN apk add --no-cache tini
 
 COPY --from=builder /app/package.json ./package.json
@@ -56,13 +56,13 @@ COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_mod
 COPY --from=builder /app/apps/server/package.json ./apps/server/package.json
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
-# 管理界面只需要构建产物，不带前端的 node_modules
+# Giao diện quản trị chỉ cần sản phẩm xây dựng (dist), không bao gồm node_modules của frontend
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
-# 模型目录：运行时由 responses/models.ts 读取。漏拷这一份的后果是静默降级成
-# 只含一个模型的内置目录——线上曾因此只返回 1 个模型而配置里有 3 个。
+# Danh mục mô hình: được đọc tại runtime bởi responses/models.ts. Nếu bỏ quên bản sao chép này, hệ thống sẽ âm thầm giáng cấp
+# về danh mục tích hợp sẵn chỉ chứa 1 mô hình — môi trường thực tế từng chỉ trả về 1 mô hình trong khi cấu hình có 3 mô hình.
 COPY config ./config
 
-# node 镜像自带 uid/gid 1000 的 node 用户；数据目录需归它所有
+# Image node có sẵn user node với uid/gid 1000; thư mục dữ liệu cần được phân quyền cho user này sở hữu
 RUN mkdir -p /data && chown -R node:node /data /app
 USER node
 

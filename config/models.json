@@ -1,5 +1,5 @@
 {
-  "comment": "可更新的模型目录。model 原样透传给上游，容器不改写、不造别名。此列表仅用于 /v1/models 展示与 Codex 端选择。",
+  "comment": "Danh mục mô hình có thể cập nhật. Model được chuyển tiếp nguyên bản lên upstream, container không viết lại, không tạo alias. Danh sách này chỉ dùng để hiển thị tại /v1/models và lựa chọn từ phía Codex.",
   "object": "list",
   "data": [
     { "id": "gpt-5-codex", "object": "model", "owned_by": "m365-codex" },

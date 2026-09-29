@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# 最小权限：CI 只需要读代码
+# Quyền hạn tối thiểu: CI chỉ cần đọc mã nguồn
 permissions:
   contents: read
 
@@ -20,36 +20,36 @@ env:
 
 jobs:
   quality:
-    name: 类型检查 / Lint / 测试
+    name: Kiểm tra kiểu / Lint / Kiểm thử
     runs-on: ubuntu-latest
     steps:
-      # Action 一律按 commit SHA 固定，防止 tag 被重新指向
+      # Action luôn được cố định theo commit SHA nhằm ngăn chặn tag bị trỏ lại
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: 类型检查
+      - name: Kiểm tra kiểu
         run: npm run typecheck
       - name: Lint
         run: npm run lint
-      - name: 单元与集成测试
+      - name: Kiểm thử đơn vị và tích hợp
         run: npm test
 
-      # 管理界面不在根 workspace 里（前端依赖树和服务端毫无交集，分开各自的
-      # lockfile 更清爽），所以单独装依赖、单独跑检查
-      - name: 安装管理界面依赖
+      # Giao diện quản trị không nằm trong workspace gốc (cây phụ thuộc frontend hoàn toàn tách biệt với server,
+      # phân tách lockfile riêng giúp quản lý sạch sẽ hơn), do đó cần cài đặt phụ thuộc và chạy kiểm tra riêng biệt
+      - name: Cài đặt phụ thuộc giao diện quản trị
         run: npm ci --prefix apps/web
-      - name: 管理界面类型检查
+      - name: Kiểm tra kiểu giao diện quản trị
         run: npm run typecheck:web
-      - name: 管理界面测试
+      - name: Kiểm thử giao diện quản trị
         run: npm run test:web
-      - name: 管理界面构建
+      - name: Xây dựng giao diện quản trị
         run: npm run build --prefix apps/web
 
   security:
-    name: 依赖漏洞与凭据扫描
+    name: Quét lỗ hổng phụ thuộc và chứng chỉ rò rỉ
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -60,32 +60,32 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: 依赖漏洞扫描（high 及以上阻断）
+      - name: Quét lỗ hổng phụ thuộc (chặn mức high trở lên)
         run: npm audit --audit-level=high
-      - name: 凭据扫描
+      - name: Quét rò rỉ chứng chỉ xác thực
         run: |
           set -euo pipefail
-          echo "检查是否误提交 .env 或账号文件"
-          # 排除模式必须允许**任意层级**的 .env.example：只锚定仓库根的话，
-          # apps/web/.env.example 这类子包示例文件会被误判成疑似凭据文件。
+          echo "Kiểm tra xem có sơ suất commit tệp .env hoặc tệp tài khoản hay không"
+          # Mẫu loại trừ bắt buộc phải cho phép .env.example ở **mọi cấp thư mục**: nếu chỉ neo tại thư mục gốc của kho,
+          # các tệp ví dụ của gói con như apps/web/.env.example sẽ bị phán đoán nhầm là tệp thông tin xác thực.
           if git ls-files | grep -Ev '(^|/)\.env\.example$' | grep -E '(^|/)(\.env($|\.)|accounts?\.json|tokens?\.json|cookies\.txt)'; then
-            echo "::error::检测到疑似凭据文件被提交"
+            echo "::error::Phát hiện tệp nghi vấn chứa chứng chỉ xác thực được commit"
             exit 1
           fi
-          echo "检查代码中是否出现硬编码密钥形态"
+          echo "Kiểm tra xem mã nguồn có xuất hiện dạng khóa bảo mật bị hardcode hay không"
           if git grep -nIE '(sk-[0-9A-Za-z]{48,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.)' -- ':!*.md' ':!.github/workflows/*'; then
-            echo "::error::检测到疑似硬编码的 API Key 或 JWT"
+            echo "::error::Phát hiện API Key hoặc JWT nghi vấn bị hardcode"
             exit 1
           fi
-          echo "凭据扫描通过"
+          echo "Quét chứng chỉ xác thực vượt qua thành công"
 
   docker:
-    name: 镜像构建与健康检查
+    name: Xây dựng image và kiểm tra sức khỏe
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: 构建镜像
+      - name: Xây dựng image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
@@ -94,7 +94,7 @@ jobs:
           tags: m365-codex:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: 启动容器并验证 /healthz 与 /readyz
+      - name: Khởi động container và xác minh /healthz cùng /readyz
         run: |
           set -euo pipefail
           MASTER_KEY="$(openssl rand -base64 32)"
@@ -106,7 +106,7 @@ jobs:
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8080/healthz > /dev/null; then break; fi
             if [ "$i" -eq 30 ]; then
-              echo "::error::容器未在 30 秒内就绪"
+              echo "::error::Container không sẵn sàng trong vòng 30 giây"
               docker logs m365-codex-ci
               exit 1
             fi
@@ -116,27 +116,27 @@ jobs:
           echo "healthz: $(curl -fsS http://127.0.0.1:8080/healthz)"
           echo "readyz:  $(curl -fsS http://127.0.0.1:8080/readyz)"
 
-          # 模型目录必须真的进了镜像。读不到时代码会静默退回只含一个模型的内置目录，
-          # 线上曾因此只返回 1 个模型而 config/models.json 里有 3 个——用条数比对钉住。
-          echo "校验模型目录条数与 config/models.json 一致"
+          # Danh mục mô hình bắt buộc phải thực sự được sao chép vào image. Khi không đọc được, mã nguồn sẽ âm thầm lùi về danh mục tích hợp sẵn chỉ chứa 1 mô hình,
+          # trên môi trường thực tế từng chỉ trả về 1 mô hình trong khi config/models.json có 3 mô hình — so sánh số lượng để đảm bảo tính toàn vẹn.
+          echo "Xác minh số lượng danh mục mô hình khớp với config/models.json"
           EXPECTED=$(node -e "console.log(require('./config/models.json').data.length)")
           ACTUAL=$(docker exec m365-codex-ci node -e "console.log(require('/app/config/models.json').data.length)")
-          echo "  期望 $EXPECTED 条，镜像内 $ACTUAL 条"
+          echo "  Kỳ vọng $EXPECTED mục, trong image có $ACTUAL mục"
           test "$EXPECTED" = "$ACTUAL"
 
-          echo "校验管理界面构建产物已随镜像发布"
+          echo "Xác minh sản phẩm build giao diện quản trị đã được phát hành kèm image"
           curl -fsS http://127.0.0.1:8080/ui/ | grep -q 'id="root"'
 
-          echo "验证非 root 运行"
+          echo "Xác minh container chạy dưới quyền non-root"
           test "$(docker exec m365-codex-ci id -u)" != "0"
 
-          echo "验证 SIGTERM 优雅退出"
+          echo "Xác minh SIGTERM thoát êm đẹp (graceful shutdown)"
           docker stop --timeout 15 m365-codex-ci
           test "$(docker inspect -f '{{.State.ExitCode}}' m365-codex-ci)" = "0"
 
-      # 镜像漏洞扫描：只阻断 HIGH/CRITICAL，且只看有修复版本的（无补丁可打的
-      # 基础镜像漏洞卡住发布没有意义，那属于跟进基础镜像更新的事）
-      - name: 镜像漏洞扫描
+      # Quét lỗ hổng image: chỉ chặn mức HIGH/CRITICAL và chỉ tính các lỗi đã có bản vá sửa chữa (các lỗ hổng base image
+      # chưa có bản vá nếu chặn phát hành sẽ không có ý nghĩa, việc đó thuộc về quá trình cập nhật base image theo định kỳ)
+      - name: Quét lỗ hổng image
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
           image-ref: m365-codex:ci
@@ -145,18 +145,18 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
-      # 反向验证：护栏要求「无主密钥拒绝启动」，这里用真实容器确认。
-      # 与上面的冒烟合并在同一个任务里，复用已构建的镜像——单独开一个任务
-      # 会重复构建一次，既慢又多一次拉取远端的机会（曾因此偶发失败）。
-      - name: 未设置 M365_CODEX_MASTER_KEY 时应退出
+      # Xác minh đảo ngược: Hàng rào bảo vệ yêu cầu "từ chối khởi động nếu thiếu Master Key", ở đây dùng container thật để kiểm chứng.
+      # Gộp chung vào cùng một job với bài test smoke ở trên để tái sử dụng image đã build — nếu tách riêng job khác
+      # sẽ phải build lại một lần nữa, vừa chậm vừa tăng nguy cơ kéo gói từ xa thất bại ngẫu nhiên.
+      - name: Phải thoát khi chưa thiết lập M365_CODEX_MASTER_KEY
         run: |
           set -euo pipefail
           if docker run --rm -e M365_CODEX_ADMIN_PASSWORD='ci-only-throwaway-password' m365-codex:ci; then
-            echo "::error::缺少主密钥时容器竟然启动成功"
+            echo "::error::Container khởi động thành công dù thiếu Master Key"
             exit 1
           fi
-          echo "符合预期：缺少主密钥时拒绝启动"
+          echo "Đúng như kỳ vọng: từ chối khởi động khi thiếu Master Key"
 
-      - name: 清理
+      - name: Dọn dẹp
         if: always()
         run: docker rm -f m365-codex-ci || true

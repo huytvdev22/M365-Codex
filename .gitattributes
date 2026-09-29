@@ -1,13 +1,13 @@
-# 仓库内一律以 LF 存储，避免 Windows 开发机把 CRLF 带进容器与 CI 脚本
+# Toàn bộ kho lưu trữ luôn lưu trữ theo định dạng ký tự xuống dòng LF, tránh việc máy phát triển Windows đưa CRLF vào container và script CI
 * text=auto eol=lf
 
-# 明确指定：这些文件在容器/CI 中执行，CRLF 会直接导致失败
+# Chỉ định rõ ràng: các tệp này được thực thi trong container/CI, ký tự CRLF sẽ trực tiếp gây lỗi thực thi
 Dockerfile      text eol=lf
 *.sh            text eol=lf
 *.yml           text eol=lf
 *.yaml          text eol=lf
 
-# 二进制文件不做任何转换
+# Các tệp nhị phân không thực hiện bất kỳ chuyển đổi định dạng nào
 *.png           binary
 *.jpg           binary
 *.jpeg          binary

@@ -2,7 +2,7 @@
   "name": "m365-codex",
   "version": "0.9.1",
   "private": true,
-  "description": "让 Codex 通过自定义 base_url + sk- 密钥使用 Microsoft 365 Copilot 上游的本地兼容网关（非官方项目）",
+  "description": "Cổng tương thích cục bộ cho phép Codex sử dụng upstream Microsoft 365 Copilot thông qua base_url tùy chỉnh + khóa sk- (dự án không chính thức)",
   "license": "MIT",
   "type": "module",
   "engines": {

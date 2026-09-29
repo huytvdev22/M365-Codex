@@ -1,11 +1,11 @@
-# 依赖与构建产物
+# Thư viện phụ thuộc và sản phẩm xây dựng (build)
 node_modules/
 dist/
 build/
 coverage/
 *.tsbuildinfo
 
-# 环境变量与本地密钥（只允许提交 .env.example）
+# Biến môi trường và khóa bảo mật cục bộ (chỉ cho phép commit .env.example)
 .env
 .env.*
 !.env.example
@@ -14,7 +14,7 @@ coverage/
 *.p12
 *.pfx
 
-# 运行时数据（SQLite / 上传文件 / 诊断包）
+# Dữ liệu runtime (SQLite / Tệp tải lên / Gói chẩn đoán)
 data/
 /data
 *.sqlite
@@ -22,33 +22,33 @@ data/
 *.sqlite-shm
 *.db
 
-# 账号与凭据文件（严禁入库）
-# 注意：目录规则必须用 / 锚定到仓库根，否则会误伤 apps/server/src/accounts/ 这类源码目录
+# Tệp tài khoản và chứng chỉ xác thực (nghiêm cấm commit vào kho)
+# Lưu ý: quy tắc thư mục bắt buộc dùng / neo vào thư mục gốc kho, tránh ảnh hưởng nhầm các thư mục mã nguồn như apps/server/src/accounts/
 accounts.json
 tokens.json
 cookies.txt
 /accounts/
 /tokens/
 
-# 探针输出（可能含未脱敏样本）
+# Kết quả đầu ra của probe (có thể chứa mẫu dữ liệu chưa khử nhạy cảm)
 probe/out/
 probe/samples/
 
-# 日志与临时文件
+# Nhật ký và tệp tạm
 *.log
 logs/
 tmp/
 .cache/
 
-# 编辑器与系统
+# Trình soạn thảo và hệ điều hành
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-# 内部/编码 agent 文档：只在本地保留，不在 GitHub 公开展示
-M365-Codex-实施执行计划.md
+# Tài liệu nội bộ / tài liệu cho coding agent: chỉ lưu giữ cục bộ, không hiển thị công khai trên GitHub
+M365-Codex-ke-hoach-thuc-thi.md
 AGENTS.md
 CLAUDE.md
-docs/里程碑进度.md
-docs/管理端API契约.md
+docs/tien-do-milestone.md
+docs/hop-dong-api-quan-tri.md

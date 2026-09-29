@@ -1,19 +1,19 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "M365-Codex 对外 API",
+    "title": "API công khai M365-Codex",
     "version": "0.4.0",
-    "description": "与 OpenAI Responses / Chat Completions / Files / Uploads 兼容的本地网关接口。非官方项目。"
+    "description": "Giao diện cổng cục bộ tương thích với OpenAI Responses / Chat Completions / Files / Uploads. Dự án không chính thức."
   },
   "servers": [{ "url": "/" }],
   "security": [{ "ApiKeyAuth": [] }, { "BearerAuth": [] }],
   "paths": {
     "/v1/models": {
       "get": {
-        "summary": "列出可用模型",
+        "summary": "Liệt kê các mô hình khả dụng",
         "responses": {
           "200": {
-            "description": "模型列表",
+            "description": "Danh sách mô hình",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ModelList" } }
             }
@@ -24,7 +24,7 @@
     },
     "/v1/responses": {
       "post": {
-        "summary": "创建一次 Response（非流式或 SSE 流式）",
+        "summary": "Tạo một Response (non-stream hoặc SSE stream)",
         "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": {
           "required": true,
@@ -34,7 +34,7 @@
         },
         "responses": {
           "200": {
-            "description": "非流式返回 Response 对象（含 Idempotency-Key 回放）；stream=true 时为 text/event-stream（不回放，仅挡并发同键）",
+            "description": "Trả về đối tượng Response ở dạng non-stream (bao gồm phát lại Idempotency-Key); khi stream=true là text/event-stream (không phát lại, chỉ chặn trùng khóa đồng thời)",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Response" } },
               "text/event-stream": { "schema": { "type": "string" } }
@@ -50,13 +50,13 @@
     },
     "/v1/responses/{id}": {
       "get": {
-        "summary": "取回一次 Response",
+        "summary": "Lấy lại một Response",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "Response 对象",
+            "description": "Đối tượng Response",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Response" } }
             }
@@ -65,21 +65,21 @@
         }
       },
       "delete": {
-        "summary": "删除/取消一次 Response",
+        "summary": "Xóa/hủy một Response",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
-        "responses": { "200": { "description": "已删除" }, "404": { "$ref": "#/components/responses/Error" } }
+        "responses": { "200": { "description": "Đã xóa" }, "404": { "$ref": "#/components/responses/Error" } }
       }
     },
     "/v1/responses/{id}/cancel": {
       "post": {
-        "summary": "取消进行中的 Response",
+        "summary": "Hủy Response đang thực hiện",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
-          "200": { "description": "取消中" },
+          "200": { "description": "Đang hủy" },
           "400": { "$ref": "#/components/responses/Error" },
           "404": { "$ref": "#/components/responses/Error" }
         }
@@ -87,7 +87,7 @@
     },
     "/v1/chat/completions": {
       "post": {
-        "summary": "Chat Completions 兼容入口（复用 Responses 内核，不建第二套推理逻辑）",
+        "summary": "Cổng tương thích Chat Completions (tái sử dụng nhân Responses, không dựng logic suy luận thứ hai)",
         "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
         "requestBody": {
           "required": true,
@@ -97,7 +97,7 @@
         },
         "responses": {
           "200": {
-            "description": "非流式返回 chat.completion（含 Idempotency-Key 回放）；stream=true 时为 text/event-stream 的 chat.completion.chunk（不回放，仅挡并发同键）",
+            "description": "Trả về chat.completion ở dạng non-stream (bao gồm phát lại Idempotency-Key); khi stream=true là chat.completion.chunk dạng text/event-stream (không phát lại, chỉ chặn trùng khóa đồng thời)",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/ChatCompletionResponse" } },
               "text/event-stream": { "schema": { "type": "string" } }
@@ -113,7 +113,7 @@
     },
     "/v1/files": {
       "post": {
-        "summary": "上传文件",
+        "summary": "Tải lên tệp",
         "requestBody": {
           "required": true,
           "content": {
@@ -131,7 +131,7 @@
         },
         "responses": {
           "201": {
-            "description": "已创建的 File 对象",
+            "description": "Đối tượng File đã tạo",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileObject" } } }
           },
           "400": { "$ref": "#/components/responses/Error" },
@@ -139,13 +139,13 @@
         }
       },
       "get": {
-        "summary": "列出当前 API Key 名下的文件",
+        "summary": "Liệt kê các tệp thuộc API Key hiện tại",
         "parameters": [
           { "name": "purpose", "in": "query", "required": false, "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "文件列表",
+            "description": "Danh sách tệp",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileList" } } }
           }
         }
@@ -153,38 +153,38 @@
     },
     "/v1/files/{id}": {
       "get": {
-        "summary": "取回单个文件的元数据",
+        "summary": "Lấy siêu dữ liệu của một tệp",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "File 对象",
+            "description": "Đối tượng File",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileObject" } } }
           },
           "404": { "$ref": "#/components/responses/Error" }
         }
       },
       "delete": {
-        "summary": "删除文件",
+        "summary": "Xóa tệp",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
-          "200": { "description": "已删除" },
+          "200": { "description": "Đã xóa" },
           "404": { "$ref": "#/components/responses/Error" }
         }
       }
     },
     "/v1/files/{id}/content": {
       "get": {
-        "summary": "下载文件原始内容",
+        "summary": "Tải về nội dung gốc của tệp",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "原始文件字节",
+            "description": "Dữ liệu byte gốc của tệp",
             "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
           },
           "404": { "$ref": "#/components/responses/Error" }
@@ -193,7 +193,7 @@
     },
     "/v1/uploads": {
       "post": {
-        "summary": "创建一次分片上传",
+        "summary": "Tạo một phiên tải lên theo phân đoạn",
         "requestBody": {
           "required": true,
           "content": {
@@ -213,7 +213,7 @@
         },
         "responses": {
           "201": {
-            "description": "已创建的 Upload 对象",
+            "description": "Đối tượng Upload đã tạo",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadObject" } } }
           },
           "400": { "$ref": "#/components/responses/Error" },
@@ -223,7 +223,7 @@
     },
     "/v1/uploads/{id}/parts": {
       "post": {
-        "summary": "上传一个分片",
+        "summary": "Tải lên một phân đoạn",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
@@ -241,7 +241,7 @@
         },
         "responses": {
           "201": {
-            "description": "已创建的 Upload.Part 对象",
+            "description": "Đối tượng Upload.Part đã tạo",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadPartObject" } } }
           },
           "400": { "$ref": "#/components/responses/Error" },
@@ -252,7 +252,7 @@
     },
     "/v1/uploads/{id}/complete": {
       "post": {
-        "summary": "完成分片上传，拼装为 File",
+        "summary": "Hoàn tất tải lên theo phân đoạn, ghép thành File",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
@@ -270,7 +270,7 @@
         },
         "responses": {
           "200": {
-            "description": "已完成的 Upload 对象（含 file 字段）",
+            "description": "Đối tượng Upload đã hoàn tất (chứa trường file)",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadObject" } } }
           },
           "400": { "$ref": "#/components/responses/Error" },
@@ -280,13 +280,13 @@
     },
     "/v1/uploads/{id}/cancel": {
       "post": {
-        "summary": "取消一次未完成的分片上传",
+        "summary": "Hủy một phiên tải lên phân đoạn chưa hoàn tất",
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
         "responses": {
           "200": {
-            "description": "已取消的 Upload 对象",
+            "description": "Đối tượng Upload đã hủy",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadObject" } } }
           },
           "404": { "$ref": "#/components/responses/Error" }
@@ -301,7 +301,7 @@
     },
     "responses": {
       "Error": {
-        "description": "统一错误体",
+        "description": "Cấu trúc phản hồi lỗi thống nhất",
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/ErrorBody" } }
         }
@@ -313,7 +313,7 @@
         "in": "header",
         "required": false,
         "schema": { "type": "string" },
-        "description": "同一 API Key + 端点 + 该键返回同一创建结果（§18）。stream=true 时不回放（SSE 无法重放），但仍会挡住并发同键请求（返回 409）。同一把键配不同请求体返回 409。"
+        "description": "Cùng API Key + endpoint + khóa này trả về cùng kết quả tạo (§18). Khi stream=true không phát lại (SSE không thể phát lại), nhưng vẫn chặn yêu cầu trùng khóa đồng thời (trả về 409). Cùng một khóa nhưng kèm body yêu cầu khác nhau sẽ trả về 409."
       }
     },
     "schemas": {

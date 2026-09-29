@@ -1,12 +1,12 @@
 version: 2
 
-# 依赖与 Action 的自动更新（对应实施计划 §20.3）。
+# Tự động cập nhật các thư viện phụ thuộc và GitHub Actions (tương ứng với kế hoạch thực thi §20.3).
 #
-# 三个 npm 生态各自独立：根 workspace（服务端 + 共享包）、管理界面、探针。
-# 它们用各自的 lockfile，混在一起更新只会互相牵制。
+# Ba hệ sinh thái npm độc lập với nhau: workspace gốc (server + shared package), giao diện quản trị (apps/web), và probe.
+# Chúng sử dụng các lockfile riêng biệt, việc gộp chung để cập nhật sẽ gây xung đột và ràng buộc lẫn nhau.
 #
-# 合并策略：分组提 PR，避免一次十几个单独 PR 淹掉列表；安全更新不分组，
-# 让它单独出来更显眼。
+# Chiến lược gộp PR: Phân nhóm tạo PR để tránh việc hàng chục PR đơn lẻ làm tràn danh sách; các bản cập nhật bảo mật không phân nhóm
+# để chúng xuất hiện riêng biệt, rõ ràng hơn.
 updates:
   - package-ecosystem: npm
     directory: /
@@ -14,9 +14,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      生产依赖:
+      phụ-thuộc-production:
         dependency-type: production
-      开发依赖:
+      phụ-thuộc-phát-triển:
         dependency-type: development
 
   - package-ecosystem: npm
@@ -25,7 +25,7 @@ updates:
       interval: weekly
     open-pull-requests-limit: 3
     groups:
-      管理界面依赖:
+      phụ-thuộc-giao-diện-quản-trị:
         patterns: ['*']
 
   - package-ecosystem: npm
@@ -34,15 +34,15 @@ updates:
       interval: monthly
     open-pull-requests-limit: 2
     groups:
-      探针依赖:
+      phụ-thuộc-probe:
         patterns: ['*']
 
-  # Action 一律按 commit SHA 固定，Dependabot 会连注释里的版本号一起更新
+  # Các Action luôn được ghim theo commit SHA, Dependabot sẽ cập nhật cả số phiên bản trong phần chú thích
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
     groups:
-      工作流依赖:
+      phụ-thuộc-workflow:
         patterns: ['*']

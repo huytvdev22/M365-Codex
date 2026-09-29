@@ -1,14 +1,14 @@
-name: 发布镜像
+name: Phát hành image
 
-# 推送到 Docker Hub。镜像仓库与凭据来自仓库配置：
+# Đẩy lên Docker Hub. Repository image và chứng chỉ lấy từ cấu hình kho:
 #   secrets.DOCKERHUB_USERNAME / secrets.DOCKERHUB_TOKEN
-#   vars.DOCKERHUB_REPOSITORY（如 m365-codex）
-# 镜像名为 <DOCKERHUB_USERNAME>/<DOCKERHUB_REPOSITORY>。
+#   vars.DOCKERHUB_REPOSITORY (ví dụ: m365-codex)
+# Tên image: <DOCKERHUB_USERNAME>/<DOCKERHUB_REPOSITORY>.
 #
-# 标签策略：
-#   push 到 main   → main、sha-<短哈希>
-#   打 v* 版本 tag → 完整版本号、主次版本号（如 v0.4.0 → 0.4.0、0.4）
-#   正式 Release   → latest（仅此一种情况会移动 latest）
+# Chiến lược gắn thẻ (tag):
+#   push lên main      → main, sha-<mã băm ngắn>
+#   tạo tag v*         → phiên bản đầy đủ, phiên bản chính.phụ (ví dụ v0.4.0 → 0.4.0, 0.4)
+#   Release chính thức → latest (chỉ trường hợp này mới cập nhật thẻ latest)
 on:
   push:
     branches: [main]
@@ -19,7 +19,7 @@ on:
 
 permissions:
   contents: read
-  # cosign 无密钥签名要用 OIDC 令牌换取短期证书
+  # Chữ ký không dùng khóa của cosign dùng token OIDC để đổi chứng chỉ ngắn hạn
   id-token: write
 
 concurrency:
@@ -27,11 +27,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # 发布门禁。计划要求「高危漏洞、凭据扫描失败、测试失败都必须阻止发布」，
-  # 但 ci.yml 只在 push 到 main 与 PR 时触发——**打版本标签这条路径根本不会跑 CI**。
-  # 所以这里在发布链路上把同样的检查再跑一遍，并让 publish 依赖它。
+  # Hàng rào kiểm soát phát hành. Kế hoạch yêu cầu "lỗ hổng mức độ cao, quét chứng chỉ thất bại, test thất bại đều phải chặn phát hành",
+  # nhưng ci.yml chỉ kích hoạt khi push vào main và tạo PR — **nhánh tạo tag phiên bản hoàn toàn không chạy CI**.
+  # Vì vậy tại đây trên quy trình phát hành cần chạy lại các bước kiểm tra tương tự và yêu cầu publish phải phụ thuộc vào bước này.
   gate:
-    name: 发布前门禁（类型 / Lint / 测试 / 漏洞 / 凭据）
+    name: Hàng rào kiểm soát trước phát hành (Kiểu / Lint / Test / Lỗ hổng / Chứng chỉ)
     runs-on: ubuntu-latest
     if: ${{ vars.DOCKERHUB_REPOSITORY != '' }}
     steps:
@@ -47,32 +47,32 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm audit --audit-level=high
-      - name: 管理界面检查
+      - name: Kiểm tra giao diện quản trị
         run: |
           npm ci --prefix apps/web
           npm run typecheck:web
           npm run test:web
           npm run build --prefix apps/web
-      - name: 凭据扫描
+      - name: Quét rò rỉ chứng chỉ xác thực
         run: |
           set -euo pipefail
           if git ls-files | grep -Ev '(^|/)\.env\.example$' | grep -E '(^|/)(\.env($|\.)|accounts?\.json|tokens?\.json|cookies\.txt)'; then
-            echo "::error::检测到疑似凭据文件"
+            echo "::error::Phát hiện tệp nghi vấn chứa chứng chỉ xác thực"
             exit 1
           fi
           if git grep -nIE '(sk-[0-9A-Za-z]{48,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.)' -- ':!*.md' ':!.github/workflows/*'; then
-            echo "::error::检测到疑似硬编码密钥"
+            echo "::error::Phát hiện khóa bảo mật nghi vấn bị hardcode"
             exit 1
           fi
-          echo "凭据扫描通过"
+          echo "Quét chứng chỉ xác thực vượt qua thành công"
 
   publish:
-    name: 构建并推送多架构镜像到 Docker Hub
+    name: Xây dựng và đẩy image đa kiến trúc lên Docker Hub
     runs-on: ubuntu-latest
-    # 未配置 Docker Hub 仓库变量时跳过（例如 fork），避免无谓失败
+    # Bỏ qua khi chưa cấu hình biến kho lưu trữ Docker Hub (ví dụ: bản fork), tránh thất bại không cần thiết
     if: ${{ vars.DOCKERHUB_REPOSITORY != '' }}
     needs: gate
-    # 发布环境：可在仓库设置里给它挂必需审批人（计划 §20.3）
+    # Môi trường phát hành: có thể gán người phê duyệt bắt buộc trong cài đặt kho lưu trữ (kế hoạch §20.3)
     environment: release
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -80,18 +80,18 @@ jobs:
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: 登录 Docker Hub
+      - name: Đăng nhập Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 计算镜像标签
+      - name: Tính toán thẻ (tag) image
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
-          # 关掉默认的 latest=auto，改由下面显式控制
+          # Tắt tùy chọn mặc định latest=auto, chuyển sang kiểm soát tường minh bên dưới
           flavor: |
             latest=false
           tags: |
@@ -100,14 +100,14 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            # latest **只**跟正式 Release。之前把裸 v* 标签也算进来，等于误打一个
-            # 标签就会悄悄覆盖 latest，与本文件开头声明的规则自相矛盾。
+            # latest **CHỈ** gắn với Release chính thức. Trước đây tính cả tag v* dạng thô, dẫn đến việc tạo nhầm một
+            # tag sẽ âm thầm ghi đè latest, mâu thuẫn với quy tắc đã nêu ở đầu tệp này.
             type=raw,value=latest,enable=${{ github.event_name == 'release' }}
 
-      - name: 安装 cosign
+      - name: Cài đặt cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: 构建并推送
+      - name: Xây dựng và đẩy image
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
@@ -121,19 +121,19 @@ jobs:
           provenance: true
           sbom: true
 
-      # 无密钥签名：证书由 Sigstore 依据 GitHub OIDC 身份签发，不需要在仓库里存私钥。
-      # 验证方式（写进 README）：
-      #   cosign verify docker.io/<用户名>/m365-codex:<标签> \
+      # Ký xác thực không cần khóa (Keyless signing): Chứng chỉ được Sigstore cấp dựa trên định danh GitHub OIDC, không cần lưu private key trong kho.
+      # Cách xác minh (ghi trong README):
+      #   cosign verify docker.io/<username>/m365-codex:<tag> \
       #     --certificate-identity-regexp '^https://github.com/.+/M365-Codex/.github/workflows/release.yml@.+' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
-      - name: 用 cosign 签名镜像
+      - name: Ký image bằng cosign
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
 
-      - name: 输出已推送的标签
+      - name: Xuất danh sách thẻ đã đẩy
         run: |
-          echo "已推送以下镜像标签到 Docker Hub："
+          echo "Đã đẩy các thẻ image sau lên Docker Hub:"
           echo "${{ steps.meta.outputs.tags }}"
-          echo "镜像摘要：${{ steps.build.outputs.digest }}（已用 cosign 无密钥签名）"
+          echo "Mã băm image (digest): ${{ steps.build.outputs.digest }} (đã ký không cần khóa bằng cosign)"

@@ -1,17 +1,17 @@
-# M365-Codex 本地/自托管部署示例
+# Mẫu triển khai cục bộ / tự lưu trữ (self-hosted) cho M365-Codex
 #
-# 使用方式：
-#   1. 在仓库根目录复制 .env.example 为 .env 并填写必填项
-#   2. docker compose -f docker/docker-compose.yml up -d
+# Hướng dẫn sử dụng:
+#   1. Tại thư mục gốc của kho lưu trữ, sao chép .env.example thành .env và điền các trường bắt buộc
+#   2. Chạy: docker compose -f docker/docker-compose.yml up -d
 #
-# 注意：.env 中包含主密钥与管理密码，切勿提交到任何仓库。
+# Lưu ý: .env chứa khóa chính (Master Key) và mật khẩu quản trị, tuyệt đối không commit lên bất kỳ kho lưu trữ nào.
 
 services:
   m365-codex:
-    # 镜像发布在 Docker Hub。可用 M365_CODEX_IMAGE 覆盖具体版本，例如
+    # Image được phát hành trên Docker Hub. Có thể dùng M365_CODEX_IMAGE để ghi đè phiên bản cụ thể, ví dụ:
     # M365_CODEX_IMAGE=foch0x97/m365-codex:0.9.1
     image: ${M365_CODEX_IMAGE:-foch0x97/m365-codex:latest}
-    # 若要本地构建镜像，取消下面注释：
+    # Nếu muốn tự xây dựng image cục bộ, hãy bỏ chú thích các dòng bên dưới:
     # build:
     #   context: ..
     #   dockerfile: Dockerfile

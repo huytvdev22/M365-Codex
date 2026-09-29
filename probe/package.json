@@ -2,7 +2,7 @@
   "name": "@m365-codex/probe",
   "version": "0.1.0",
   "private": true,
-  "description": "M0 上游能力探针：用真实 M365 Copilot 账号跑一遍固定用例，产出脱敏能力报告，用于校准 codecV1.ts 与相关配置。独立子包，不进根 workspace，不进生产镜像。",
+  "description": "Probe năng lực upstream M0: chạy bộ test case cố định bằng tài khoản M365 Copilot thật, xuất báo cáo năng lực đã khử nhạy cảm, dùng để hiệu chuẩn codecV1.ts và các cấu hình liên quan. Gói con độc lập, không nằm trong workspace gốc, không đưa vào image production.",
   "type": "module",
   "engines": {
     "node": ">=22"
