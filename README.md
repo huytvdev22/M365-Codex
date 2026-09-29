@@ -1,301 +1,282 @@
 # M365-Codex
 
-> 用「自定义 `base_url` + `sk-` 密钥」登录 Codex，把 Microsoft 365 Copilot 当作上游，获得接近官方 OpenAI 账号登录的本地编码体验。
+> Sử dụng "tùy chỉnh `base_url` + khóa bí mật `sk-`" để đăng nhập vào Codex, coi Microsoft 365 Copilot là dịch vụ thượng nguồn (upstream), mang lại trải nghiệm lập trình cục bộ gần tương đương với việc đăng nhập tài khoản OpenAI chính thức.
 
 [![CI](https://github.com/Foch0x97/M365-Codex/actions/workflows/ci.yml/badge.svg)](https://github.com/Foch0x97/M365-Codex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**当前版本：`v0.9.1`**
+**Phiên bản hiện tại: `v0.9.1`**
 
-功能已全部实现并通过自动化测试与端到端验收。上游协议已用真实账号校准过：
-WebSocket 握手、请求体格式、响应帧解析都以实际流量为准（见 `adapter/codecV1.ts`）。
+Toàn bộ tính năng đã được hiện thực và vượt qua các bài kiểm thử tự động cũng như nghiệm thu đầu-cuối (end-to-end). Giao thức upstream đã được hiệu chuẩn bằng tài khoản thật:
+Bắt tay WebSocket, định dạng thân yêu cầu, phân tích gói tin phản hồi đều dựa trên lưu lượng thực tế (xem `adapter/codecV1.ts`).
 
-**距离 `v1.0.0` 还差一次"真正生成成功"的验证**——校准所用的账号没有 Copilot 许可，
-上游在协议完全正确之后于业务层拒绝（`InvalidCopilotLicense`），因此流式增量的真实形态、
-工具调用字段、图片输入位置、用量与引用这几项**仍未经真实内容验证**。
-详见 [部署与验收指南](docs/部署与验收.md)。
-
----
-
-## ⚠️ 合规与风险声明（使用前必读）
-
-- 本项目是**个人非官方项目**，与 Microsoft、OpenAI 均无任何关联，也未获得任何一方授权或背书。
-- 本项目访问 Microsoft 365 Copilot 的方式基于**逆向得到的 Sydney / BizChat WebSocket 协议**。Microsoft 没有面向第三方模型代理提供官方 HTTP 补全接口。
-- 这种访问方式**很可能违反 Microsoft 服务条款**（其条款明确禁止逆向工程、抓取、以及规避技术限制）。使用本项目可能导致：
-  - Microsoft 账号被限制、暂停或封禁；
-  - 所在租户被管理员或 Microsoft 侧介入处理；
-  - 上游协议随时变更或被切断，功能**可能在任何时刻失效**。
-- **上游端点会漂移**（已观察到 `substrate.office.com` 与 `substrate.svc.cloud.microsoft` 两种形态），因此本项目把上游地址、路径、scope 全部做成配置项。
-- 使用者需自行承担全部风险与后果。**请勿用于生产环境、商业用途，或任何你不愿意失去的账号。**
-- 若你需要稳定、受支持、合规的服务，请使用 OpenAI 官方账号或 Microsoft 官方提供的 API。
-
-作者不对因使用本项目造成的任何账号损失、数据损失或其他后果负责。
+**Để đạt tới `v1.0.0` chỉ còn thiếu một lần kiểm chứng "tạo nội dung thành công trên thực tế"** — tài khoản dùng để hiệu chuẩn trước đây không có giấy phép (license) Copilot hợp lệ,
+nên sau khi giao thức hoàn toàn chuẩn xác, phía dịch vụ upstream đã từ chối ở tầng nghiệp vụ (`InvalidCopilotLicense`). Do đó, hình thái thực tế của dữ liệu luồng (stream chunk),
+trường gọi công cụ (tool call), vị trí nhập ảnh, đo lường usage và trích dẫn tham chiếu **vẫn chưa qua kiểm chứng bằng nội dung thật**.
+Chi tiết xem [Hướng dẫn triển khai và nghiệm thu](docs/部署与验收.md).
 
 ---
 
-## 这个项目是什么
+## ⚠️ Tuyên bố Tuân thủ & Rủi ro (Bắt buộc đọc trước khi dùng)
 
-Codex 支持通过 `config.toml` 指定自定义的模型提供方（`base_url` + API Key）。M365-Codex 就是这样一个**本地网关**：
+- Dự án này là **dự án cá nhân phi chính thức**, hoàn toàn không liên kết, không được ủy quyền hay chứng thực bởi Microsoft hoặc OpenAI.
+- Phương thức truy cập Microsoft 365 Copilot của dự án này dựa trên **kỹ thuật đảo ngược (reverse engineering) giao thức WebSocket Sydney / BizChat**. Microsoft không cung cấp giao diện HTTP hoàn thành (completion) chính thức cho các proxy mô hình bên thứ ba.
+- Cách truy cập này **rất có thể vi phạm Điều khoản dịch vụ của Microsoft** (các điều khoản nêu rõ nghiêm cấm kỹ thuật đảo ngược, thu thập dữ liệu và vượt qua các rào cản kỹ thuật). Việc sử dụng dự án này có thể dẫn đến:
+  - Tài khoản Microsoft bị hạn chế, tạm ngưng hoặc khóa vĩnh viễn;
+  - Tenant (tổ chức) liên quan bị can thiệp xử lý bởi quản trị viên hoặc Microsoft;
+  - Giao thức thượng nguồn có thể thay đổi hoặc bị cắt bất cứ lúc nào, tính năng **có thể ngừng hoạt động bất kỳ lúc nào**.
+- **Endpoint upstream có thể thay đổi/trôi dạt** (đã quan sát thấy cả 2 dạng `substrate.office.com` và `substrate.svc.cloud.microsoft`), do đó dự án này đã cấu hình hóa toàn bộ địa chỉ, đường dẫn và phạm vi (scope) upstream.
+- Người dùng phải tự chịu toàn bộ rủi ro và hậu quả. **Tuyệt đối không dùng cho môi trường sản xuất (production), mục đích thương mại, hoặc bất kỳ tài khoản nào bạn không muốn bị mất.**
+- Nếu bạn cần một dịch vụ ổn định, có hỗ trợ và tuân thủ pháp lý, vui lòng sử dụng tài khoản chính thức của OpenAI hoặc API chính thức do Microsoft cung cấp.
 
+Tác giả không chịu trách nhiệm cho bất kỳ tổn thất tài khoản, mất mát dữ liệu hoặc hậu quả nào phát sinh từ việc sử dụng dự án này.
+
+---
+
+## Dự án này là gì?
+
+Codex hỗ trợ chỉ định nhà cung cấp mô hình tùy chỉnh thông qua tệp `config.toml` (`base_url` + API Key). M365-Codex chính là một **cổng cục bộ (Local Gateway)** như vậy:
+
+```text
+Codex CLI ──HTTP (Giao thức Responses)──> M365-Codex ──WebSocket (Sydney)──> Microsoft 365 Copilot
+              Khóa bí mật sk-                 Container cục bộ                Tài khoản M365 của bạn
 ```
-Codex CLI ──HTTP(Responses 协议)──> M365-Codex ──WebSocket(Sydney)──> Microsoft 365 Copilot
-              sk- 密钥                  本地容器                        你自己的 M365 账号
-```
 
-它对外暴露与 OpenAI Responses API 兼容的接口，对内维护 Microsoft 账号池、OAuth Token、以及有状态的上游 WebSocket 会话。
+Dự án mở ra giao diện tương thích với OpenAI Responses API ra bên ngoài, đồng thời bên trong duy trì nhóm tài khoản Microsoft, OAuth Token và các phiên WebSocket có trạng thái kết nối với upstream.
 
-### 能做什么
+### Những việc có thể làm
 
-- 用自定义 Base URL + `sk-` 密钥登录 Codex，省去官方账号与绑卡；
-- 文本与代码生成、SSE 流式输出、多轮上下文；
-- `model` 与 `reasoning.effort` **原样透传**（本项目不新造模型别名，也不改写取值）；
-- 完整的工具调用代理循环：模型请求调用工具 → 本机执行 → 结果回传 → 继续推理；
-- Codex 的本机能力照常可用：读写文件、`apply_patch`、执行命令、Git、跑测试、命令行本地代码审查、本地/自建 MCP、`AGENTS.md`；
-- 文件上传与文本提取：纯文本/代码/JSON/CSV/日志、PDF、Office（docx/xlsx/pptx），供 `input_file` 引用；`/v1/files`、`/v1/uploads` 分片上传；
-- `/v1/chat/completions` 兼容入口（复用 Responses 内核，供其他 OpenAI 兼容客户端使用，非 Codex 自身）；
-- 多 API Key 管理（有效期、限额、可撤销）、自定义公开地址、管理界面。
+- Đăng nhập Codex bằng Base URL tùy chỉnh + khóa bí mật `sk-`, không cần tài khoản chính thức hay thẻ thanh toán quốc tế;
+- Sinh văn bản và mã nguồn, truyền luồng SSE, giữ ngữ cảnh nhiều lượt (multi-turn);
+- **Chuyển tiếp nguyên trạng** `model` và `reasoning.effort` (dự án này không tự tạo bí danh model mới, cũng không sửa đổi giá trị);
+- Vòng lặp ủy quyền gọi công cụ (tool call proxy loop) hoàn chỉnh: Mô hình yêu cầu gọi công cụ → Thực thi trên máy cục bộ → Gửi kết quả ngược lại → Tiếp tục suy luận;
+- Các năng lực cục bộ của Codex vẫn hoạt động bình thường: Đọc ghi file, `apply_patch`, thực thi lệnh, Git, chạy kiểm thử, đánh giá mã nguồn cục bộ qua CLI, MCP cục bộ/tự dựng, `AGENTS.md`;
+- Tải lên tệp và trích xuất văn bản: Văn bản thuần/mã nguồn/JSON/CSV/logs, PDF, Office (docx/xlsx/pptx) để phục vụ tham chiếu `input_file`; hỗ trợ tải lên phân đoạn qua `/v1/files`, `/v1/uploads`;
+- Cổng tương thích `/v1/chat/completions` (tái sử dụng nhân Responses, phục vụ cho các client tương thích OpenAI khác, không phải bản thân Codex);
+- Quản lý nhiều API Key (hạn dùng, hạn mức, thu hồi), địa chỉ công khai tùy chỉnh, giao diện quản trị trực quan.
 
-### 不能做什么（依赖 OpenAI 后端，本项目不会伪装实现）
+### Những việc không thể làm (Phụ thuộc backend OpenAI, dự án này không giả lập)
 
-Codex Cloud 云端任务、云端代码审查与云端 GitHub 集成、OpenAI 托管内置工具（`web_search` / `file_search` / `code_interpreter` / `computer_use` / `image_generation`）、ChatGPT 工作区 RBAC 与企业保留策略、依赖 OpenAI 的插件与 MCP、Embeddings / Realtime / Batch / Fine-tuning、官方用量计费面板。
+Các tác vụ Codex Cloud trên đám mây, đánh giá mã và tích hợp GitHub trên cloud, các công cụ tích hợp sẵn do OpenAI quản lý (`web_search` / `file_search` / `code_interpreter` / `computer_use` / `image_generation`), RBAC không gian làm việc ChatGPT và chính sách lưu trữ doanh nghiệp, plugin và MCP phụ thuộc OpenAI, Embeddings / Realtime / Batch / Fine-tuning, bảng điều khiển thanh toán mức sử dụng chính thức.
 
-此外，本项目**无法保证**你请求的 `model` 会被上游真实使用——上游实际使用哪个模型由 Microsoft 决定，本项目只做记录与如实上报。
+Ngoài ra, dự án này **không thể đảm bảo** rằng `model` bạn yêu cầu sẽ được upstream thực sự sử dụng — việc upstream thực tế sử dụng mô hình nào hoàn toàn do Microsoft quyết định, dự án này chỉ ghi lại và báo cáo trung thực.
 
-### 取决于上游探测结果的能力
+### Các năng lực phụ thuộc vào kết quả dò quét upstream thực tế
 
-图片理解、PDF/Office 附件、长上下文上限、严格结构化 JSON、并行工具调用、思考等级是否真正分级、精确 token 用量、引用来源、取消及时性——这些能力是否可用取决于对真实上游的探测结果，达不到门槛的不会默认启用。
+Hiểu hình ảnh, tệp đính kèm PDF/Office, giới hạn ngữ cảnh dài, JSON cấu trúc nghiêm ngặt, gọi công cụ song song, cấp độ suy nghĩ (effort) có thực sự phân cấp hay không, lượng token chính xác, nguồn trích dẫn, tính kịp thời của việc hủy yêu cầu — các khả năng này có hoạt động hay không phụ thuộc vào kết quả dò quét upstream thực tế; các tính năng chưa đạt tiêu chuẩn sẽ không được bật mặc định.
 
 ---
 
-## ⚠️ 账号前提（先确认，否则后面全是白做）
+## ⚠️ Điều kiện tiên quyết về tài khoản (Cần xác nhận trước)
 
-本项目把**付费版 Microsoft 365 Copilot** 当作上游。你的账号必须**已分配 Copilot 许可**。
+Dự án này sử dụng **Microsoft 365 Copilot bản trả phí** làm dịch vụ upstream. Tài khoản của bạn bắt buộc phải **được cấp phép Copilot (Copilot license)**.
 
-**E3 / A3 / E5 / A5 这些基础订阅本身不含 Copilot**——Copilot 是要在基础订阅之上
-单独购买、单独分配的**加载项**。只有基础订阅时，上游会在业务层明确拒绝：
+**Các gói đăng ký cơ bản như E3 / A3 / E5 / A5 không bao gồm Copilot** — Copilot là một **gói bổ sung (add-on)** cần mua riêng và phân bổ riêng trên nền các gói đăng ký cơ bản. Khi chỉ có gói đăng ký cơ bản, phía upstream sẽ từ chối rõ ràng ở tầng nghiệp vụ:
 
 ```json
 {"value":"ForbiddenRequest","errorCode":"InvalidCopilotLicense",
  "message":"It looks like you don't have a valid license. To get access, please check with your administrator."}
 ```
 
-这个拒绝**发生在协议全部正确之后**——OAuth 授权能成功、token 的 audience 与 scope
-全对、WebSocket 握手能通、请求体能被正确解析并回显。所以"能登录、能刷 token"
-完全不代表能用，别拿这个当验证通过的标志。
+Sự từ chối này **diễn ra sau khi toàn bộ giao thức đã hoàn toàn chính xác** — Xác thực OAuth thành công, audience và scope của token hoàn toàn đúng, bắt tay WebSocket thông suốt, thân yêu cầu được phân tích và phản hồi chuẩn. Vì vậy "đăng nhập được, refresh token được" hoàn toàn không đồng nghĩa với việc có thể sử dụng được.
 
-另外注意两件容易混淆的事：
+Ngoài ra cần lưu ý hai điểm dễ nhầm lẫn:
 
-- **Copilot Chat（免费层）** 与本项目对接的付费 Copilot 是**不同的服务**，端点也不同，
-  有前者不等于能用本项目。
-- **区域限制独立存在**：即使有许可，Copilot 在部分地区不提供服务，且判定跟随**租户
-  注册地**而非你的出口 IP——**挂代理没有用**。
+- **Copilot Chat (tầng miễn phí)** và Copilot trả phí mà dự án này tích hợp là **hai dịch vụ khác nhau** với các endpoint hoàn toàn khác nhau. Có tài khoản miễn phí không có nghĩa là dùng được dự án này.
+- **Hạn chế khu vực địa lý tồn tại độc lập**: Ngay cả khi có giấy phép, Copilot vẫn không cung cấp dịch vụ ở một số khu vực, và việc kiểm tra này căn cứ theo **nơi đăng ký của Tenant (tổ chức)** chứ không căn cứ vào IP mạng của bạn — **dùng VPN / Proxy không có tác dụng**.
 
-怎么确认：管理中心 → 用户 → 许可证，看是否有单独一条 "Microsoft 365 Copilot"
-（教育版为对应的 A 系列 SKU）。只有 E3/A3 而没有这一条，就是缺加载项。
+Cách kiểm tra: Trung tâm quản trị Microsoft 365 → Người dùng → Giấy phép (Licenses), xem có dòng riêng biệt "Microsoft 365 Copilot" (hoặc SKU dòng A tương ứng cho bản giáo dục). Nếu chỉ có E3/A3 mà không có dòng này nghĩa là tài khoản thiếu add-on.
 
 ---
 
-## 快速开始
+## Bắt đầu nhanh
 
-> 前置条件：一个**已分配 Copilot 许可**的 Microsoft 365 账号（授权步骤在管理界面完成）。
+> Điều kiện tiên quyết: Một tài khoản Microsoft 365 **đã được cấp giấy phép Copilot** (các bước ủy quyền được thực hiện trên giao diện quản trị).
 
-### 1. 准备环境变量
+### 1. Chuẩn bị biến môi trường
 
 ```bash
 cp .env.example .env
 ```
 
-生成主密钥（Base64，解码后 32 字节）：
+Tạo khóa chủ chính (Base64, sau khi giải mã có độ dài 32 bytes):
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-把结果填入 `.env` 的 `M365_CODEX_MASTER_KEY`，并设置 `M365_CODEX_ADMIN_PASSWORD`（至少 12 位）。
+Điền kết quả vào `M365_CODEX_MASTER_KEY` trong file `.env`, đồng thời thiết lập `M365_CODEX_ADMIN_PASSWORD` (ít nhất 12 ký tự).
 
-**没有有效主密钥，服务会直接拒绝启动**——这是刻意设计，避免 Token 以明文入库。
+**Nếu không có khóa chủ hợp lệ, dịch vụ sẽ từ chối khởi động** — Đây là thiết kế có chủ đích nhằm tránh việc lưu trữ Token dạng văn bản thô (plaintext) vào cơ sở dữ liệu.
 
-### 2. 用 Docker 运行
+### 2. Chạy bằng Docker
 
-镜像发布在 **Docker Hub**：[`foch0x97/m365-codex`](https://hub.docker.com/r/foch0x97/m365-codex)，
-多架构（`linux/amd64` + `linux/arm64`）。
+Image được phát hành trên **Docker Hub**: [`foch0x97/m365-codex`](https://hub.docker.com/r/foch0x97/m365-codex), hỗ trợ đa kiến trúc (`linux/amd64` + `linux/arm64`).
 
 ```bash
 docker pull foch0x97/m365-codex:latest
 ```
 
-标签规则：`latest` 跟随最新正式 Release；`0.9.1` / `0.9` 由版本 tag 产生；
-`main` 与 `sha-<短哈希>` 跟随主分支最新提交。
+Quy tắc tag: `latest` theo sát bản phát hành Release chính thức mới nhất; `0.9.1` / `0.9` tạo từ tag phiên bản; `main` và `sha-<mã băm ngắn>` theo sát commit mới nhất của nhánh main.
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-验证：
+Kiểm tra trạng thái:
 
 ```bash
 curl http://127.0.0.1:8080/healthz
 ```
 
-`/readyz` 会额外校验主密钥可用、数据库迁移到位、数据目录可写，任一不通过返回 503。
+Endpoint `/readyz` sẽ kiểm tra thêm tính sẵn sàng của khóa chủ, migration cơ sở dữ liệu, quyền ghi thư mục dữ liệu; nếu bất kỳ mục nào không đạt sẽ trả về 503.
 
-### 3. 进管理界面
+### 3. Truy cập giao diện quản trị
 
-浏览器打开 **`http://<你的地址>:8080/ui/`**（访问 `/` 会自动跳转过去），
-用 `M365_CODEX_ADMIN_PASSWORD` 登录。
+Mở trình duyệt truy cập **`http://<địa-chỉ-của-bạn>:8080/ui/`** (truy cập `/` sẽ tự động chuyển hướng sang đây),
+đăng nhập bằng `M365_CODEX_ADMIN_PASSWORD`.
 
-三类路径互不重叠，便于放在反向代理后分别控制：
+Ba nhóm đường dẫn được tách biệt rõ ràng, thuận tiện cho việc kiểm soát sau reverse proxy:
 
-| 路径 | 用途 | 鉴权 |
+| Đường dẫn | Mục đích | Cơ chế xác thực |
 |---|---|---|
-| `/ui/` | 管理界面页面 | 页面内登录（管理密码 → 会话令牌） |
-| `/admin/*` | 管理 JSON 接口 | 管理会话令牌 |
-| `/v1/*` | 对 Codex 等客户端暴露的兼容接口 | `sk-` API Key |
+| `/ui/` | Trang giao diện quản trị Web | Đăng nhập trên trang (Mật khẩu admin → Phiên session token) |
+| `/admin/*` | JSON API quản trị | Session token quản trị |
+| `/v1/*` | Giao diện tương thích cho Codex và các client khác | `sk-` API Key |
 
-账号授权、创建 API Key、生成 Codex 配置、查看请求与账号状态、代理池、备份恢复
-都在管理界面里完成。详细步骤见[部署与验收指南](docs/部署与验收.md)。
+Ủy quyền tài khoản, tạo API Key, sinh cấu hình Codex, xem trạng thái yêu cầu và tài khoản, nhóm proxy, sao lưu và phục hồi đều được thực hiện trên giao diện quản trị. Chi tiết các bước xem tại [Hướng dẫn triển khai và nghiệm thu](docs/部署与验收.md).
 
-### 4. 本地开发运行
+### 4. Chạy trong môi trường phát triển cục bộ (Local Dev)
 
 ```bash
 npm ci
-npm ci --prefix apps/web   # 管理界面不在根 workspace 里，单独装
-npm run build              # 同时构建服务端与管理界面
+npm ci --prefix apps/web   # Giao diện quản trị không nằm trong root workspace, cần cài riêng
+npm run build              # Xây dựng đồng thời cả backend server và frontend web
 npm run dev
 ```
 
-### 5. 配置 Codex
+### 5. Cấu hình Codex
 
-在管理界面一键生成，或手写 `~/.codex/config.toml`：
+Bạn có thể sinh nhanh cấu hình trên giao diện quản trị với 1 cú click, hoặc tự chỉnh sửa file `~/.codex/config.toml`:
 
 ```toml
-model = "gpt-5-codex"            # 由 Codex 端选择，容器不改写
-model_reasoning_effort = "high"  # 取值随模型而定，原样透传
+model = "gpt-5-codex"            # Do phía Codex lựa chọn, container không sửa đổi
+model_reasoning_effort = "high"  # Giá trị tùy thuộc vào model, chuyển tiếp nguyên trạng
 model_provider = "m365-codex"
 
 [model_providers.m365-codex]
 name = "M365-Codex (Responses compatible)"
 base_url = "https://codex.example.com/v1"
 env_key = "M365_CODEX_API_KEY"
-wire_api = "responses"           # 只支持 responses，chat 已于 2026-02 移除
+wire_api = "responses"           # Chỉ hỗ trợ responses, chat đã bị gỡ bỏ từ 2026-02
 ```
 
-然后把管理界面创建的 `sk-` 密钥设置到环境变量 `M365_CODEX_API_KEY`。
+Sau đó gán khóa bí mật `sk-` được tạo từ giao diện quản trị vào biến môi trường `M365_CODEX_API_KEY`.
 
 ---
 
-## 配置项
+## Các mục cấu hình
 
-完整列表见 [.env.example](.env.example)。要点：
+Danh sách đầy đủ xem tại [.env.example](.env.example). Các điểm cốt lõi:
 
-| 变量 | 必填 | 说明 |
+| Biến môi trường | Bắt buộc | Mô tả |
 |---|---|---|
-| `M365_CODEX_MASTER_KEY` | 是 | Base64，解码后 32 字节；无效则拒绝进入 ready |
-| `M365_CODEX_ADMIN_PASSWORD` | 是 | 管理端登录密码，至少 12 位 |
-| `PORT` | 否 | 默认 `8080` |
-| `DATA_DIR` | 否 | 默认 `/data` |
-| `PUBLIC_API_BASE_URL` | 否 | 对外 API Base URL，用于生成 Codex 配置 |
-| `TRUST_PROXY` | 否 | 启用后才信任 `X-Forwarded-*` |
-| `LOG_PRIVACY_MODE` | 否 | `strict`（默认）/ `metadata` / `debug` |
-| `UPSTREAM_WS_BASE` | 否 | 上游 WebSocket 基址，用于应对端点漂移 |
-| `OAUTH_*` | 否 | OAuth 客户端 ID、端点与 scope，留空使用内置默认值 |
-| `UPSTREAM_*` | 否 | 上游路径模板、协议版本、心跳/超时/重连 |
-| `TOOLS_*` | 否 | 工具调用方式（`native`/`prompt`/`auto`）与代理循环上限：每轮调用数、轮次、累计调用数、结果大小、参数修复次数 |
-| `FILES_*` | 否 | 单文件/单请求大小上限、单 Key 累计存储上限、文件保留期、未完成 Upload 存活时间 |
-| `UPSTREAM_IMAGE_INPUT` | 否 | 上游是否真支持图片输入，默认 `false`（`input_image` 返回明确错误，不假装支持） |
-| `CONTEXT_MAX_CHARS` | 否 | 重建的对话上下文超过多少字符就从最旧历史开始截断，默认给一个宽松值 |
-| `RATE_LIMIT_GLOBAL_*` | 否 | API Key 级限额（RPM/日配额/最大并发）的全局天花板；单个 Key 只能比这更严 |
-| `CLEANUP_*` | 否 | 定时清理的运行间隔与 Response/审计日志/幂等记录的保留期 |
-| `PROXY_CHECK_TIMEOUT_MS` | 否 | 出口代理健康检查超时，默认 `5000` |
-| `METRICS_ENABLED` | 否 | 是否开启 `GET /metrics`，默认 `true` |
-| `METRICS_REQUIRE_AUTH` | 否 | `/metrics` 是否要求管理会话鉴权，默认 `true`（会暴露账号数量与错误分布，不建议无鉴权公开） |
-| `BACKUP_RETENTION_COUNT` | 否 | 备份包保留份数，超过后定时清理删最旧的，默认 `7` |
+| `M365_CODEX_MASTER_KEY` | Có | Base64, sau giải mã đúng 32 bytes; không hợp lệ sẽ từ chối ready |
+| `M365_CODEX_ADMIN_PASSWORD` | Có | Mật khẩu đăng nhập trang quản trị, tối thiểu 12 ký tự |
+| `PORT` | Không | Mặc định `8080` |
+| `DATA_DIR` | Không | Mặc định `/data` |
+| `PUBLIC_API_BASE_URL` | Không | Base URL API công khai ra ngoài, dùng để sinh cấu hình Codex |
+| `TRUST_PROXY` | Không | Bật lên mới tin tưởng các header `X-Forwarded-*` |
+| `LOG_PRIVACY_MODE` | Không | `strict` (mặc định) / `metadata` / `debug` |
+| `UPSTREAM_WS_BASE` | Không | Địa chỉ cơ sở WebSocket thượng nguồn, dùng khi endpoint bị thay đổi |
+| `OAUTH_*` | Không | Client ID, endpoint và scope OAuth, để trống sẽ dùng mặc định tích hợp sẵn |
+| `UPSTREAM_*` | Không | Mẫu đường dẫn upstream, phiên bản giao thức, heartbeat/timeout/reconnect |
+| `TOOLS_*` | Không | Phương thức gọi công cụ (`native`/`prompt`/`auto`) và giới hạn vòng lặp: số lần gọi mỗi lượt, số lượt, tổng số lần gọi, kích thước kết quả, số lần sửa tham số |
+| `FILES_*` | Không | Giới hạn dung lượng đơn tệp/đơn yêu cầu, giới hạn lưu trữ tích lũy mỗi Key, thời gian lưu file, thời gian sống của Upload chưa hoàn tất |
+| `UPSTREAM_IMAGE_INPUT` | Không | Upstream có thực sự hỗ trợ ảnh không, mặc định `false` (`input_image` sẽ trả về lỗi rõ ràng chứ không giả vờ hỗ trợ) |
+| `CONTEXT_MAX_CHARS` | Không | Ngưỡng ký tự tối đa của ngữ cảnh hội thoại; vượt quá sẽ cắt tỉa từ lịch sử cũ nhất |
+| `RATE_LIMIT_GLOBAL_*` | Không | Giới hạn trần toàn cục cấp API Key (RPM/hạn mức ngày/concurrency tối đa); từng Key chỉ có thể cấu hình chặt hơn mức này |
+| `CLEANUP_*` | Không | Khoảng thời gian chạy dọn dẹp định kỳ và thời hạn lưu trữ Response/nhật ký kiểm toán/bản ghi idempotent |
+| `PROXY_CHECK_TIMEOUT_MS` | Không | Thời gian chờ kiểm tra sức khỏe proxy gửi ra ngoài, mặc định `5000` |
+| `METRICS_ENABLED` | Không | Có mở `GET /metrics` không, mặc định `true` |
+| `METRICS_REQUIRE_AUTH` | Không | `/metrics` có yêu cầu xác thực phiên admin không, mặc định `true` (tránh để lộ số lượng tài khoản và phân bổ lỗi ra ngoài) |
+| `BACKUP_RETENTION_COUNT` | Không | Số lượng bản sao lưu được giữ lại, vượt quá sẽ xóa bản cũ nhất, mặc định `7` |
 
-**严禁**通过环境变量注入任何 Microsoft Token 或 OAuth 凭据。服务启动时会检测常见的注入变量名并拒绝启动；这些凭据只能经 PKCE 授权流程获取，并以 AES-256-GCM 加密入库。
-
----
-
-## 添加 Microsoft 账号
-
-只有一种方式：本网关自己的 **PKCE 授权流程**。
-
-1. 调用 `POST /admin/oauth/authorize-url` 拿到授权链接
-2. 在浏览器打开，选择有 Copilot 权限的账号登录
-3. 登录后会跳到 Microsoft 的 `nativeclient` 提示页，复制地址栏完整 URL
-4. 把它提交给 `POST /admin/oauth/callback`
-
-因为回调落在 Microsoft 自己的页面上，**本服务不需要公网可达**，也不用暴露回调端点。授权会话 10 分钟过期，授权码只能用一次，可以同时为多个账号并行授权。授权后本服务用自己保存的 `refresh_token` 独立续期。
-
-### 账号状态
-
-每个账号处于以下状态之一：`probing`（待探测）、`online`、`busy`、`cooldown`（限流冷却）、`reauth_required`（刷新凭据失效，需重新授权）、`disabled`（人工停用）、`unsupported`（上游能力不满足）、`error`。
-
-刷新凭据失效时账号会自动转入 `reauth_required` 并停止重试；人工停用的账号不会因一次重新授权被悄悄启用。
+**Nghiêm cấm** truyền bất kỳ Microsoft Token hoặc thông tin đăng nhập OAuth nào qua biến môi trường. Khi khởi động, dịch vụ sẽ kiểm tra các tên biến phổ biến này và từ chối chạy; các thông tin này chỉ được cấp phép qua luồng PKCE và được mã hóa AES-256-GCM khi lưu vào CSDL.
 
 ---
 
-## 可观测性与备份恢复
+## Thêm tài khoản Microsoft
+
+Chỉ có một cách duy nhất: Thông qua **luồng ủy quyền PKCE** tích hợp sẵn của Gateway.
+
+1. Gọi `POST /admin/oauth/authorize-url` để lấy liên kết ủy quyền
+2. Mở trên trình duyệt, chọn tài khoản có quyền Copilot để đăng nhập
+3. Sau khi đăng nhập sẽ chuyển tiếp đến trang nhắc `nativeclient` của Microsoft, sao chép toàn bộ URL trên thanh địa chỉ
+4. Dán URL đó vào `POST /admin/oauth/callback`
+
+Vì callback rơi vào chính trang nội bộ của Microsoft, **dịch vụ này không cần mở ra Internet công khai**, cũng không cần mở endpoint callback ra ngoài. Phiên ủy quyền hết hạn sau 10 phút, mã ủy quyền (code) chỉ dùng 1 lần, hỗ trợ ủy quyền song song nhiều tài khoản. Sau khi ủy quyền, dịch vụ sẽ tự động gia hạn độc lập bằng `refresh_token` được lưu trữ an toàn.
+
+### Trạng thái tài khoản
+
+Mỗi tài khoản sẽ ở một trong các trạng thái sau: `probing` (đang chờ dò quét), `online`, `busy`, `cooldown` (đang hạ nhiệt do rate limit), `reauth_required` (refresh token hết hiệu lực, cần ủy quyền lại), `disabled` (quản trị viên tắt thủ công), `unsupported` (năng lực upstream không đáp ứng), `error`.
+
+Khi refresh token hết hiệu lực, tài khoản sẽ tự động chuyển sang `reauth_required` và dừng thử lại; tài khoản bị tắt thủ công sẽ không bị tự động bật lại khi thực hiện ủy quyền lại.
+
+---
+
+## Khả năng quan sát & Sao lưu phục hồi
 
 ### `GET /metrics`
 
-Prometheus 文本格式，覆盖请求量与耗时（按端点/状态）、上游调用与错误分类、SSE 中断次数、
-工具调用数与轮次、工具参数校验结果（pass/rejected）、Token 刷新结果、账号状态迁移、
-限额拒绝次数，以及抓取时现填的即时值（各状态账号数、当前在途请求数、数据库与文件占用）。
+Định dạng văn bản chuẩn Prometheus, bao gồm lượng yêu cầu và độ trễ (theo endpoint/status), các cuộc gọi upstream và phân loại lỗi, số lần gián đoạn SSE, số lượng và số lượt gọi công cụ, kết quả kiểm tra tham số công cụ (pass/rejected), kết quả refresh token, biến chuyển trạng thái tài khoản, số lần từ chối do vượt hạn mức, cùng các chỉ số tức thời khi scrape (số tài khoản theo từng trạng thái, số request đang xử lý, dung lượng CSDL và tệp).
 
-- `METRICS_ENABLED`（默认 `true`）：关闭后端点直接 404，如同不存在；
-- `METRICS_REQUIRE_AUTH`（默认 `true`）：指标会暴露账号数量与错误分布，默认要求管理会话
-  （`Authorization: Bearer <管理令牌>`）；仅在抓取器与本服务处于同一可信内网时才建议关闭。
+- `METRICS_ENABLED` (mặc định `true`): Tắt đi thì endpoint sẽ trả về 404 như không tồn tại;
+- `METRICS_REQUIRE_AUTH` (mặc định `true`): Chỉ số sẽ để lộ số lượng tài khoản và phân loại lỗi, mặc định yêu cầu xác thực phiên admin (`Authorization: Bearer <admin-token>`); chỉ nên tắt khi scraper nằm trong cùng mạng nội bộ tin cậy.
 
-**隐私红线**：指标里绝不出现邮箱、提示词、输出正文、Token、文件名；标签值统一走字符白名单
-清洗，超长或形似 Token/API Key 的值会被替换或截断。
+**Nguyên tắc bảo vệ quyền riêng tư**: Không bao giờ đưa email, prompt, nội dung output, token, tên file vào metrics; các giá trị nhãn (labels) đều được lọc qua danh sách trắng ký tự, các giá trị quá dài hoặc có định dạng giống Token/API Key sẽ bị thay thế hoặc cắt ngắn.
 
-### 备份与恢复
+### Sao lưu và phục hồi
 
-- `POST /admin/backup`：生成备份包（数据库用 `VACUUM INTO` 出一份一致性快照 + 已上传文件），
-  落到 `<DATA_DIR>/backups/`，返回 `{id, bytes, created_at}`。
-- `GET /admin/backup`：列出已生成的备份包；`GET /admin/backup/:id/download`：下载。
-- `POST /admin/restore`：multipart 上传备份包，校验格式版本、数据库结构版本、主密钥版本
-  一致后写入数据目录——**校验通过只代表已落盘，必须重启服务后才会生效**（正在运行的进程
-  仍持有旧数据库的连接），响应里会明确说明这一点，不会假装恢复已经生效。
-- **主密钥不进备份包**：库里的 Token 仍是密文，换机器恢复时必须提供同一个
-  `M365_CODEX_MASTER_KEY` 才能解密；备份包里只记录密钥版本号用于校验。
-- 备份包按 `BACKUP_RETENTION_COUNT`（默认 7）份定时清理，超出的自动删除最旧的。
-- `GET /admin/diagnostics`：脱敏诊断包——版本、数据库结构版本、账号状态分布、就绪检查、
-  维护任务执行情况、脱敏配置摘要、错误分类计数，供报障时一次性交出。
+- `POST /admin/backup`: Tạo gói sao lưu (CSDL dùng `VACUUM INTO` để tạo snapshot nhất quán + các tệp đã upload), lưu tại `<DATA_DIR>/backups/`, trả về `{id, bytes, created_at}`.
+- `GET /admin/backup`: Liệt kê các bản sao lưu; `GET /admin/backup/:id/download`: Tải bản sao lưu về.
+- `POST /admin/restore`: Tải lên gói sao lưu qua multipart, kiểm tra phiên bản định dạng, cấu trúc CSDL, phiên bản Master Key nhất quán rồi ghi đè vào thư mục dữ liệu — **Kiểm tra thành công chỉ đại diện cho việc dữ liệu đã ghi xuống đĩa, bắt buộc phải khởi động lại dịch vụ mới có hiệu lực** (tiến trình đang chạy vẫn giữ kết nối đến CSDL cũ).
+- **Master Key không nằm trong gói sao lưu**: Token trong CSDL vẫn là bản mã hóa, khi phục hồi sang máy khác bắt buộc phải cung cấp cùng một `M365_CODEX_MASTER_KEY` mới giải mã được.
+- Bản sao lưu được tự động dọn dẹp theo `BACKUP_RETENTION_COUNT` (mặc định 7 bản).
+- `GET /admin/diagnostics`: Gói chẩn đoán đã khử dữ liệu nhạy cảm — phiên bản, schema version, phân bố trạng thái tài khoản, kiểm tra readiness, trạng thái tác vụ bảo trì, cấu hình tóm tắt, thống kê lỗi để phục vụ báo cáo sự cố.
 
 ---
 
-## 安全设计
+## Thiết kế An toàn & Bảo mật
 
-- **Token 加密存储**：AES-256-GCM，每个敏感字段独立随机 nonce，记录密钥版本以支持轮换；主密钥仅来自环境变量，无默认值。密文以账号 ID 作 AAD 绑定，搬到别的账号行上解不开。
-- **PKCE 只用 S256**：不提供 plain 降级；`code_verifier` 同样加密入库；授权码通过原子 UPDATE 保证只消费一次，并发重放会被拒绝。
-- **Token 刷新单飞**：同账号并发刷新共享同一个任务，避免互相覆盖 `refresh_token` 把账号刷坏；写回是事务化原子替换。
-- **API Key 不落明文**：`sk-` + 52 位 CSPRNG Base62；库中只存 `SHA-256(每 Key 独立盐 ‖ Key)` 与用于索引的前缀；明文只在创建时返回一次。
-- **恒定时间校验**：API Key 与管理密码比较全部使用 `timingSafeEqual`，避免时序侧信道。
-- **日志脱敏**：`strict` 模式不记录请求体与提示词，IP 只保留网段（IPv4 `/24`、IPv6 `/48`）；`authorization`、`access_token`、`password` 等字段在任何模式下都被替换为 `[已脱敏]`。
-- **登录节流**：管理端登录失败按 IP 计数，15 分钟内失败 8 次后临时拒绝。
-- **容器加固**：非 root 运行、只读根文件系统、`no-new-privileges`、Healthcheck、SIGTERM 优雅退出；镜像不含开发依赖、账号文件、`.env` 或任何 Token。
-- **仓库纪律**：只提交 `.env.example`；CI 中有凭据扫描，检测到疑似 `.env`、账号文件、硬编码 `sk-` 或 JWT 直接失败。
+- **Lưu trữ Token mã hóa**: AES-256-GCM, mỗi trường nhạy cảm dùng một nonce ngẫu nhiên độc lập, ghi nhận phiên bản khóa để hỗ trợ xoay vòng khóa; Master Key chỉ lấy từ biến môi trường, không có giá trị mặc định. Dữ liệu mã hóa ràng buộc với ID tài khoản dưới dạng AAD, chuyển sang dòng tài khoản khác sẽ không thể giải mã.
+- **PKCE chuẩn S256**: Không hỗ trợ chế độ giáng cấp `plain`; `code_verifier` cũng được mã hóa khi lưu CSDL; mã ủy quyền được tiêu thụ thông qua UPDATE nguyên tử (atomic) đảm bảo chỉ dùng 1 lần.
+- **Chống xung đột khi Refresh Token (Single-flight)**: Nhiều yêu cầu đồng thời trên cùng một tài khoản sẽ dùng chung một tác vụ refresh, tránh ghi đè làm hỏng `refresh_token`; ghi đè được thực hiện nguyên tử trong transaction.
+- **Không lưu API Key dạng văn bản thô**: Cấu trúc `sk-` + 52 ký tự CSPRNG Base62; cơ sở dữ liệu chỉ lưu `SHA-256(Salt riêng từng Key ‖ Key)` và tiền tố dùng để đánh index; văn bản thô chỉ hiển thị một lần duy nhất lúc tạo.
+- **So sánh thời gian hằng số (Timing-safe)**: So sánh API Key và mật khẩu admin đều dùng `timingSafeEqual`, ngăn chặn tấn công kênh phụ (timing side-channel).
+- **Khử nhạy cảm nhật ký (Log Masking)**: Chế độ `strict` không ghi lại thân yêu cầu và prompt, địa chỉ IP chỉ giữ dải mạng (IPv4 `/24`, IPv6 `/48`); các trường `authorization`, `access_token`, `password` luôn được thay thế bằng `[ĐÃ KHỬ NHẠY CẢM]` ở mọi chế độ.
+- **Chống brute-force đăng nhập**: Đăng nhập thất bại được đếm theo IP, thất bại 8 lần trong 15 phút sẽ tạm thời từ chối.
+- **Gia cố Container**: Chạy dưới quyền non-root, hệ thống tệp gốc ở chế độ read-only, `no-new-privileges`, Healthcheck, xử lý tín hiệu thoát mềm SIGTERM; image không chứa devDependencies, file tài khoản, `.env` hay bất kỳ Token nào.
 
 ---
 
-## 技术栈
+## Ngăn xếp công nghệ (Tech Stack)
 
-TypeScript + Node.js ≥22 + Fastify；SQLite（WAL，使用 Node 内置 `node:sqlite`，无原生编译依赖）；Zod 校验；Pino 日志；AES-256-GCM 加密；Vitest 测试。单进程单容器，端口 `8080`，数据目录 `/data`。
+TypeScript + Node.js ≥22 + Fastify; SQLite (WAL, sử dụng module tích hợp sẵn `node:sqlite` của Node, không có dependency biên dịch native); Kiểm tra dữ liệu Zod; Ghi log Pino; Mã hóa AES-256-GCM; Kiểm thử Vitest. Đơn tiến trình trong một container duy nhất, cổng mặc định `8080`, thư mục dữ liệu `/data`.
 
-## 开发命令
+## Lệnh phát triển
 
 ```bash
-npm ci             # 安装依赖
-npm run build      # 构建
-npm run typecheck  # 类型检查（含测试文件）
-npm run lint       # ESLint
-npm test           # 单元与集成测试
-npm run dev        # 开发模式（热重载）
+npm ci             # Cài đặt dependencies
+npm run build      # Xây dựng dự án
+npm run typecheck  # Kiểm tra kiểu TypeScript (bao gồm cả file test)
+npm run lint       # Kiểm tra ESLint
+npm test           # Chạy unit test và integration test
+npm run dev        # Chạy môi trường phát triển (hot reload)
 ```
 
-## 贡献与许可
+## Đóng góp & Giấy phép
 
-本项目以 [MIT 许可证](LICENSE) 发布。第三方依赖声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Dự án được phát hành dưới [Giấy phép MIT](LICENSE). Khai báo các thư viện phụ thuộc bên thứ ba xem tại [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-提交 PR 前请确保 `npm run typecheck`、`npm run lint`、`npm test` 全部通过，且**不包含任何真实凭据**。
+Trước khi gửi Pull Request, vui lòng đảm bảo `npm run typecheck`, `npm run lint`, `npm test` đều vượt qua và **tuyệt đối không chứa bất kỳ thông tin đăng nhập thực tế nào**.

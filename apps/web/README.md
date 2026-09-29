@@ -1,11 +1,11 @@
-# M365-Codex 管理 WebUI
+# Giao diện Quản trị WebUI của M365-Codex
 
-`@m365-codex/web` —— M365-Codex 的管理后台前端。React + Vite + TypeScript，手写 CSS（不引 UI 框架、不引图标包、不引 CDN 资源）。
+`@m365-codex/web` — Frontend bảng quản trị của M365-Codex. Xây dựng bằng React + Vite + TypeScript, CSS tự viết (không dùng UI framework, không dùng gói icon bên ngoài, không kéo tài nguyên CDN).
 
-这是独立子包，**不在**仓库根 npm workspace 里，有自己的 `package.json` 与 `package-lock.json`；
-生产构建产物挂载在服务端的 `/ui/` 路径下（`/admin/*` 留给 JSON 管理 API，两者不共用前缀）。
+Đây là một package con độc lập, **không nằm trong** npm workspace gốc của kho lưu trữ, có `package.json` và `package-lock.json` riêng biệt;
+Sản phẩm build production được mount tĩnh dưới đường dẫn `/ui/` của server backend (dành `/admin/*` cho JSON API quản trị, hai bên không dùng chung tiền tố).
 
-## 开发
+## Phát triển (Development)
 
 ```bash
 cd apps/web
@@ -13,93 +13,80 @@ npm install
 npm run dev
 ```
 
-默认会把 `/admin`、`/v1` 请求代理到 `http://127.0.0.1:8080`（服务端默认端口），
-可用 `VITE_API_TARGET` 环境变量覆盖，例如：
+Mặc định dev server sẽ proxy các request `/admin`, `/v1` sang `http://127.0.0.1:8080` (cổng mặc định của backend server),
+có thể ghi đè bằng biến môi trường `VITE_API_TARGET`, ví dụ:
 
 ```bash
 VITE_API_TARGET=http://192.168.0.5:8080 npm run dev
 ```
 
-### 不依赖服务端独立开发（Mock 模式）
+### Phát triển độc lập không phụ thuộc backend (Chế độ Mock)
 
-服务端的 M7 接口（概览、代理池、设置等）实现之前，可以整站切到内存模拟数据：
+Trước khi các API backend (Tổng quan, nhóm proxy, cài đặt...) hoàn thiện, bạn có thể chuyển toàn bộ trang web sang dùng dữ liệu giả lập trong bộ nhớ:
 
 ```bash
 VITE_USE_MOCK=1 npm run dev
 ```
 
-模拟数据定义在 `src/api/mock.ts`，域名统一用 `*.example.invalid`，不含任何真实凭据。
-`VITE_USE_MOCK` 也可以写进 `.env.local`（参考 `.env.example`）。
+Dữ liệu giả lập được định nghĩa trong `src/api/mock.ts`, toàn bộ tên miền sử dụng `*.example.invalid`, không chứa bất kỳ thông tin đăng nhập thực tế nào.
+`VITE_USE_MOCK` cũng có thể được ghi vào `.env.local` (tham khảo `.env.example`).
 
-真实模式与 Mock 模式共用同一个 `AdminApi` 接口（`src/api/adminApi.ts`），
-页面代码只从 `src/api/index.ts` 导入 `api`，不关心当前跑的是哪一个实现。
+Chế độ thực tế và chế độ Mock dùng chung một interface `AdminApi` (`src/api/adminApi.ts`),
+mã nguồn các trang chỉ import `api` từ `src/api/index.ts` mà không cần bận tâm đang chạy implementation nào.
 
-## 构建
+## Xây dựng (Build)
 
 ```bash
 npm run build
 ```
 
-产物输出到 `apps/web/dist`，`base` 固定为 `/ui/`（由服务端接静态托管，本仓库其余部分不需要改）。
+Sản phẩm đầu ra được xuất vào `apps/web/dist`, với `base` cố định là `/ui/` (do backend server đảm nhiệm host tĩnh, phần còn lại của kho lưu trữ không cần chỉnh sửa).
 
-## 测试
+## Kiểm thử (Test)
 
 ```bash
-npm test          # 一次性运行
+npm test          # Chạy một lần
 npm run test:watch
 ```
 
-用 vitest + @testing-library/react，覆盖这几条关键路径：
+Sử dụng vitest + @testing-library/react, bao phủ các luồng kiểm thử trọng yếu sau:
 
-- 登录守卫：未登录访问任何受保护页面都会被重定向回登录页（`src/test/loginGuard.test.tsx`）。
-- API Key 明文一次性展示：创建后弹窗展示明文，勾选「我已保存」前无法关闭，关闭后明文不再残留在 DOM 里、列表只显示掩码（`src/test/apiKeyReveal.test.tsx`）。
-- 统一错误体展示：`ErrorBanner` 把 `type`/`message`/`param`/`request_id` 都友好地渲染出来（`src/test/errorBanner.test.tsx`）。
-- 代理地址掩码：代理池列表不会把完整地址（含用户名密码）泄露到 DOM 里（`src/test/proxyMask.test.tsx`）。
+- **Bảo vệ đăng nhập (Login Guard)**: Truy cập bất kỳ trang được bảo vệ nào khi chưa đăng nhập đều bị chuyển hướng về trang đăng nhập (`src/test/loginGuard.test.tsx`).
+- **Hiển thị API Key thô một lần duy nhất**: Sau khi tạo, modal hiển thị key dạng thô, không thể đóng modal trước khi tick chọn "Tôi đã lưu key này", sau khi đóng thì key thô không còn lưu lại trong DOM, danh sách chỉ hiển thị dạng mặt nạ (mask) (`src/test/apiKeyReveal.test.tsx`).
+- **Hiển thị lỗi thống nhất**: `ErrorBanner` hiển thị rõ ràng và thân thiện các trường `type`/`message`/`param`/`request_id` (`src/test/errorBanner.test.tsx`).
+- **Mặt nạ địa chỉ Proxy**: Danh sách proxy pool không để lộ địa chỉ đầy đủ (chứa user:pass) ra DOM (`src/test/proxyMask.test.tsx`).
 
-不追求全覆盖，只保证这几条红线不被破坏。
+Không theo đuổi độ bao phủ 100%, chỉ đảm bảo các nguyên tắc an toàn cốt lõi không bị phá vỡ.
 
-## 目录结构
+## Cấu trúc thư mục
 
 ```text
 src/
-  api/          与服务端的接口层：types.ts（契约类型）、adminApi.ts（接口定义）、
-                client.ts（真实实现）、mock.ts（模拟实现）、http.ts（fetch 封装）
-  auth/         登录会话：AuthContext（令牌只放内存 + sessionStorage）、RequireAuth（路由守卫）
-  components/   通用组件：Layout、StatusBadge、ErrorBanner、CopyButton、RevealApiKeyModal 等
-  hooks/        useAsync：统一 loading / error / data 三态
-  pages/        每个导航项一个页面
-  styles/       手写 CSS + CSS 变量，theme.css 管深浅色，global.css 管布局与组件样式
-  util/format.ts 时间戳/字节数/百分比等展示格式化
+  api/          Tầng giao tiếp với server: types.ts (kiểu hợp đồng API), adminApi.ts (định nghĩa interface),
+                client.ts (triển khai thực tế), mock.ts (triển khai giả lập), http.ts (bọc hàm fetch)
+  auth/         Phiên đăng nhập: AuthContext (token chỉ lưu bộ nhớ + sessionStorage), RequireAuth (route guard)
+  components/   Component dùng chung: Layout, StatusBadge, ErrorBanner, CopyButton, RevealApiKeyModal, v.v.
+  hooks/        useAsync: Chuẩn hóa 3 trạng thái loading / error / data
+  pages/        Mỗi mục điều hướng tương ứng với một trang
+  styles/       CSS tự viết + biến CSS, theme.css quản lý giao diện sáng/tối, global.css quản lý layout và style component
+  util/format.ts Định dạng hiển thị dấu thời gian, số byte, phần trăm, v.v.
 ```
 
-## 安全要点（照 AGENTS.md 的红线执行）
+## Các điểm cốt lõi về bảo mật
 
-- 会话令牌只放 React state（内存）与 `sessionStorage`，绝不写 `localStorage`，也绝不出现在任何
-  `console.*` 调用里；收到 401 会自动清空会话并跳回登录页。
-- API Key 明文只在创建那一刻显示一次，关闭确认弹窗后组件状态里也不再持有它；列表接口本来就只返回掩码。
-- 代理池地址在 UI 侧同样按掩码形态展示，不在 DOM 里拼出完整的用户名密码。
-- 所有真实凭据、邮箱、域名在代码/测试夹具里一律使用 `*.example.invalid` 之类的占位值。
+- Session token quản trị chỉ lưu trong React state (bộ nhớ RAM) và `sessionStorage`, tuyệt đối không ghi vào `localStorage`, và tuyệt đối không xuất hiện trong bất kỳ lệnh `console.*` nào; khi nhận mã lỗi 401 sẽ tự động xóa sạch phiên và chuyển hướng về trang đăng nhập.
+- API Key dạng thô chỉ hiển thị một lần duy nhất tại thời điểm tạo, sau khi đóng popup xác nhận thì state component cũng hủy bỏ nó; API danh sách mặc định chỉ trả về chuỗi đã che mặt nạ.
+- Địa chỉ Proxy trong UI cũng luôn hiển thị dạng mặt nạ, không ghép chuỗi username/password đầy đủ trong DOM.
+- Mọi tài khoản, email, tên miền mẫu trong code và test fixture đều dùng giá trị giữ chỗ dạng `*.example.invalid`.
 
-## 已知的服务端对齐风险
+## Rủi ro đồng bộ với phía backend đã ghi nhận
 
-WebUI 完全按 `docs/管理端API契约.md` 写（`src/api/client.ts`），但那份契约文档定稿时，
-M1–M2 的账号/OAuth 接口其实已经实现过一版，两边字段有几处对不上。前端已经按**契约文档**实现，
-下面这几处如果服务端保留的是旧实现，需要二选一对齐：
+WebUI được viết hoàn toàn dựa trên tài liệu hợp đồng API quản trị (`src/api/client.ts`), tuy nhiên trong quá trình phát triển giai đoạn đầu, các API tài khoản/OAuth phía backend đã có một phiên bản thực hiện trước nên có một số trường chưa khớp hoàn toàn. Frontend đã hoàn thành theo **tài liệu hợp đồng**, nếu backend giữ phiên bản cũ thì cần thống nhất theo các điểm sau:
 
-1. **账号状态变更**：契约写的是 `PATCH /admin/accounts/:id`（body `{status}`）；
-   现有 `apps/server/src/routes/accounts.ts` 实现的是 `PATCH /admin/accounts/:id/status`。
-2. **OAuth 回调入参**：契约写的是 `{redirect_url}` 或 `{code, state}`；
-   现有实现读的是 `{callback}`。前端目前发送 `{redirect_url: callbackUrl}`。
-3. **账号视图里的 `proxy_id`**：`src/api/types.ts` 的 `AccountView` 加了这个字段（代理池是
-   M7 才新增的能力，M1–M2 的 `AccountView` 里没有），以及 `POST /admin/accounts/:id/proxy`
-   绑定接口——这两个都还没有服务端实现可以对照，是前端按契约文档 §2.4 推测的形状。
-4. **`/admin/settings` 各分组的具体字段名**：契约文档只给了分组名
-   （`network`/`scheduler`/`logging`/`oauth`/`tools`/`files`），没有列出每个分组下具体有哪些字段。
-   `src/api/types.ts` 里的 `NetworkSettings`/`SchedulerSettings`/... 是前端根据实施计划 §10/§12
-   和 `.env.example` 里的配置项推测出来的字段名，服务端实现时字段名很可能需要调整，
-   前端这边对齐起来只是改 `types.ts` + `SettingsGroupPage` 用到的 `SettingFieldMeta[]`，改动量不大。
-5. **请求/工具调用列表的可空字段**：契约文档没有逐字段标注是否可为 `null`，
-   `src/api/types.ts` 里的 `null` 标注（例如 `account_id`、`api_key_id`）是前端按业务含义推测的，
-   服务端返回形状如果不同，以服务端为准即可，字段名本身不会变。
+1. **Thay đổi trạng thái tài khoản**: Hợp đồng ghi `PATCH /admin/accounts/:id` (thân request `{status}`); triển khai hiện tại của backend tại `apps/server/src/routes/accounts.ts` là `PATCH /admin/accounts/:id/status`.
+2. **Tham số callback OAuth**: Hợp đồng ghi `{redirect_url}` hoặc `{code, state}`; backend hiện tại đang đọc `{callback}`. Frontend hiện đang gửi `{redirect_url: callbackUrl}`.
+3. **Trường `proxy_id` trong AccountView**: `src/api/types.ts` có thêm trường này và API gán proxy `POST /admin/accounts/:id/proxy` — cả hai đều được frontend suy đoán dựa trên tài liệu hợp đồng §2.4.
+4. **Các trường cụ thể của `/admin/settings`**: Tài liệu hợp đồng chỉ đưa ra tên nhóm (`network`/`scheduler`/`logging`/`oauth`/`tools`/`files`) mà không liệt kê chi tiết từng trường. Các trường trong `src/api/types.ts` được suy luận từ cấu hình `.env.example`, nếu backend có khác biệt thì chỉ cần cập nhật lại `types.ts` và `SettingFieldMeta[]` trong `SettingsGroupPage`.
+5. **Các trường có thể null trong danh sách Request/Tool calls**: Tài liệu hợp đồng không đánh dấu từng trường có thể `null` hay không, các trường được đánh dấu `null` trong frontend là suy đoán theo nghiệp vụ logic, khi backend trả về cấu trúc chính thức thì sẽ đồng bộ theo backend.
 
-两边对齐后可以把这一段删掉。
+Sau khi hai bên đồng bộ hoàn tất, phần ghi chú này có thể được gỡ bỏ.
