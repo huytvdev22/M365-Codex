@@ -2,10 +2,10 @@ import { Buffer } from 'node:buffer';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 /**
- * 管理端密码哈希（scrypt）。
+ * Băm mật khẩu phía quản trị (scrypt).
  *
- * 管理密码来自环境变量，服务不持久化明文；这里的哈希用于登录校验，
- * 每次进程启动时基于环境变量重新派生，避免明文长期驻留在比较逻辑中。
+ * Mật khẩu quản trị được lấy từ biến môi trường, server không lưu trữ plain text; hash tại đây dùng để xác thực đăng nhập,
+ * mỗi lần tiến trình khởi động sẽ được phái sinh lại dựa trên biến môi trường, tránh việc plain text lưu lại lâu dài trong logic so sánh.
  */
 
 const SCRYPT_N = 16384;

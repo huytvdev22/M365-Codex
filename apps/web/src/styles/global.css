@@ -41,7 +41,7 @@ button {
   cursor: pointer;
 }
 
-/* ---- 布局外壳 ---- */
+/* ---- Khung bố cục ---- */
 
 .app-shell {
   display: grid;
@@ -146,7 +146,7 @@ button {
   margin-top: 4px;
 }
 
-/* ---- 通用组件 ---- */
+/* ---- Component dùng chung ---- */
 
 .card {
   background: var(--bg-elevated);

@@ -1,8 +1,8 @@
 import type { ResponseStatus } from '@m365-codex/shared';
 
 /**
- * OpenAI Responses 协议的对象形态（M4 文本子集）。
- * 工具调用项（function_call）在 M5 补充；图片/文件在 M6。
+ * Hình thái đối tượng giao thức OpenAI Responses (tập con văn bản M4).
+ * Các mục gọi công cụ (function_call) được bổ sung ở M5; hình ảnh/tệp ở M6.
  */
 
 export interface UrlCitationAnnotation {
@@ -57,13 +57,13 @@ export interface ResponseError {
 export interface ResponseObject {
   id: string;
   object: 'response';
-  /** 秒级 epoch，与 OpenAI 对齐 */
+  /** Epoch theo giây, khớp với OpenAI */
   created_at: number;
   status: ResponseStatus;
-  /** 回显客户端请求的 model（容器不改写） */
+  /** Echo lại model client yêu cầu (container không viết lại) */
   model: string;
   output: OutputItem[];
-  /** M4 暂不提供精确用量（取决于 M0 探测），先给 null */
+  /** M4 tạm thời chưa cung cấp mức sử dụng chính xác (phụ thuộc vào probe M0), trước mắt để null */
   usage: null;
   metadata: Record<string, string> | null;
   previous_response_id: string | null;
@@ -74,7 +74,7 @@ export interface ResponseObject {
   incomplete_details: { reason: string } | null;
 }
 
-/** SSE 事件名（对应实施计划 §4.3，至少实现这些）。 */
+/** Tên sự kiện SSE (tương ứng kế hoạch triển khai §4.3, tối thiểu thực hiện các sự kiện này). */
 export const SSE_EVENTS = {
   CREATED: 'response.created',
   QUEUED: 'response.queued',
@@ -100,13 +100,13 @@ export const SSE_EVENTS = {
 
 export type SseEventName = (typeof SSE_EVENTS)[keyof typeof SSE_EVENTS];
 
-/** 一条 SSE 事件：名称 + 数据对象。数据里均带单调 sequence_number。 */
+/** Một sự kiện SSE: tên + đối tượng dữ liệu. Dữ liệu đều mang sequence_number đơn điệu tăng. */
 export interface SseEvent {
   event: SseEventName;
   data: Record<string, unknown>;
 }
 
-/** 序列化为 SSE 线格式。 */
+/** Tuần tự hóa thành định dạng đường truyền SSE. */
 export function serializeSse(event: SseEvent): string {
   return `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`;
 }

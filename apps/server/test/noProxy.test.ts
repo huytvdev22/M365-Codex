@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { hostnameFromUrl, shouldBypassProxy } from '../src/util/noProxy.js';
 
 /**
- * NO_PROXY 排除判断：对齐 curl/Node 生态的通行约定（逗号/空格分隔、`*`、
- * 前导点、`*.` 通配、大小写不敏感、端口忽略、点边界后缀匹配）。
+ * Phán đoán loại trừ NO_PROXY: Khớp với quy ước chung của hệ sinh thái curl/Node (phân tách dấu phẩy/khoảng trắng, `*`,
+ * dấu chấm đầu, wildcard `*.`, không phân biệt hoa thường, bỏ qua cổng, khớp hậu tố ranh giới dấu chấm).
  */
 
 describe('shouldBypassProxy', () => {

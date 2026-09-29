@@ -3,9 +3,9 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * `/v1/chat/completions` 全链路集成测试（对应实施计划 §M6）。
- * 断言的重点是「复用 Responses 内核，不建第二套推理逻辑」：全链路走同一个
- * 模拟 Sydney 上游、同一套账号调度与工具循环，这里只验证协议转换是否正确。
+ * Test tích hợp toàn trình `/v1/chat/completions` (tương ứng kế hoạch triển khai §M6).
+ * Trọng tâm assert là "tái sử dụng nhân Responses, không dựng logic suy luận thứ hai": Toàn trình đi qua cùng một
+ * mock Sydney upstream, cùng bộ điều phối tài khoản và vòng lặp công cụ, ở đây chỉ xác minh chuyển đổi giao thức có chính xác không.
  */
 
 let harness: TestHarness | undefined;
@@ -64,7 +64,7 @@ describe('POST /v1/chat/completions 非流式', () => {
     expect(body.choices[0]?.message.content).toBe('你好，世界');
     expect(body.choices[0]?.finish_reason).toBe('stop');
 
-    // messages 正确映射进 input：system 与 user 都进了上游收到的文本
+    // messages được ánh xạ chính xác vào input: system và user đều vào nội dung văn bản upstream nhận được
     expect(server?.invocationTexts[0]).toContain('你是助手');
     expect(server?.invocationTexts[0]).toContain('在吗');
   });
@@ -107,7 +107,7 @@ describe('POST /v1/chat/completions 非流式', () => {
     expect(call?.function.name).toBe('shell');
     expect(call?.id).toBe('call_1');
 
-    // 换成普通回答行为，模拟工具在本机执行完、把结果回传续接
+    // Chuyển sang hành vi trả lời thông thường, mô phỏng công cụ thực thi xong trên máy cục bộ và truyền lại kết quả để nối tiếp
     server.setBehavior({ kind: 'normal', chunks: ['好的'] });
     const second = await harness.app.inject({
       method: 'POST',
@@ -128,7 +128,7 @@ describe('POST /v1/chat/completions 非流式', () => {
       },
     });
     expect(second.statusCode).toBe(200);
-    // 上游第二次收到的文本里应包含完整重建的历史：用户提问、工具调用、工具结果
+    // Văn bản upstream nhận lần 2 phải chứa lịch sử tái tạo đầy đủ: câu hỏi người dùng, gọi công cụ, kết quả công cụ
     expect(server.invocationTexts[1]).toContain('运行测试');
     expect(server.invocationTexts[1]).toContain('shell');
     expect(server.invocationTexts[1]).toContain('Exit code: 0');

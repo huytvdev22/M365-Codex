@@ -4,10 +4,10 @@ import type { Cryptor, SealedValue } from '../crypto/index.js';
 import { asRow, asRows, type Database } from '../db/index.js';
 
 /**
- * 出口代理池的数据访问层（对应实施计划 §13.1、§M7）。
+ * Tầng truy cập dữ liệu cho pool proxy đầu ra (tương ứng kế hoạch triển khai §13.1, §M7).
  *
- * `url` 里可能带用户名密码，属于凭据，与 Token 同规格 AES-256-GCM 加密存储，
- * 独立 nonce。对外展示一律走 `maskProxyUrl`，明文永不离开这个文件。
+ * Trong `url` có thể kèm username và password, thuộc về thông tin xác thực, được lưu trữ mã hóa AES-256-GCM cùng chuẩn với Token,
+ * nonce độc lập. Hiển thị ra ngoài luôn đi qua `maskProxyUrl`, chuỗi văn bản rõ vĩnh viễn không rời khỏi file này.
  */
 
 export type ProxyStatus = 'unknown' | 'healthy' | 'unhealthy';
@@ -55,7 +55,7 @@ export interface ProxyCheckResult {
   cooldownUntil: number | null;
 }
 
-/** 从 URL 推断协议；无法识别的一律归为 http（最常见的形态）。 */
+/** Suy đoán giao thức từ URL; không nhận diện được thì quy về http (dạng phổ biến nhất). */
 export function protocolOf(url: string): ProxyProtocol {
   const scheme = url.split('://')[0]?.toLowerCase() ?? '';
   if (scheme === 'socks5' || scheme === 'socks5h') return 'socks5';
@@ -64,8 +64,8 @@ export function protocolOf(url: string): ProxyProtocol {
 }
 
 /**
- * 打码：只保留协议与主机:端口，用户名密码整体替换为 `***:***`。
- * 解析失败（形态非法）时整体打码，绝不把原串透出去。
+ * Làm mờ: chỉ giữ lại giao thức và host:port, username:password thay thế toàn bộ thành `***:***`.
+ * Khi phân tích thất bại (sai định dạng) sẽ che mờ toàn bộ, tuyệt đối không để lọt chuỗi gốc.
  */
 export function maskProxyUrl(url: string): string {
   try {
@@ -142,7 +142,7 @@ export class ProxyNodeRepository {
     );
   }
 
-  /** 解密出明文 URL。仅供内部转发用（拨号、健康检查），绝不对外返回。 */
+  /** Giải mã ra URL văn bản rõ. Chỉ dùng cho chuyển tiếp nội bộ (quay số, kiểm tra sức khỏe), tuyệt đối không trả ra ngoài. */
   decryptUrl(row: ProxyNodeRow): string {
     const sealed: SealedValue = {
       ciphertext: Buffer.isBuffer(row.url_enc) ? row.url_enc : Buffer.from(row.url_enc),
@@ -152,7 +152,7 @@ export class ProxyNodeRepository {
     return this.#cryptor.open(sealed, `proxy:${row.id}`);
   }
 
-  /** 供调度器/OAuth 客户端解析账号绑定的出口：节点不存在或已停用一律视为不可用。 */
+  /** Dành cho bộ điều phối/OAuth client phân giải cổng ra mà tài khoản liên kết: node không tồn tại hoặc đã vô hiệu hóa đều xem như không khả dụng. */
   resolveActiveUrl(id: string): string | null {
     const row = this.findById(id);
     if (row === undefined || row.enabled !== 1) return null;
@@ -201,7 +201,7 @@ export class ProxyNodeRepository {
     return Number(this.#db.prepare('DELETE FROM proxy_nodes WHERE id = ?').run(id).changes) > 0;
   }
 
-  /** 健康检查结果写回：延迟、失败计数、冷却窗口（对应实施计划 §13.1）。 */
+  /** Ghi lại kết quả kiểm tra sức khỏe: độ trễ, số lần thất bại, cửa sổ làm nguội (tương ứng kế hoạch triển khai §13.1). */
   recordCheck(id: string, result: ProxyCheckResult, now = Date.now()): void {
     this.#db
       .prepare(
@@ -212,7 +212,7 @@ export class ProxyNodeRepository {
       .run(result.status, result.latencyMs, now, result.failureCount, result.cooldownUntil, now, id);
   }
 
-  /** 该节点当前绑定的账号 ID 列表。 */
+  /** Danh sách ID tài khoản hiện đang liên kết với node này. */
   boundAccountIds(id: string): string[] {
     const rows = asRows<{ id: string }>(
       this.#db.prepare('SELECT id FROM accounts WHERE proxy_node_id = ?').all(id),
@@ -221,7 +221,7 @@ export class ProxyNodeRepository {
   }
 }
 
-/** 组装对外视图。`urlMasked` 必须由调用方用 `maskProxyUrl(repo.decryptUrl(row))` 算好传入。 */
+/** Lắp ráp view đối ngoại. `urlMasked` bắt buộc do bên gọi tính trước qua `maskProxyUrl(repo.decryptUrl(row))` rồi truyền vào. */
 export function toProxyNodeView(row: ProxyNodeRow, urlMasked: string, boundAccounts: string[]): ProxyNodeView {
   return {
     id: row.id,

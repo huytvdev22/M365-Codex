@@ -15,11 +15,11 @@ import {
 } from '../../apps/server/dist/config/index.js';
 
 /**
- * 账号来源：网关自己的 SQLite 数据库（对应实施计划 §3.2「探针从现有授权账号读取
- * Token」）。账号只能经 PKCE 授权流程添加，探针不做任何登录，只读已有账号。
+ * Nguồn tài khoản: Cơ sở dữ liệu SQLite của chính gateway (tương ứng kế hoạch triển khai §3.2 "Probe đọc Token từ tài khoản ủy quyền hiện có").
+ * Tài khoản chỉ có thể được thêm qua quy trình ủy quyền PKCE, probe không thực hiện bất kỳ đăng nhập nào, chỉ đọc tài khoản hiện có.
  *
- * 铁律：Token 解密后只在内存里传递给 WebSocket URL 构造函数，探针任何一层都
- * 不得把它写进文件、日志或返回值以外的地方。
+ * Quy tắc sắt: Token sau khi giải mã chỉ truyền trong bộ nhớ cho hàm tạo URL WebSocket, bất kỳ tầng nào của probe
+ * đều không được ghi nó vào file, log hay bất kỳ nơi nào ngoài giá trị trả về.
  */
 
 export interface OpenAccountDbOptions {
@@ -46,7 +46,7 @@ function parseMasterKey(raw: string): Buffer {
   return decoded;
 }
 
-/** 打开账号数据库并准备好读取/刷新 Token 所需的组件。不做 schema 之外的任何改动。 */
+/** Mở database tài khoản và chuẩn bị các component cần thiết để đọc/refresh Token. Không thực hiện bất kỳ thay đổi nào ngoài schema. */
 export function openAccountSource(options: OpenAccountDbOptions): AccountSource {
   const masterKey = parseMasterKey(options.masterKeyBase64);
   const db = openDatabase(options.dbPath);

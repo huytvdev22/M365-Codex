@@ -3,13 +3,13 @@ import type { Cryptor } from '../crypto/index.js';
 import { asRow, type Database } from '../db/index.js';
 
 /**
- * PKCE 授权会话。
+ * Phiên ủy quyền PKCE.
  *
- * 三条硬性保证：
- * 1. code_verifier 加密存储（它能换 Token，属于凭据）；
- * 2. 会话 10 分钟过期；
- * 3. 授权码只能消费一次——用带 `consumed_at IS NULL` 条件的 UPDATE 实现，
- *    并发提交同一个 state 时只有一个能拿到会话。
+ * Ba đảm bảo cứng:
+ * 1. code_verifier được lưu trữ mã hóa (nó có thể đổi ra Token, thuộc về thông tin xác thực);
+ * 2. Phiên hết hạn sau 10 phút;
+ * 3. Mã ủy quyền chỉ có thể tiêu thụ một lần — thực hiện bằng UPDATE với điều kiện `consumed_at IS NULL`,
+ *    khi gửi đồng thời cùng một state chỉ có một yêu cầu lấy được phiên.
  */
 
 export const OAUTH_SESSION_TTL_MS = 10 * 60 * 1000;
@@ -77,8 +77,8 @@ export class OAuthSessionRepository {
   }
 
   /**
-   * 原子消费：只有把 consumed_at 从 NULL 改成时间戳的那次调用能成功。
-   * 并发重放同一个授权码时，后来者会拿到 `already_consumed`。
+   * Tiêu thụ nguyên tử: chỉ lần gọi nào đổi thành công consumed_at từ NULL sang timestamp mới thành công.
+   * Khi phát lại đồng thời cùng một mã ủy quyền, người đến sau sẽ nhận được `already_consumed`.
    */
   consume(state: string, now = Date.now()): ConsumeResult {
     const row = this.find(state);
@@ -104,7 +104,7 @@ export class OAuthSessionRepository {
     return { ok: true, codeVerifier, redirectUri: row.redirect_uri };
   }
 
-  /** 清理过期与已消费的会话，避免 code_verifier 密文长期滞留。 */
+  /** Dọn dẹp các phiên hết hạn và đã tiêu thụ, tránh việc bản mã code_verifier lưu lại lâu dài. */
   purge(now = Date.now(), consumedRetentionMs = 60 * 60 * 1000): number {
     const expired = this.#db.prepare('DELETE FROM oauth_sessions WHERE expires_at <= ?').run(now);
     const consumed = this.#db

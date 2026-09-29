@@ -30,10 +30,10 @@ import type {
 } from './types';
 
 /**
- * 真实服务端实现。接口路径与方法严格照 docs/管理端API契约.md。
+ * Triển khai máy chủ thực tế. Đường dẫn và phương thức API tuân thủ nghiêm ngặt quy ước API quản trị.
  *
- * 注意几处已知的、和现有 M1–M2 代码实现之间可能存在的出入（见本次任务最终报告），
- * 这里按契约文档写；服务端如果保留了旧路径，需要在联调时二选一对齐。
+ * Chú ý một số điểm khác biệt có thể có giữa tài liệu quy ước và mã nguồn M1-M2,
+ * tại đây viết theo tài liệu quy ước; nếu máy chủ giữ đường dẫn cũ cần đồng bộ khi tích hợp.
  */
 export const realAdminApi: AdminApi = {
   login: (password) => request<LoginResponse>('/admin/login', { method: 'POST', body: { password } }),
@@ -97,10 +97,9 @@ export const realAdminApi: AdminApi = {
     (r) => r.data,
   ),
 
-  // 备份 / 恢复 / 诊断：路径与返回字段见 apps/server/src/routes/backup.ts。
-  // 注：服务端当前实现里 POST /admin/backup 尚未真正读取 body 里的 includeFiles
-  // （处理函数直接调用 context.backup.create() 不带参数），这里仍按契约把它传过去，
-  // 服务端补上读取逻辑后前端不需要再改。
+  // Sao lưu / Phục hồi / Chẩn đoán: đường dẫn và trường trả về xem tại apps/server/src/routes/backup.ts.
+  // Ghi chú: Phía server hiện tại chưa đọc includeFiles trong body POST /admin/backup,
+  // ở đây vẫn truyền theo quy ước, khi server cập nhật thì frontend không cần sửa lại.
   createBackup: (options) => request<BackupInfo>('/admin/backup', { method: 'POST', body: options ?? {} }),
   listBackups: () => request<BackupListResponse>('/admin/backup').then((r) => r.items),
   downloadBackup: (id) => requestBlob(`/admin/backup/${id}/download`),

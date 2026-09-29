@@ -6,7 +6,7 @@ import { evaluateVerdict, type Verdict } from './verdict.js';
 import type { CapabilityResult } from './types.js';
 
 export interface AccountRunResult {
-  /** 展示用标签，已脱敏（例如掩码邮箱 + tid 前 8 位），绝不含真实完整邮箱 */
+  /** Nhãn hiển thị, đã khử nhạy cảm (ví dụ email đã mask + 8 ký tự đầu của tid), tuyệt đối không chứa email đầy đủ thật */
   label: string;
   results: CapabilityResult[];
 }
@@ -182,7 +182,7 @@ export function renderJsonReport(report: ProbeRunReport): string {
   return JSON.stringify(payload, null, 2);
 }
 
-/** 写盘前统一做一次脱敏检查（§4 硬红线），任何一处失败都不落盘。 */
+/** Kiểm tra khử nhạy cảm thống nhất một lần trước khi ghi ra đĩa (ranh giới đỏ cứng §4), bất kỳ vị trí nào thất bại đều không ghi đĩa. */
 export function writeReportFiles(outDir: string, report: ProbeRunReport): { markdownPath: string; jsonPath: string } {
   mkdirSync(outDir, { recursive: true });
   const timestamp = new Date(report.generatedAt).toISOString().replaceAll(/[:.]/g, '-');

@@ -115,7 +115,7 @@ describe('FileRepository', () => {
     files.create({
       id: 'file_8', apiKeyId, filename: 'b.txt', purpose: 'user_data', mimeType: 'text/plain',
       kind: 'text', bytes: 50, sha256: 'f'.repeat(64), status: 'processed', extractedText: null,
-      extractionNote: null, expiresAt: now - 1000, // 已过期，不计入
+      extractionNote: null, expiresAt: now - 1000, // Đã hết hạn, không tính vào
     });
     expect(files.sumActiveBytes(apiKeyId, now)).toBe(100);
   });

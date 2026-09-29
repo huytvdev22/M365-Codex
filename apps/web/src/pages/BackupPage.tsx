@@ -8,15 +8,15 @@ import { useAsync } from '../hooks/useAsync';
 import { formatBytes, formatDateTime } from '../util/format';
 
 /**
- * 备份 / 恢复 / 诊断，对应服务端 apps/server/src/routes/backup.ts：
- *   POST /admin/backup、GET /admin/backup、GET /admin/backup/:id/download、
- *   POST /admin/restore、GET /admin/diagnostics。
+ * Sao lưu / Phục hồi / Chẩn đoán, tương ứng phía server apps/server/src/routes/backup.ts:
+ *   POST /admin/backup, GET /admin/backup, GET /admin/backup/:id/download,
+ *   POST /admin/restore, GET /admin/diagnostics.
  *
- * 恢复的语义必须如实传达：服务端只做「校验 + 落盘」，正在运行的进程仍持有旧库连接，
- * 界面上任何地方都不能暗示恢复完成即已生效——上传成功后必须重启服务。
+ * Ngữ nghĩa phục hồi cần truyền đạt chính xác: server chỉ thực hiện "Kiểm tra + Ghi đĩa", tiến trình đang chạy vẫn giữ kết nối CSDL cũ,
+ * giao diện không được ngầm hiểu phục hồi xong là có hiệu lực ngay — sau khi tải lên thành công bắt buộc phải khởi động lại server.
  */
 
-/** 触发浏览器下载一个内存中的 Blob；用完立即释放 object URL，不常驻。 */
+/** Kích hoạt trình duyệt tải xuống một Blob trong bộ nhớ; giải phóng object URL ngay sau khi dùng. */
 function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -45,7 +45,7 @@ function CreateBackupCard({ onCreated }: { onCreated: (info: BackupInfo) => void
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>生成备份</h2>
+      <h2 style={{ marginTop: 0 }}>Tạo bản sao lưu</h2>
       <div className="field">
         <label className="checkbox-row">
           <input
@@ -53,12 +53,12 @@ function CreateBackupCard({ onCreated }: { onCreated: (info: BackupInfo) => void
             checked={includeFiles}
             onChange={(e) => setIncludeFiles(e.target.checked)}
           />
-          包含已上传文件
+          Bao gồm các tệp đã tải lên
         </label>
         <span className="field-hint">
-          备份始终包含数据库快照（VACUUM INTO 生成的一致性快照）；勾选后额外打包 <code>files/</code>{' '}
-          目录下的原始上传文件。主密钥不会写入备份包——换机器恢复时仍需提供同一个{' '}
-          <code>M365_CODEX_MASTER_KEY</code>。
+          Bản sao lưu luôn bao gồm snapshot CSDL nhất quán (tạo bằng VACUUM INTO); tích chọn mục này sẽ đóng gói thêm
+          toàn bộ tệp trong thư mục <code>files/</code>. Khóa chủ không nằm trong bản sao lưu — khi phục hồi sang máy khác
+          vẫn cần cung cấp cùng một <code>M365_CODEX_MASTER_KEY</code>.
         </span>
       </div>
       {error !== null && (
@@ -67,7 +67,7 @@ function CreateBackupCard({ onCreated }: { onCreated: (info: BackupInfo) => void
         </div>
       )}
       <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={creating}>
-        {creating ? '生成中…' : '生成备份'}
+        {creating ? 'Đang tạo…' : 'Tạo bản sao lưu'}
       </button>
     </div>
   );
@@ -91,9 +91,9 @@ function BackupListCard({ refreshKey }: { refreshKey: number }) {
   return (
     <div className="card table-wrap">
       <div className="flex-between" style={{ marginBottom: 10 }}>
-        <h2 style={{ margin: 0 }}>备份列表</h2>
+        <h2 style={{ margin: 0 }}>Danh sách bản sao lưu</h2>
         <button type="button" className="btn btn-sm" onClick={reload}>
-          刷新
+          Làm mới
         </button>
       </div>
       <AsyncSection
@@ -102,16 +102,16 @@ function BackupListCard({ refreshKey }: { refreshKey: number }) {
         data={data}
         onRetry={reload}
         isEmpty={(list) => list.length === 0}
-        emptyTitle="还没有生成过任何备份"
+        emptyTitle="Chưa có bản sao lưu nào được tạo"
       >
         {(backups) => (
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>大小</th>
-                <th>生成时间</th>
-                <th>操作</th>
+                <th>Kích thước</th>
+                <th>Thời gian tạo</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -127,7 +127,7 @@ function BackupListCard({ refreshKey }: { refreshKey: number }) {
                       disabled={downloadingId === backup.id}
                       onClick={() => handleDownload(backup)}
                     >
-                      {downloadingId === backup.id ? '下载中…' : '下载'}
+                      {downloadingId === backup.id ? 'Đang tải…' : 'Tải về'}
                     </button>
                     {downloadError?.id === backup.id && (
                       <div style={{ marginTop: 8, maxWidth: 280 }}>
@@ -161,9 +161,9 @@ function RestoreCard() {
     if (file === null) return;
     if (
       !window.confirm(
-        '即将上传备份包并覆盖当前数据库（文件目录视备份内容而定）。\n' +
-          '校验通过只代表已经写入磁盘，绝不代表当前正在运行的服务已经切换到新数据——\n' +
-          '必须在恢复后手动重启服务，重启前服务仍按旧数据运行。确认继续？',
+        'Sắp tải lên gói sao lưu và ghi đè cơ sở dữ liệu hiện tại (thư mục tệp tùy thuộc nội dung sao lưu).\n\n' +
+          'Xác minh thành công chỉ đại diện cho việc dữ liệu đã ghi xuống đĩa, tuyệt đối KHÔNG có nghĩa là dịch vụ đang chạy đã chuyển sang dữ liệu mới —\n' +
+          'Bắt buộc phải khởi động lại dịch vụ sau khi phục hồi, trước khi khởi động lại dịch vụ vẫn chạy trên dữ liệu cũ. Xác nhận tiếp tục?',
       )
     ) {
       return;
@@ -180,17 +180,17 @@ function RestoreCard() {
 
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>从备份恢复</h2>
+      <h2 style={{ marginTop: 0 }}>Phục hồi từ bản sao lưu</h2>
       <div className="error-banner" style={{ marginBottom: 12 }}>
-        <div className="error-title">恢复不会立即生效</div>
+        <div className="error-title">Phục hồi sẽ không có hiệu lực ngay lập tức</div>
         <div>
-          上传的备份包会先做格式与版本校验，通过后写入数据目录；但当前正在运行的进程仍持有旧数据库的连接，
-          <strong>必须手动重启服务后，恢复的数据才会真正生效</strong>。重启之前，服务表现如同什么都没发生过。
+          Gói sao lưu tải lên sẽ được kiểm tra định dạng và phiên bản schema trước khi ghi vào thư mục dữ liệu; tuy nhiên tiến trình server đang chạy vẫn giữ kết nối đến CSDL cũ,
+          <strong> bắt buộc phải khởi động lại server thủ công thì dữ liệu phục hồi mới thực sự có hiệu lực</strong>. Trước khi khởi động lại, dịch vụ vẫn hoạt động trên dữ liệu cũ.
         </div>
       </div>
       <form onSubmit={handleSubmit}>
         <div className="field">
-          <label htmlFor="restore-file">备份包文件（.tar.gz）</label>
+          <label htmlFor="restore-file">Tệp gói sao lưu (.tar.gz)</label>
           <input id="restore-file" type="file" accept=".gz,.tar.gz" onChange={handleFileChange} />
         </div>
         {error !== null && (
@@ -199,23 +199,23 @@ function RestoreCard() {
           </div>
         )}
         <button type="submit" className="btn btn-danger" disabled={restoring || file === null}>
-          {restoring ? '上传并校验中…' : '上传并恢复'}
+          {restoring ? 'Đang tải lên và kiểm tra…' : 'Tải lên & Phục hồi'}
         </button>
       </form>
       {result !== null && (
         <div className="error-banner" style={{ marginTop: 14 }}>
           <div className="error-title">
             <span className="badge badge-warn" style={{ marginRight: 8 }}>
-              需要重启才会生效
+              Cần khởi động lại để áp dụng
             </span>
-            备份已写入数据目录
+            Đã ghi bản sao lưu vào thư mục dữ liệu
           </div>
           <div>{result.message}</div>
           <div className="text-muted" style={{ marginTop: 8 }}>
-            备份生成于 {formatDateTime(result.manifest.created_at)} · schema v{result.manifest.schema_version} ·
+            Bản sao lưu tạo lúc {formatDateTime(result.manifest.created_at)} · schema v{result.manifest.schema_version} ·
             {result.manifest.includes_files
-              ? ` 含 ${result.manifest.file_count} 个文件`
-              : ' 不含上传文件'}
+              ? ` Bao gồm ${result.manifest.file_count} tệp`
+              : ' Không bao gồm tệp đã tải lên'}
           </div>
         </div>
       )}
@@ -249,20 +249,20 @@ function DiagnosticsCard() {
   return (
     <div className="card">
       <div className="flex-between" style={{ marginBottom: 10 }}>
-        <h2 style={{ margin: 0 }}>诊断包</h2>
+        <h2 style={{ margin: 0 }}>Gói chẩn đoán (Diagnostics)</h2>
         <div className="flex gap-8">
           {report !== null && (
             <button type="button" className="btn btn-sm" onClick={handleDownloadJson}>
-              下载 JSON
+              Tải JSON
             </button>
           )}
           <button type="button" className="btn btn-sm btn-primary" onClick={handleGenerate} disabled={loading}>
-            {loading ? '生成中…' : '生成诊断包'}
+            {loading ? 'Đang tạo…' : 'Tạo gói chẩn đoán'}
           </button>
         </div>
       </div>
       <div className="field-hint" style={{ marginBottom: 12 }}>
-        只汇总结构化计数与脱敏后的配置摘要，不含提示词、输出正文、邮箱、Token 或文件名，可以放心随报障工单一起提供。
+        Chỉ tổng hợp số liệu thống kê và cấu hình tóm tắt đã được khử dữ liệu nhạy cảm, không chứa prompt, văn bản đầu ra, email, Token hay tên file; an toàn để đính kèm khi báo cáo lỗi.
       </div>
       {error !== null && (
         <div style={{ marginBottom: 12 }}>
@@ -272,37 +272,37 @@ function DiagnosticsCard() {
       {report !== null && (
         <div className="grid grid-cols-2">
           <div>
-            <div className="stat-label">系统状态</div>
+            <div className="stat-label">Trạng thái hệ thống</div>
             <div>{report.system_status}</div>
           </div>
           <div>
-            <div className="stat-label">运行时长</div>
-            <div>{Math.round(report.uptime_ms / 60_000)} 分钟</div>
+            <div className="stat-label">Thời gian chạy</div>
+            <div>{Math.round(report.uptime_ms / 60_000)} phút</div>
           </div>
           <div>
-            <div className="stat-label">数据库结构版本</div>
+            <div className="stat-label">Phiên bản cấu trúc CSDL</div>
             <div>
-              v{report.schema.current}（期望 v{report.schema.expected}）{report.schema.ok ? '' : ' · 不一致'}
+              v{report.schema.current} (kỳ vọng v{report.schema.expected}){report.schema.ok ? '' : ' · Không khớp'}
             </div>
           </div>
           <div>
-            <div className="stat-label">存储占用</div>
+            <div className="stat-label">Dung lượng lưu trữ</div>
             <div>
-              数据库 {formatBytes(report.storage.db_bytes)} · 文件 {formatBytes(report.storage.files_bytes)}（
-              {report.storage.file_count} 个）
+              CSDL {formatBytes(report.storage.db_bytes)} · Tệp {formatBytes(report.storage.files_bytes)} (
+              {report.storage.file_count} tệp)
             </div>
           </div>
           <div>
-            <div className="stat-label">可用账号</div>
+            <div className="stat-label">Tài khoản khả dụng</div>
             <div>{report.accounts_usable}</div>
           </div>
           <div>
-            <div className="stat-label">进行中请求</div>
+            <div className="stat-label">Yêu cầu đang xử lý</div>
             <div>{report.in_flight_requests}</div>
           </div>
           {report.notes.length > 0 && (
             <div style={{ gridColumn: '1 / -1' }}>
-              <div className="stat-label">备注</div>
+              <div className="stat-label">Ghi chú</div>
               <ul>
                 {report.notes.map((note) => (
                   <li key={note} className="text-muted">
@@ -328,18 +328,18 @@ export function BackupPage() {
   };
 
   return (
-    <Layout title="备份与恢复" subtitle="数据库与文件备份、恢复、诊断包导出">
+    <Layout title="Sao lưu & Phục hồi" subtitle="Sao lưu, phục hồi cơ sở dữ liệu & tệp tin, xuất gói chẩn đoán hệ thống">
       <div className="grid grid-cols-2">
         <CreateBackupCard onCreated={handleCreated} />
         <div className="card">
-          <h2 style={{ marginTop: 0 }}>最近一次生成</h2>
+          <h2 style={{ marginTop: 0 }}>Lần tạo gần nhất</h2>
           {lastCreated === null ? (
-            <div className="text-muted">尚未在本次会话生成过备份。</div>
+            <div className="text-muted">Chưa tạo bản sao lưu nào trong phiên làm việc này.</div>
           ) : (
             <div>
               <div className="flex gap-8" style={{ alignItems: 'center' }}>
                 <span className="mono">{lastCreated.id}</span>
-                <CopyButton value={lastCreated.id} label="复制 ID" />
+                <CopyButton value={lastCreated.id} label="Sao chép ID" />
               </div>
               <div className="text-muted" style={{ marginTop: 6 }}>
                 {formatBytes(lastCreated.bytes)} · {formatDateTime(lastCreated.created_at)}

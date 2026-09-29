@@ -1,8 +1,8 @@
 /**
- * 数据库迁移定义。
+ * Định nghĩa migration cơ sở dữ liệu.
  *
- * 迁移只增不改：已发布的迁移不得原地修改，只能追加新版本。
- * 每个里程碑补齐自己需要的表，避免提前建出无人使用的空表。
+ * Migration chỉ thêm chứ không sửa: migration đã phát hành không được sửa đổi tại chỗ mà chỉ thêm phiên bản mới.
+ * Mỗi milestone bổ sung các bảng cần thiết cho mình, tránh tạo trước các bảng rỗng không có người dùng.
  */
 
 export interface Migration {
@@ -12,14 +12,14 @@ export interface Migration {
 }
 
 const M001_CORE = `
--- 通用键值设置表
+-- Bảng cài đặt key-value chung
 CREATE TABLE settings (
   key        TEXT PRIMARY KEY,
   value      TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
 
--- 对外 API Key。库中只存哈希与索引前缀，不存明文。
+-- API Key đối ngoại. CSDL chỉ lưu hash và prefix index, không lưu plain text.
 CREATE TABLE api_keys (
   id                TEXT PRIMARY KEY,
   name              TEXT NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE api_keys (
 CREATE INDEX idx_api_keys_prefix ON api_keys (prefix);
 CREATE INDEX idx_api_keys_enabled ON api_keys (enabled);
 
--- 管理端会话。只存会话令牌的哈希。
+-- Phiên quản trị. Chỉ lưu hash của token phiên.
 CREATE TABLE admin_sessions (
   id           TEXT PRIMARY KEY,
   token_hash   TEXT NOT NULL UNIQUE,
@@ -53,7 +53,7 @@ CREATE TABLE admin_sessions (
 );
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions (expires_at);
 
--- 审计日志：管理侧的敏感操作留痕，不记录任何凭据内容。
+-- Nhật ký kiểm toán (audit log): Lưu dấu vết thao tác nhạy cảm phía quản trị, không ghi lại thông tin xác thực.
 CREATE TABLE audit_logs (
   id         TEXT PRIMARY KEY,
   actor      TEXT NOT NULL,
@@ -67,7 +67,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs (created_at);
 `;
 
 const M002_ACCOUNTS = `
--- Microsoft 账号。同一 (租户, 对象) 只保留一条，重复授权走更新而非新增。
+-- Tài khoản Microsoft. Cùng cặp (tenant, object) chỉ lưu 1 bản ghi, ủy quyền lại sẽ cập nhật thay vì thêm mới.
 CREATE TABLE accounts (
   id            TEXT PRIMARY KEY,
   tid           TEXT NOT NULL,
@@ -83,7 +83,7 @@ CREATE TABLE accounts (
 );
 CREATE INDEX idx_accounts_status ON accounts (status);
 
--- 账号 Token。access/refresh 均以 AES-256-GCM 加密存储，各自独立 nonce。
+-- Token tài khoản. Cả access/refresh đều được mã hóa bằng AES-256-GCM, mỗi trường có nonce độc lập.
 CREATE TABLE account_tokens (
   account_id        TEXT PRIMARY KEY REFERENCES accounts (id) ON DELETE CASCADE,
   access_token_enc  BLOB,
@@ -95,7 +95,7 @@ CREATE TABLE account_tokens (
   rotated_at        INTEGER
 );
 
--- 账号健康度。调度器据此做冷却与择优，M3 会继续扩展。
+-- Độ khỏe tài khoản. Bộ điều phối dựa vào đây để làm nguội và lựa chọn tài khoản tối ưu, M3 tiếp tục mở rộng.
 CREATE TABLE account_health (
   account_id           TEXT PRIMARY KEY REFERENCES accounts (id) ON DELETE CASCADE,
   last_ok_at           INTEGER,
@@ -106,8 +106,8 @@ CREATE TABLE account_health (
   updated_at           INTEGER NOT NULL
 );
 
--- PKCE 授权会话。code_verifier 属于凭据，同样加密存储。
--- consumed_at 保证授权码只能被消费一次。
+-- Phiên ủy quyền PKCE. code_verifier là dữ liệu nhạy cảm, cũng được mã hóa lưu trữ.
+-- consumed_at đảm bảo mã ủy quyền chỉ được sử dụng một lần duy nhất.
 CREATE TABLE oauth_sessions (
   state               TEXT PRIMARY KEY,
   code_verifier_enc   BLOB NOT NULL,
@@ -123,12 +123,12 @@ CREATE INDEX idx_oauth_sessions_expires_at ON oauth_sessions (expires_at);
 `;
 
 const M003_RESPONSES = `
--- Responses 请求记录。
--- 每次请求都记录 requested_* 与 upstream/reported_* 四组模型信息（对应实施计划 §4.2）：
---   requested_model / requested_reasoning_effort：客户端请求的原值
---   upstream_model_parameter：实际透传给上游的值
---   reported_upstream_model：上游自报的模型（可能与请求不一致）
--- body 存完成后的 Response JSON，供 GET /v1/responses/:id 返回。
+-- Bản ghi yêu cầu Responses.
+-- Mỗi yêu cầu đều ghi lại 4 nhóm thông tin model requested_* và upstream/reported_* (tương ứng §4.2):
+--   requested_model / requested_reasoning_effort: Giá trị gốc của client request
+--   upstream_model_parameter: Giá trị thực tế chuyển tiếp tới upstream
+--   reported_upstream_model: Model do upstream tự báo cáo (có thể khác với request)
+-- body lưu JSON Response sau khi hoàn tất, phục vụ trả về cho GET /v1/responses/:id.
 CREATE TABLE responses (
   id                         TEXT PRIMARY KEY,
   api_key_id                 TEXT REFERENCES api_keys (id),
@@ -149,8 +149,8 @@ CREATE TABLE responses (
 CREATE INDEX idx_responses_api_key ON responses (api_key_id);
 CREATE INDEX idx_responses_status ON responses (status);
 
--- Response ↔ 账号 ↔ 上游会话的粘性绑定（对应实施计划 §5）。
--- previous_response_id 续接时据此复用同一账号与上游会话。
+-- Ràng buộc dính giữa Response ↔ Tài khoản ↔ Phiên upstream (tương ứng §5).
+-- previous_response_id khi tiếp tục phiên dựa vào đây để tái sử dụng cùng tài khoản và phiên upstream.
 CREATE TABLE conversation_bindings (
   response_id               TEXT PRIMARY KEY REFERENCES responses (id) ON DELETE CASCADE,
   account_id                TEXT REFERENCES accounts (id),
@@ -160,9 +160,9 @@ CREATE TABLE conversation_bindings (
 `;
 
 const M004_TOOL_CALLS = `
--- 工具调用记录（对应实施计划 §5、§M5）。
--- UNIQUE (response_id, call_id) + status 保证同一工具调用不因重连/重复提交而重复执行。
--- side_effect 标记该工具是否可能产生副作用；副作用阶段禁止自动跨账号重放。
+-- Bản ghi gọi công cụ (tương ứng §5, §M5).
+-- UNIQUE (response_id, call_id) + status đảm bảo cùng một lệnh gọi công cụ không bị thực thi lặp do reconnect/submit lại.
+-- side_effect đánh dấu công cụ có thể tạo tác dụng phụ hay không; giai đoạn tác dụng phụ cấm tự động replay qua tài khoản khác.
 CREATE TABLE tool_calls (
   id          TEXT PRIMARY KEY,
   response_id TEXT NOT NULL REFERENCES responses (id) ON DELETE CASCADE,
@@ -178,18 +178,18 @@ CREATE TABLE tool_calls (
 );
 CREATE INDEX idx_tool_calls_call_id ON tool_calls (call_id);
 
--- 代理循环的计数沿对话链累加（对应实施计划 §7.4 的「最大工具轮次 / 最大累计工具调用数」）。
--- 放在 response 行上是为了 O(1) 拿到上一轮的计数，不必回溯整条 previous_response_id 链。
+-- Đếm vòng lặp agent tích lũy dọc theo chuỗi đối thoại (tương ứng §7.4 "vòng lặp công cụ tối đa / tổng số lệnh gọi tích lũy tối đa").
+-- Đặt trên dòng response để lấy bộ đếm lượt trước với độ phức tạp O(1), không phải duyệt ngược cả chuỗi previous_response_id.
 ALTER TABLE responses ADD COLUMN tool_round INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE responses ADD COLUMN tool_calls_total INTEGER NOT NULL DEFAULT 0;
 `;
 
 const M005_FILES_UPLOADS = `
--- 文件元数据（对应实施计划 §11、§M6）。磁盘上只按 file-id 建目录存内容，
--- 文件名（filename）只入库、绝不直接拼进磁盘路径。
--- status：processed（已按能力提取或明确判定不可提取）/ error（提取失败）。
--- extracted_text 为空且 status=processed 时，表示"已识别但明确不做提取"
--- （如未识别的二进制、图片），extraction_note 说明原因，不是出错。
+-- Metadata tệp (tương ứng §11, §M6). Trên ổ đĩa chỉ tạo thư mục theo file-id để lưu nội dung,
+-- tên tệp (filename) chỉ lưu trong CSDL, tuyệt đối không ghép trực tiếp vào đường dẫn ổ đĩa.
+-- status: processed (đã trích xuất hoặc xác định rõ không thể trích xuất) / error (trích xuất thất bại).
+-- Khi extracted_text rỗng và status=processed biểu thị "đã nhận diện nhưng chủ động không trích xuất"
+-- (như file nhị phân không nhận diện, hình ảnh), extraction_note giải thích lý do, không phải lỗi.
 CREATE TABLE files (
   id               TEXT PRIMARY KEY,
   api_key_id       TEXT NOT NULL REFERENCES api_keys (id) ON DELETE CASCADE,
@@ -209,8 +209,8 @@ CREATE TABLE files (
 CREATE INDEX idx_files_api_key ON files (api_key_id);
 CREATE INDEX idx_files_expires_at ON files (expires_at);
 
--- 分片上传（Uploads API）。状态流转：pending -> completed / cancelled / expired。
--- 完成后 file_id 指向拼装出的 files 行；取消或过期时清理磁盘上已收到的分片。
+-- Tải lên phân mảnh (Uploads API). Luồng trạng thái: pending -> completed / cancelled / expired.
+-- Sau khi hoàn tất file_id trỏ tới dòng files được lắp ráp; khi hủy hoặc hết hạn thì dọn dẹp các mảnh đã nhận trên đĩa.
 CREATE TABLE uploads (
   id          TEXT PRIMARY KEY,
   api_key_id  TEXT NOT NULL REFERENCES api_keys (id) ON DELETE CASCADE,
@@ -226,8 +226,8 @@ CREATE TABLE uploads (
 CREATE INDEX idx_uploads_api_key ON uploads (api_key_id);
 CREATE INDEX idx_uploads_status_expires ON uploads (status, expires_at);
 
--- 分片：每个 part 落一份独立磁盘文件（<DATA_DIR>/files/uploads/<upload-id>/<part-id>），
--- complete 时按 part_ids 给定的顺序拼接。part_number 只用于同一 upload 内去重与追踪。
+-- Mảnh phân đoạn: Mỗi part lưu thành một file đĩa độc lập (<DATA_DIR>/files/uploads/<upload-id>/<part-id>),
+-- khi complete sẽ ghép theo thứ tự chỉ định trong part_ids. part_number chỉ dùng khử trùng lặp và theo dõi trong cùng upload.
 CREATE TABLE upload_parts (
   id           TEXT PRIMARY KEY,
   upload_id    TEXT NOT NULL REFERENCES uploads (id) ON DELETE CASCADE,
@@ -239,11 +239,11 @@ CREATE TABLE upload_parts (
 `;
 
 const M006_IDEMPOTENCY = `
--- 请求幂等（对应实施计划 §18）。
--- 主键是 (key, api_key_id, endpoint) 三元组：幂等键的作用域限定在单个 API Key
--- 与单个端点内，不同 Key 用同一个字符串互不干扰。
--- request_fingerprint 存请求体的稳定哈希：同一把键配不同请求体属于客户端用错键，
--- 必须报错，而不是把两个不同请求当成同一个。
+-- Tính bất biến/idempotency của yêu cầu (tương ứng §18).
+-- Khóa chính là bộ ba (key, api_key_id, endpoint): Phạm vi khóa idempotency giới hạn trong từng API Key
+-- và từng endpoint, chuỗi giống nhau giữa các Key khác nhau hoàn toàn độc lập.
+-- request_fingerprint lưu hash ổn định của request body: Cùng key mà gửi body khác nhau là client dùng sai key,
+-- bắt buộc phải báo lỗi, không được xem hai request khác nhau là một.
 CREATE TABLE idempotency_keys (
   key                 TEXT NOT NULL,
   api_key_id          TEXT NOT NULL REFERENCES api_keys (id) ON DELETE CASCADE,
@@ -261,9 +261,9 @@ CREATE INDEX idx_idempotency_created_at ON idempotency_keys (created_at);
 `;
 
 const M007_PROXY_NODES = `
--- 出口代理池（对应实施计划 §13.1、§M7）。
--- url 含账号密码，属于凭据，与 Token 同规格 AES-256-GCM 加密存储；
--- 列表接口只返回打码后的 url_masked（见 repo/proxyNodes.ts），明文永不出网关。
+-- Nhóm proxy outbound (tương ứng §13.1, §M7).
+-- url chứa tài khoản mật khẩu thuộc dữ liệu nhạy cảm, mã hóa AES-256-GCM cùng chuẩn với Token;
+-- Giao diện danh sách chỉ trả về url_masked đã che mặt nạ (xem repo/proxyNodes.ts), plain text không bao giờ ra khỏi gateway.
 CREATE TABLE proxy_nodes (
   id             TEXT PRIMARY KEY,
   name           TEXT NOT NULL,
@@ -286,19 +286,19 @@ CREATE INDEX idx_proxy_nodes_enabled ON proxy_nodes (enabled);
 `;
 
 const M008_RESPONSES_DROP_IDEMPOTENCY_UNIQUE = `
--- 放宽 responses 表的唯一约束（对应实施计划 §18 幂等改造）。
--- M003 建表时把 UNIQUE (api_key_id, idempotency_key) 直接放在 responses 表上，
--- 当时是"完整语义在 M7"之前的占位约束；现在完整的幂等保证已经收敛到独立的
--- idempotency_keys 表（begin/complete/release，作用域含 endpoint；流式请求
--- 执行完会 release 这把键，允许同键之后重新执行）。这条表级约束反而会跟
--- "同键释放后重新执行"冲突——第二次 INSERT 一个新的 response 行时撞见旧约束报错。
--- 因此这里重建表去掉该约束：idempotency_key 列继续保留供审计/回溯，
--- 不再承担唯一性职责；SQLite 不支持 DROP CONSTRAINT，只能整表重建。
+-- Nới lỏng ràng buộc duy nhất của bảng responses (tương ứng tái cấu trúc idempotency §18).
+-- M003 khi tạo bảng đã đặt trực tiếp UNIQUE (api_key_id, idempotency_key) trên bảng responses,
+-- lúc đó là ràng buộc giữ chỗ trước khi "ngữ nghĩa hoàn chỉnh ở M7"; hiện nay bảo đảm idempotency đầy đủ đã thu về bảng
+-- idempotency_keys độc lập (begin/complete/release, phạm vi kèm endpoint; request dạng stream
+-- khi thực thi xong sẽ release key này, cho phép cùng key thực thi lại sau). Ràng buộc cấp bảng này ngược lại sẽ xung đột
+-- với việc "thực thi lại sau khi giải phóng cùng key" — khi INSERT lần thứ hai một dòng response mới sẽ đụng ràng buộc cũ báo lỗi.
+-- Do đó ở đây dựng lại bảng để xóa ràng buộc này: Cột idempotency_key tiếp tục giữ lại để kiểm toán/truy vết,
+-- không còn gánh vác trách nhiệm duy nhất; SQLite không hỗ trợ DROP CONSTRAINT, bắt buộc phải dựng lại toàn bảng.
 --
--- 陷阱：SQLite 的 DROP TABLE 内部等价于逐行 DELETE 再移除表定义，PRAGMA
--- foreign_keys=ON 时会对每一行触发外键的 ON DELETE 动作——也就是说 DROP TABLE
--- responses 会把 tool_calls、conversation_bindings 里引用这些行的记录级联删空！
--- 因此先把这两张表的数据原样快照出来，重建完 responses 后再插回去。
+-- Cạm bẫy: DROP TABLE của SQLite tương đương DELETE từng dòng rồi mới xóa định nghĩa bảng, khi PRAGMA
+-- foreign_keys=ON sẽ kích hoạt hành động ON DELETE của khóa ngoại trên từng dòng — tức DROP TABLE
+-- responses sẽ xóa theo tầng làm rỗng toàn bộ bản ghi trong tool_calls và conversation_bindings tham chiếu tới các dòng này!
+-- Vì vậy trước tiên chụp snapshot dữ liệu nguyên bản của hai bảng này ra, sau khi dựng lại responses thì chèn lại.
 CREATE TABLE _tool_calls_backup_v8 AS SELECT * FROM tool_calls;
 CREATE TABLE _conversation_bindings_backup_v8 AS SELECT * FROM conversation_bindings;
 
@@ -336,7 +336,7 @@ CREATE INDEX idx_responses_api_key ON responses (api_key_id);
 CREATE INDEX idx_responses_status ON responses (status);
 CREATE INDEX idx_responses_idempotency_lookup ON responses (api_key_id, idempotency_key);
 
--- responses 已经用新表恢复出来，把级联清空的子表数据插回去
+-- responses đã được phục hồi bằng bảng mới, chèn lại dữ liệu các bảng con bị xóa dây chuyền
 DELETE FROM tool_calls;
 INSERT INTO tool_calls SELECT * FROM _tool_calls_backup_v8;
 DELETE FROM conversation_bindings;
@@ -347,16 +347,16 @@ DROP TABLE _conversation_bindings_backup_v8;
 `;
 
 const M009_API_KEYS_EXTRA_FIELDS = `
--- API Key 补齐计划 §10.1 列出、此前一直没做的四项（对应本次改动）：
--- 备注（note，纯展示用）、累计请求次数（request_count，管理界面用量展示）、
--- 按 Key 收紧的工具调用次数上限（max_tool_calls）与单文件/单个上传分片大小
--- 上限（max_file_bytes）。后两者都是"只能更严、不能突破全局天花板"的语义
--- （与既有 rpm_limit/daily_limit/max_concurrency 一致），生效逻辑分别接进
--- responses/service.ts 的工具轮次计数与 files/service.ts 的大小校验，
--- 取 min(Key 自身设置, 全局配置)。
+-- Bổ sung 4 trường API Key được liệt kê trong kế hoạch §10.1:
+-- Ghi chú (note, chỉ hiển thị), số lần yêu cầu tích lũy (request_count, hiển thị lượng dùng trên trang quản trị),
+-- giới hạn số lần gọi công cụ siết chặt theo Key (max_tool_calls) và giới hạn kích thước tệp/mảnh upload đơn lẻ
+-- (max_file_bytes). Cả hai trường sau đều mang ngữ nghĩa "chỉ có thể chặt chẽ hơn, không vượt quá trần toàn cục"
+-- (nhất quán với rpm_limit/daily_limit/max_concurrency sẵn có), logic áp dụng lần lượt tích hợp vào
+-- bộ đếm vòng công cụ của responses/service.ts và kiểm tra kích thước của files/service.ts,
+-- lấy min(cài đặt của Key, cấu hình toàn cục).
 --
--- request_count 的更新时机和 last_used_at 一起做（repo/apiKeys.ts 的
--- touch()），不在鉴权热路径上单独多一次写。
+-- Thời điểm cập nhật request_count thực hiện cùng lúc với last_used_at (touch() trong repo/apiKeys.ts),
+-- không ghi thêm một lần riêng lẻ trên đường dẫn xác thực nóng.
 ALTER TABLE api_keys ADD COLUMN note TEXT;
 ALTER TABLE api_keys ADD COLUMN request_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE api_keys ADD COLUMN max_tool_calls INTEGER;

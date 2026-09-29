@@ -1,15 +1,15 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// 开发代理目标可用 VITE_API_TARGET 覆盖，默认打到本机 8080（服务端默认端口）。
+// Mục tiêu proxy phát triển có thể ghi đè bằng VITE_API_TARGET, mặc định trỏ về cổng 8080 (cổng mặc định của server).
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, '.', '');
   const apiTarget = env.VITE_API_TARGET || 'http://127.0.0.1:8080';
 
   return {
-    // 生产构建挂载在 /ui/ 下（服务端静态托管，/admin/* 留给 JSON 管理 API，
-    // 避免同一前缀下一半页面一半接口）；开发模式留在根路径，
-    // 这样 /admin、/v1 的代理规则不会跟应用自身的资源请求打架。
+    // Build production mount tại /ui/ (server phục vụ tĩnh, /admin/* dành cho JSON API quản trị,
+    // tránh việc cùng prefix nửa là trang web nửa là API); Chế độ dev giữ ở root path,
+    // để các quy tắc proxy /admin, /v1 không xung đột với tài nguyên của chính web app.
     base: command === 'build' ? '/ui/' : '/',
     plugins: [react()],
     server: {

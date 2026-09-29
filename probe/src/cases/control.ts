@@ -2,7 +2,7 @@ import { buildEvidence, countEventKind, makeResult, runText } from '../caseHelpe
 import { CANCELLATION_PROMPT, ownLiterals } from '../testInputs.js';
 import type { CapabilityResult, ProbeContext } from '../types.js';
 
-/** #17 请求取消：收到首个分片后主动发送 stop 帧，上游是否及时停止。 */
+/** #17 Hủy yêu cầu: Chủ động gửi stop frame sau khi nhận chunk đầu tiên, xem upstream có dừng kịp thời hay không. */
 export async function caseRequestCancellation(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const controller = new AbortController();
@@ -16,7 +16,7 @@ export async function caseRequestCancellation(ctx: ProbeContext): Promise<Capabi
   });
 
   const deltaCount = countEventKind(outcome, 'text_delta');
-  // 请求要求「不少于 300 字」的长回答，若取消生效，收到的分片数应明显少于完整回答会产生的分片数
+  // Yêu cầu một câu trả lời dài "không dưới 300 từ", nếu việc hủy có hiệu lực, số chunk nhận được phải ít hơn rõ rệt so với câu trả lời hoàn chỉnh
   const cancelledEarly = outcome.closeReason === 'client_cancelled' || deltaCount <= 2;
 
   return makeResult({
@@ -34,7 +34,7 @@ export async function caseRequestCancellation(ctx: ProbeContext): Promise<Capabi
   });
 }
 
-/** #29 客户端断开后上游是否可取消：不发 stop 帧、直接断开连接，观察连接层行为是否干净。 */
+/** #29 Upstream có thể hủy sau khi client ngắt kết nối không: không gửi stop frame, ngắt kết nối trực tiếp, quan sát xem hành vi tầng kết nối có dứt khoát không. */
 export async function caseClientDisconnectCancel(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const controller = new AbortController();

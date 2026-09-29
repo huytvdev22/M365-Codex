@@ -68,8 +68,8 @@ describe('FilesService', () => {
     });
     expect(row.status).toBe('processed');
     expect(row.extracted_text).toBeNull();
-    // 走完整流水线时，无结构信号 + 内容也非法 UTF-8 会先在 classify 阶段判定为
-    // 不可信（这与 extract.ts 单测里直接传 trusted=true 触发的"不猜测"分支不同）
+    // Khi chạy toàn bộ pipeline, không có tín hiệu cấu trúc + nội dung UTF-8 không hợp lệ sẽ bị xác định ở giai đoạn classify là
+    // không đáng tin cậy (khác với nhánh "không phán đoán" được kích hoạt khi truyền trusted=true trong unit test extract.ts)
     expect(row.extraction_note).toContain('不可信');
   });
 
@@ -101,7 +101,7 @@ describe('FilesService', () => {
         filename: 'b.txt',
         purpose: 'user_data',
         declaredMimeType: 'text/plain',
-        content: Buffer.alloc(600, 'b'), // 1000 + 600 > 1500 上限
+        content: Buffer.alloc(600, 'b'), // 1000 + 600 > 1500 giới hạn trên
       }),
     ).rejects.toMatchObject({ status: 413 });
   });

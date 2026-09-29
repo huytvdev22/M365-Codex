@@ -1,20 +1,20 @@
 /**
- * 优雅关闭时中止在途请求所用的 abort reason（对应实施计划 §19）。
+ * Abort reason dùng để hủy các yêu cầu đang bay (in-flight) khi tắt êm (graceful shutdown) (tương ứng kế hoạch triển khai §19).
  *
- * `responses/service.ts` 的 `#run` 靠这个哨兵值区分「用户/客户端主动取消」
- * （`/v1/responses/:id/cancel`、`DELETE`、客户端断开——这些要落库成
- * `cancelled`）与「进程正在优雅关闭」——后者由 `server.ts` 统一按
- * `maintenance/recovery.ts` 同一套「in_progress → incomplete」处置落库，
- * `#run` 自己不再重复写状态，避免两处并发写同一行互相竞争、产生两套语义。
+ * Hàm `#run` của `responses/service.ts` dựa vào giá trị sentinel này để phân biệt giữa "người dùng/client chủ động hủy"
+ * (`/v1/responses/:id/cancel`, `DELETE`, client ngắt kết nối — những trường hợp này cần lưu DB thành
+ * `cancelled`) và "tiến trình đang tắt êm" — trường hợp sau do `server.ts` xử lý thống nhất theo
+ * cùng một cơ chế "in_progress → incomplete" của `maintenance/recovery.ts`,
+ * `#run` tự nó không ghi đè trạng thái nữa, tránh việc hai nơi ghi đồng thời vào cùng một dòng gây tranh chấp và tạo ra hai bộ ngữ nghĩa.
  */
 export const SHUTDOWN_ABORT_REASON = 'm365-codex:graceful-shutdown';
 
 /**
- * 进行中 Response 的取消登记表。
+ * Bảng đăng ký hủy bỏ các Response đang xử lý.
  *
- * 把 responseId 映射到它的 AbortController，让 `POST /v1/responses/:id/cancel`
- * 与 `DELETE /v1/responses/:id` 能中止另一路请求正在进行的上游对话。
- * 只存活于内存——进行中的请求本就绑定在本进程的连接上。
+ * Ánh xạ responseId tới AbortController của nó, giúp `POST /v1/responses/:id/cancel`
+ * và `DELETE /v1/responses/:id` có thể hủy cuộc hội thoại upstream đang chạy của luồng yêu cầu khác.
+ * Chỉ tồn tại trong bộ nhớ — các yêu cầu đang bay vốn gắn liền với kết nối của tiến trình này.
  */
 export class InFlightRegistry {
   readonly #controllers = new Map<string, AbortController>();
@@ -27,7 +27,7 @@ export class InFlightRegistry {
     this.#controllers.delete(responseId);
   }
 
-  /** 中止指定 response；返回是否确有进行中的请求被中止。 */
+  /** Hủy bỏ response chỉ định; trả về liệu có thực sự có yêu cầu đang xử lý bị hủy hay không. */
   cancel(responseId: string): boolean {
     const controller = this.#controllers.get(responseId);
     if (controller === undefined) return false;
@@ -36,9 +36,9 @@ export class InFlightRegistry {
   }
 
   /**
-   * 优雅关闭专用：中止全部在途请求的上游连接（关闭 WebSocket / 取消 dispatch），
-   * 并清空登记表。返回被中止的 responseId 列表，供调用方把对应记录落库为
-   * incomplete（见 `server.ts` 的 `gracefulShutdown`）。
+   * Dành riêng cho tắt êm (graceful shutdown): Hủy toàn bộ kết nối upstream của các yêu cầu đang bay (đóng WebSocket / hủy dispatch),
+   * và làm rỗng bảng đăng ký. Trả về danh sách responseId bị hủy, để bên gọi cập nhật các bản ghi tương ứng vào DB thành
+   * incomplete (xem `gracefulShutdown` của `server.ts`).
    */
   cancelAll(): string[] {
     const ids = [...this.#controllers.keys()];

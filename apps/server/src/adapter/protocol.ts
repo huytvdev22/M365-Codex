@@ -1,22 +1,22 @@
 /**
- * Sydney / BizChat 线协议编解码（版本隔离层）。
+ * Mã hóa / giải mã giao thức đường truyền Sydney / BizChat (lớp cô lập phiên bản).
  *
- * 上游用的是 SignalR 风格的 JSON 协议：每条消息是一段 JSON，以记录分隔符
- * `0x1e`（RS）结尾。握手后客户端发起一次 invocation，服务端流式回若干帧，
- * 最后给出 completion。
+ * Upstream sử dụng giao thức JSON theo kiểu SignalR: mỗi thông điệp là một đoạn JSON,
+ * kết thúc bằng ký tự phân cách bản ghi `0x1e` (RS). Sau khi bắt tay, client khởi tạo một invocation,
+ * server truyền luồng về một số frame, cuối cùng trả về completion.
  *
- * 帧分隔（0x1e）是 SignalR 既定规范，稳定可依赖。**消息内部的字段语义**已在
- * 2026-07-27 用真实账号跑通 M0 校准：请求侧是单数 `message` 对象（不是
- * `messages` 数组），响应侧的业务负载在 `item` 字段里（不是 `arguments[0]`）——
- * 详见 `codecV1.ts` 顶部注释与 `docs/里程碑进度.md` 的 M0 一节。这一步仍单独
- * 抽成 `mapMessageToEvents`，作为未来上游协议再次漂移时的替换接缝；整个 codec
- * 通过 `ProtocolCodec` 接口暴露，可按 `protocolVersion` 切换不同实现。
+ * Phân cách frame (0x1e) là quy chuẩn đã định của SignalR, ổn định và đáng tin cậy. **Ngữ nghĩa các trường bên trong message**
+ * đã được kiểm chuẩn thực tế M0 với tài khoản thật vào ngày 27-07-2026: phía request là đối tượng số ít `message` (không phải
+ * mảng `messages`), payload nghiệp vụ phía response nằm trong trường `item` (không phải `arguments[0]`) —
+ * chi tiết xem chú thích đầu file `codecV1.ts` và phần M0 trong `docs/trien-khai-va-nghiem-thu.md`. Bước này vẫn được tách
+ * riêng thành `mapMessageToEvents`, đóng vai trò là khớp nối thay thế nếu sau này giao thức upstream tiếp tục trôi dạt;
+ * toàn bộ codec được phơi bày qua giao diện `ProtocolCodec`, có thể chuyển đổi implementation khác nhau theo `protocolVersion`.
  */
 
-/** 记录分隔符：SignalR JSON 协议每条消息以它结尾。 */
+/** Ký tự phân cách bản ghi (Record separator): Mỗi message của giao thức SignalR JSON kết thúc bằng ký tự này. */
 export const RECORD_SEPARATOR = '\x1e';
 
-/** SignalR 消息类型。 */
+/** Phân loại message SignalR. */
 export const MESSAGE_TYPE = {
   INVOCATION: 1,
   STREAM_ITEM: 2,
@@ -27,7 +27,7 @@ export const MESSAGE_TYPE = {
   CLOSE: 7,
 } as const;
 
-/** 解析出的原始上游消息。字段是 SignalR 通用形态，内部语义留给映射层。 */
+/** Message upstream thô đã được parse. Các trường có hình thái chung của SignalR, ngữ nghĩa bên trong dành cho tầng ánh xạ xử lý. */
 export interface RawMessage {
   type: number;
   target?: string;
@@ -39,94 +39,94 @@ export interface RawMessage {
   [key: string]: unknown;
 }
 
-/** 归一化上游事件。M4 会把它映射到 Responses 的 SSE 事件。 */
+/** Sự kiện upstream đã chuẩn hóa. M4 sẽ ánh xạ nó sang sự kiện SSE của Responses. */
 export type UpstreamEvent =
   | { kind: 'text_delta'; text: string }
   | { kind: 'reasoning_delta'; text: string }
   | { kind: 'citation'; url: string; title: string | null }
-  /** 工具调用开始：上游要求调用名为 name 的工具 */
+  /** Bắt đầu gọi công cụ: Upstream yêu cầu gọi công cụ có tên là name */
   | { kind: 'tool_call_begin'; callId: string; name: string }
-  /** 工具调用参数增量（JSON 字符串片段） */
+  /** Phần gia tăng đối số gọi công cụ (đoạn chuỗi JSON) */
   | { kind: 'tool_call_args_delta'; callId: string; delta: string }
-  /** 工具调用结束：参数已完整 */
+  /** Kết thúc gọi công cụ: Đối số đã hoàn chỉnh */
   | { kind: 'tool_call_end'; callId: string }
   | { kind: 'completed'; stopReason: string | null }
   | { kind: 'upstream_error'; message: string; retryable: boolean }
   | { kind: 'raw'; message: RawMessage };
 
-/** 声明给上游的工具（函数）。name + JSON Schema 参数。 */
+/** Khai báo công cụ (hàm) cung cấp cho upstream. Tên name + tham số JSON Schema. */
 export interface ToolDeclaration {
   name: string;
   description?: string | undefined;
   parameters?: Record<string, unknown> | undefined;
 }
 
-/** 回传给上游的工具执行结果，用于续推理。 */
+/** Kết quả thực thi công cụ truyền ngược lại cho upstream, dùng để tiếp tục suy luận. */
 export interface ToolResultInput {
   callId: string;
   output: string;
 }
 
 /**
- * 图片输入的建模字段（M6，`UPSTREAM_IMAGE_INPUT=true` 时生效）。
+ * Trường mô hình hóa cho dữ liệu đầu vào dạng hình ảnh (M6, có hiệu lực khi `UPSTREAM_IMAGE_INPUT=true`).
  *
- * ⚠️ 仍待校准：M0 真实探测证实了文本 invocation 的字段形态（见 `codecV1.ts`），
- * 但受限于测试账号的 Copilot 许可证状态（实测走到 `InternalError`/
- * `InvalidCopilotLicense`，未能拿到一次成功生成），没能进一步验证图片输入的
- * 真实字段名与位置。这里继续沿用「通过 `InvocationInput.passthrough` 透传」的
- * 既有约定（`model`/`reasoning`/`temperature` 等已经在走这条通道）——因为
- * `scheduler/dispatcher.ts` 已冻结、不接受新增顶层字段，复用 passthrough 是
- * 当前唯一能不改调度层就把新字段送到线协议层的办法。等拿到一个有效许可证的
- * 账号能跑通真实图片输入后，再决定是保留这个约定还是替换成上游实际要求的形态。
+ * ⚠️ Vẫn cần kiểm chuẩn: Dò quét thực tế M0 đã xác nhận cấu trúc trường của invocation văn bản (xem `codecV1.ts`),
+ * nhưng do giới hạn trạng thái giấy phép Copilot của tài khoản thử nghiệm (thực tế gặp `InternalError` /
+ * `InvalidCopilotLicense`, chưa nhận được phản hồi sinh thành công), nên chưa thể kiểm chứng thêm tên trường
+ * và vị trí thực sự của hình ảnh đầu vào. Tại đây tiếp tục áp dụng quy ước sẵn có "chuyển tiếp qua `InvocationInput.passthrough`"
+ * (`model`/`reasoning`/`temperature`... đã đi qua kênh này) — vì `scheduler/dispatcher.ts` đã đóng băng, không chấp nhận
+ * thêm trường cấp cao nhất mới, việc tái sử dụng passthrough là cách duy nhất hiện tại để đưa trường mới vào tầng giao thức
+ * dây mà không cần sửa tầng điều phối (dispatcher). Khi có tài khoản với giấy phép hợp lệ chạy thành công hình ảnh thật,
+ * sẽ quyết định giữ nguyên quy ước này hay đổi theo hình thái thực tế mà upstream yêu cầu.
  */
 export interface ImageInputDescriptor {
-  /** 图片 URL，或按 file-id 解析出的 data URL */
+  /** URL ảnh, hoặc data URL được giải mã từ file-id */
   url: string;
   detail?: string | null;
 }
 
 export interface InvocationInput {
   invocationId: string;
-  /** 用户本轮输入的纯文本（M3 只支持文本；图片/文件是 M6） */
+  /** Văn bản thuần túy người dùng nhập vào lượt này (M3 chỉ hỗ trợ văn bản; hình ảnh/tệp tin là M6) */
   text: string;
-  /** 上游会话标识；续接同一会话时带上 */
+  /** Định danh phiên làm việc upstream; mang theo khi tiếp tục cùng một phiên */
   conversationRef?: string | undefined;
   /**
-   * 账号的对象 ID（`participant.id`）。M0 实测确认真实上游的每条 invocation
-   * 都带这个字段（回显消息的 `from.id` 与之一致）；调用方（调度器）本来就持有
-   * oid 用于构造连接 URL，这里顺路透传给编解码层，不需要新开一条获取渠道。
+   * Object ID của tài khoản (`participant.id`). Đoạn đo thực tế M0 xác nhận mọi invocation của upstream thật
+   * đều mang trường này (khớp với `from.id` của tin nhắn phản hồi); bên gọi (dispatcher) vốn đã giữ
+   * oid để dựng URL kết nối, tiện đường chuyển tiếp cho tầng codec, không cần mở thêm kênh truy xuất mới.
    */
   participantId?: string | undefined;
-  /** 透传的 model / reasoning.effort 等，原样带给上游，不改写 */
+  /** model / reasoning.effort... được truyền trực tiếp, giữ nguyên gửi lên upstream không sửa đổi */
   passthrough?: Record<string, unknown>;
-  /** 本轮可用的工具声明（M5） */
+  /** Khai báo các công cụ có sẵn cho lượt này (M5) */
   tools?: readonly ToolDeclaration[] | undefined;
-  /** 工具执行结果回传（M5，续接时带上） */
+  /** Kết quả thực thi công cụ truyền lại (M5, mang theo khi nối tiếp) */
   toolResults?: readonly ToolResultInput[] | undefined;
 }
 
-/** 协议编解码接口。按 protocolVersion 选具体实现，便于 M0 后替换。 */
+/** Giao diện mã hóa/giải mã giao thức. Chọn implementation cụ thể theo protocolVersion, thuận tiện thay thế sau M0. */
 export interface ProtocolCodec {
   readonly version: string;
-  /** 握手帧（含结尾 RS） */
+  /** Khung (frame) bắt tay (kèm ký tự RS kết thúc) */
   encodeHandshake(): string;
-  /** 判断一段文本是否为握手响应（服务端 ack 通常是空对象 `{}`） */
+  /** Kiểm tra một đoạn văn bản có phải là phản hồi bắt tay hay không (ack từ server thường là đối tượng rỗng `{}`) */
   isHandshakeAck(raw: string): boolean;
-  /** 发起对话的 invocation 帧（含结尾 RS） */
+  /** Frame invocation để khởi tạo đối thoại (kèm RS kết thúc) */
   encodeInvocation(input: InvocationInput): string;
-  /** 心跳帧（含结尾 RS） */
+  /** Frame nhịp tim ping (kèm RS kết thúc) */
   encodePing(): string;
-  /** 取消 invocation 帧（含结尾 RS） */
+  /** Frame hủy invocation (kèm RS kết thúc) */
   encodeCancel(invocationId: string): string;
-  /** 把一条原始消息映射为若干归一化事件 */
+  /** Ánh xạ một raw message thành một số sự kiện đã chuẩn hóa */
   mapMessageToEvents(message: RawMessage): UpstreamEvent[];
-  /** 该消息是否代表本轮 completion（流结束） */
+  /** Message này có đại diện cho completion (kết thúc luồng) của lượt này hay không */
   isCompletion(message: RawMessage): boolean;
 }
 
 /**
- * 把粘包/半包的字节流按 RS 切成完整帧。
- * 返回完整帧数组与残留的未完成片段（下次拼接用）。
+ * Tách luồng byte bị dính/nửa gói (sticky/half packet) theo ký tự RS thành các frame hoàn chỉnh.
+ * Trả về mảng frame hoàn chỉnh và đoạn chưa hoàn thiện còn sót lại (dùng để ghép nối lượt sau).
  */
 export function splitFrames(buffer: string): { frames: string[]; rest: string } {
   const parts = buffer.split(RECORD_SEPARATOR);
@@ -135,7 +135,7 @@ export function splitFrames(buffer: string): { frames: string[]; rest: string } 
   return { frames, rest };
 }
 
-/** 解析单帧 JSON 为原始消息；非法 JSON 返回 null（由调用方决定如何处理）。 */
+/** Phân tích frame JSON đơn lẻ thành raw message; JSON không hợp lệ trả về null (bên gọi quyết định cách xử lý). */
 export function parseFrame(frame: string): RawMessage | null {
   try {
     const parsed: unknown = JSON.parse(frame);
@@ -149,8 +149,8 @@ export function parseFrame(frame: string): RawMessage | null {
 }
 
 /**
- * 帧重组器：喂入任意分片的字符串，吐出完整消息。
- * WebSocket 的一帧不一定对应协议的一条消息，可能粘包或拆包。
+ * Bộ tái tổ hợp frame: Đưa vào các mẩu chuỗi phân mảnh bất kỳ, xuất ra message hoàn chỉnh.
+ * Một frame WebSocket không nhất thiết tương ứng 1-1 với một message của giao thức, có thể bị dính hoặc tách gói.
  */
 export class FrameReassembler {
   #buffer = '';

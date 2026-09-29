@@ -3,18 +3,16 @@ import type { ResponseRepository, ResponseRow } from '../repo/responses.js';
 import type { ResponseObject } from '../responses/types.js';
 
 /**
- * 服务重启后的恢复（对应实施计划 §18）。
+ * Phục hồi sau khi khởi động lại dịch vụ (tương ứng kế hoạch triển khai §18).
  *
- * 处置原则：
- * - `queued`——还没有任何进程真正接手执行，天然可查询、可恢复，这里只是
- *   确认它仍然可见，不需要改写任何字段；
- * - `in_progress`——进程崩溃前可能已经向上游发出请求、甚至已经执行了带
- *   副作用的工具调用，重启后**无法确认**上次具体进行到哪一步。因此一律标记
- *   为 `incomplete`（带 `incomplete_details.reason`），而不是猜测性地继续
- *   或重放：继续执行等于对不确定状态强行下结论，重放则可能让已经执行过的
- *   副作用工具再执行一次；
- * - 已发出的工具调用（`tool_calls` 表中 `emitted`/`completed`）原样保留，
- *   仍可通过 `GET /v1/responses/:id` 关联查询，绝不自动重放任何有副作用的操作。
+ * Nguyên tắc xử lý:
+ * - `queued` — chưa có bất kỳ tiến trình nào thực sự tiếp nhận thực thi, tự nhiên có thể truy vấn, có thể phục hồi, ở đây chỉ
+ *   xác nhận nó vẫn hiển thị, không cần ghi đè bất kỳ trường nào;
+ * - `in_progress` — trước khi tiến trình sập có thể đã gửi yêu cầu lên upstream, thậm chí đã thực thi các lệnh gọi công cụ
+ *   có tác dụng phụ, sau khi khởi động lại **không thể xác nhận** lần trước cụ thể đã tiến hành tới bước nào. Do đó toàn bộ được đánh dấu
+ *   là `incomplete` (kèm `incomplete_details.reason`), chứ không tiếp tục hay phát lại một cách võ đoán: tiếp tục thực thi đồng nghĩa với việc áp đặt kết luận lên trạng thái không chắc chắn, còn phát lại thì có thể khiến công cụ tác dụng phụ đã chạy bị chạy thêm lần nữa;
+ * - Lệnh gọi công cụ đã phát ra (`emitted`/`completed` trong bảng `tool_calls`) được giữ nguyên bản,
+ *   vẫn có thể liên kết truy vấn qua `GET /v1/responses/:id`, tuyệt đối không tự động phát lại bất kỳ thao tác nào có tác dụng phụ.
  */
 
 export interface RecoveryDeps {
@@ -23,24 +21,24 @@ export interface RecoveryDeps {
 }
 
 export interface RecoveryResult {
-  /** 保持 queued、可继续被查询的记录数 */
+  /** Số bản ghi giữ nguyên queued, có thể tiếp tục được truy vấn */
   queuedKept: number;
-  /** 被标记为 incomplete 的 in_progress 记录数 */
+  /** Số bản ghi in_progress bị đánh dấu là incomplete */
   inProgressMarkedIncomplete: number;
 }
 
 export const RESTART_INCOMPLETE_REASON = 'server_restarted';
 /**
- * 优雅关闭（§19）用的 incomplete 原因，与重启恢复区分开，方便管理界面/日志
- * 排查时分清楚这条记录是「进程重启后发现的」还是「这次关闭时主动收尾的」；
- * 落库的**处置方式**（状态、`incomplete_details` 形状）与重启恢复完全一致，
- * 只是原因字符串不同——不是另一套语义。
+ * Lý do incomplete dùng khi tắt êm (graceful shutdown §19), phân biệt với phục hồi khi khởi động lại, thuận tiện cho giao diện quản trị/log
+ * khi điều tra phân định rõ bản ghi này là "phát hiện sau khi tiến trình khởi động lại" hay "chủ động dọn dẹp khi tắt lần này";
+ * **Cách thức xử lý** lưu DB (trạng thái, cấu trúc `incomplete_details`) hoàn toàn nhất quán với phục hồi khi khởi động lại,
+ * chỉ khác chuỗi lý do — không phải là một bộ ngữ nghĩa khác.
  */
 export const SHUTDOWN_INCOMPLETE_REASON = 'server_shutting_down';
 
 /**
- * 把仍处于 in_progress 的记录标记为 incomplete；重启恢复与优雅关闭共用同一份
- * 处置逻辑，只是触发时机与 `reason` 不同，避免两处各写一套不一致的语义。
+ * Đánh dấu các bản ghi vẫn đang ở in_progress thành incomplete; phục hồi khi khởi động lại và tắt êm dùng chung một
+ * logic xử lý, chỉ khác thời điểm kích hoạt và `reason`, tránh việc viết hai bộ ngữ nghĩa không nhất quán ở hai nơi.
  */
 export function markInProgressAsIncomplete(
   responses: ResponseRepository,
@@ -79,11 +77,11 @@ export function recoverOnStartup(deps: RecoveryDeps, now = Date.now()): Recovery
 }
 
 /**
- * 补一份最简 Response 快照，供 `GET /v1/responses/:id` 在重启后仍能返回
- * 结构完整的对象（而不是退化成 `{id, object, status}` 的兜底形态）。
- * 字段只能尽力还原：`responses` 表没有持久化 metadata / max_output_tokens /
- * temperature 等请求参数（只在完成时随 body 落库），重启恢复时这些原样不可得，
- * 只能给出 null，属于已知的近似，不影响“状态可查、不猜测执行结果”这条硬约束。
+ * Bổ sung một snapshot Response tối giản, giúp `GET /v1/responses/:id` sau khi khởi động lại vẫn có thể trả về
+ * đối tượng có cấu trúc hoàn chỉnh (thay vì thoái hóa thành dạng cứu cánh `{id, object, status}`).
+ * Các trường chỉ có thể cố gắng phục hồi: bảng `responses` không lưu trữ metadata / max_output_tokens /
+ * temperature các tham số yêu cầu (chỉ lưu kèm body khi hoàn thành), khi phục hồi sau khởi động lại những thông tin nguyên bản này không có sẵn,
+ * chỉ có thể trả về null, thuộc về xấp xỉ đã biết trước, không ảnh hưởng tới ràng buộc cứng "trạng thái có thể tra cứu, không võ đoán kết quả thực thi".
  */
 function buildIncompleteBody(row: ResponseRow, reason: string): ResponseObject {
   return {

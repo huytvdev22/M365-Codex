@@ -36,7 +36,7 @@ describe('generateApiKey', () => {
     const generated = generateApiKey();
     expect(generated.hash).not.toContain(generated.key);
     expect(generated.salt).not.toContain(generated.key);
-    // 前缀是索引用途，只暴露开头 8 位随机字符
+    // Tiền tố dùng để index, chỉ để lộ 8 ký tự ngẫu nhiên đầu tiên
     expect(generated.key.startsWith(generated.prefix)).toBe(true);
     expect(generated.prefix.length).toBeLessThan(generated.key.length);
   });

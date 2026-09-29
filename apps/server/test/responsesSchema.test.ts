@@ -140,7 +140,7 @@ describe('extractInputText：Codex 风格的多轮历史回放（真实抓包结
     expect(extracted.text).toContain('【工具结果】\nExit code: 0\nOutput:\nok');
     expect(extracted.toolResults).toEqual([{ callId: 'call_1', output: 'Exit code: 0\nOutput:\nok' }]);
 
-    // 顺序也要正确：developer 在最前，工具结果在最后
+    // Thứ tự cũng phải chính xác: developer ở đầu tiên, kết quả công cụ ở cuối cùng
     const order = [
       extracted.text.indexOf('【开发者指令】'),
       extracted.text.indexOf('【用户】'),
@@ -328,7 +328,7 @@ describe('extractInputText：上下文长度上限与截断', () => {
     });
     const extracted = extractInputText(req, { contextMaxChars: 60 });
     expect(extracted.truncatedChars).toBeGreaterThan(0);
-    // 最旧的一轮被丢了，最新一轮必须还在
+    // Vòng cũ nhất bị bỏ, vòng mới nhất bắt buộc phải còn
     expect(extracted.text).toContain('最新一轮问题');
     expect(extracted.text).not.toContain('很久以前的第一轮');
   });
@@ -343,7 +343,7 @@ describe('buildConversationText', () => {
         { label: '【用户】', text: '很旧的问题'.repeat(20) },
         { label: '【用户】', text: '最新问题' },
       ],
-      10, // 极小上限，必然触发截断
+      10, // Giới hạn cực nhỏ, chắc chắn kích hoạt cắt ngắn
     );
     expect(result.text).toContain(longInstructions);
     expect(result.truncatedChars).toBeGreaterThan(0);

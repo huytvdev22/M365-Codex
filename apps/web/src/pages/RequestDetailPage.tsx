@@ -11,22 +11,22 @@ export function RequestDetailPage() {
   const { data, error, loading, reload } = useAsync(() => api.getRequest(id), [id]);
 
   return (
-    <Layout title="请求详情" subtitle={id}>
+    <Layout title="Chi tiết yêu cầu" subtitle={id}>
       <AsyncSection loading={loading} error={error} data={data} onRetry={reload}>
         {(detail) => (
           <>
             <div className="card">
               <div className="grid grid-cols-3">
                 <div>
-                  <div className="stat-label">状态</div>
+                  <div className="stat-label">Trạng thái</div>
                   <ResponseStatusBadge status={detail.status} />
                 </div>
                 <div>
-                  <div className="stat-label">模型</div>
+                  <div className="stat-label">Mô hình</div>
                   <div>{detail.requested_model}</div>
                 </div>
                 <div>
-                  <div className="stat-label">推理强度</div>
+                  <div className="stat-label">Reasoning Effort</div>
                   <div>{detail.requested_reasoning_effort ?? '—'}</div>
                 </div>
                 <div>
@@ -34,46 +34,46 @@ export function RequestDetailPage() {
                   <div className="mono">{detail.api_key_id ?? '—'}</div>
                 </div>
                 <div>
-                  <div className="stat-label">账号</div>
+                  <div className="stat-label">Tài khoản</div>
                   <div className="mono">{detail.account_id ?? '—'}</div>
                 </div>
                 <div>
-                  <div className="stat-label">工具轮次 / 累计调用</div>
+                  <div className="stat-label">Lượt công cụ / Tổng lần gọi</div>
                   <div>
                     {detail.tool_round} / {detail.tool_calls_total}
                   </div>
                 </div>
                 <div>
-                  <div className="stat-label">创建时间</div>
+                  <div className="stat-label">Thời gian tạo</div>
                   <div>{formatDateTime(detail.created_at)}</div>
                 </div>
                 <div>
-                  <div className="stat-label">更新时间</div>
+                  <div className="stat-label">Thời gian cập nhật</div>
                   <div>{formatDateTime(detail.updated_at)}</div>
                 </div>
               </div>
               {detail.error_message !== null && (
                 <div className="error-banner" style={{ marginTop: 16 }}>
-                  <div className="error-title">错误信息</div>
+                  <div className="error-title">Thông tin lỗi</div>
                   <div>{detail.error_message}</div>
                 </div>
               )}
             </div>
 
             <div className="card">
-              <h2 style={{ marginTop: 0 }}>工具调用（不含参数与结果正文）</h2>
+              <h2 style={{ marginTop: 0 }}>Các cuộc gọi công cụ (không chứa tham số và kết quả)</h2>
               {detail.tool_calls.length === 0 ? (
-                <div className="text-muted">这条请求没有发生工具调用。</div>
+                <div className="text-muted">Yêu cầu này không kích hoạt gọi công cụ nào.</div>
               ) : (
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>call_id</th>
-                        <th>名称</th>
-                        <th>状态</th>
-                        <th>副作用</th>
-                        <th>时间</th>
+                        <th>Mã Call ID</th>
+                        <th>Tên công cụ</th>
+                        <th>Trạng thái</th>
+                        <th>Tác dụng phụ (Side effect)</th>
+                        <th>Thời gian</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -82,7 +82,7 @@ export function RequestDetailPage() {
                           <td className="mono">{call.call_id}</td>
                           <td>{call.name}</td>
                           <td>{call.status}</td>
-                          <td>{call.side_effect ? '是' : '否'}</td>
+                          <td>{call.side_effect ? 'Có' : 'Không'}</td>
                           <td>{formatDateTime(call.created_at)}</td>
                         </tr>
                       ))}

@@ -77,7 +77,7 @@ describe('evaluateVerdict', () => {
     const lowPassRate: ToolCallStats = {
       trials: 20,
       toolNameRecognized: 20,
-      firstPassSchemaOk: 10, // 50%，低于 95% 门槛
+      firstPassSchemaOk: 10, // 50%, thấp hơn ngưỡng 95%
       passWithinTwoRepairs: 20,
       undeclaredToolCalls: 0,
       duplicateJsonInBody: 0,

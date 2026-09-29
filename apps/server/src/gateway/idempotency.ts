@@ -4,17 +4,17 @@ import type { Database } from '../db/index.js';
 import { asRow } from '../db/index.js';
 
 /**
- * 请求幂等（对应实施计划 §18）。
+ * Tính bình đẳng/idempotent của yêu cầu (tương ứng kế hoạch triển khai §18).
  *
- * 规则：同一 API Key + 端点 + `Idempotency-Key` 返回同一个创建结果。
- * 关键约束是**不重复提交可能产生工具调用的上游请求**——重放一次
- * `POST /v1/responses` 意味着模型可能再决定执行一次有副作用的工具。
+ * Quy tắc: Cùng một API Key + endpoint + `Idempotency-Key` sẽ trả về cùng một kết quả tạo.
+ * Ràng buộc cốt lõi là **không gửi lặp lại yêu cầu upstream có thể sinh lệnh gọi công cụ** — việc phát lại một lần
+ * `POST /v1/responses` đồng nghĩa với việc mô hình có thể quyết định thực thi lại một công cụ có tác dụng phụ.
  *
- * 请求体指纹一并入库：同一把幂等键配不同的请求体属于客户端用错了键，
- * 必须报错而不是返回上一次的结果（否则会静默把两个不同请求当成一个）。
+ * Vân tay của body yêu cầu cũng được lưu: cùng một idempotency key kết hợp với body yêu cầu khác nhau thuộc về lỗi dùng sai key của client,
+ * bắt buộc phải báo lỗi thay vì trả về kết quả lần trước (nếu không sẽ âm thầm xem hai yêu cầu khác nhau là một).
  *
- * 并发同键：靠唯一索引让第二个请求插入失败，转而等待/复用第一个的结果，
- * 而不是两个都打上游。
+ * Trùng key đồng thời: dựa vào unique index để khiến yêu cầu thứ hai chèn thất bại, chuyển sang chờ/tái sử dụng kết quả của yêu cầu thứ nhất,
+ * thay vì cả hai cùng đánh lên upstream.
  */
 
 export type IdempotencyState = 'in_progress' | 'completed';
@@ -32,7 +32,7 @@ export interface IdempotencyRow {
   updated_at: number;
 }
 
-/** 对请求体做稳定指纹：键排序后哈希，避免字段顺序不同被误判成不同请求。 */
+/** Tạo vân tay ổn định cho body yêu cầu: sắp xếp key rồi băm hash, tránh việc thứ tự field khác nhau bị nhận diện nhầm là yêu cầu khác. */
 export function fingerprintRequest(body: unknown): string {
   return createHash('sha256').update(stableStringify(body)).digest('hex');
 }
@@ -45,11 +45,11 @@ function stableStringify(value: unknown): string {
 }
 
 export interface BeginResult {
-  /** 已有完成结果，直接回放 */
+  /** Đã có kết quả hoàn thành, phát lại trực tiếp */
   replay?: { statusCode: number; body: unknown; responseId: string | null };
-  /** 同键请求仍在处理中 */
+  /** Yêu cầu cùng key vẫn đang xử lý */
   inProgress?: boolean;
-  /** 本次是首次，调用方继续正常处理，完成后调用 complete() */
+  /** Lần này là lần đầu, bên gọi tiếp tục xử lý bình thường, sau khi hoàn thành gọi complete() */
   fresh?: boolean;
 }
 
@@ -61,8 +61,8 @@ export class IdempotencyStore {
   }
 
   /**
-   * 登记一次幂等请求。
-   * 返回该回放、该等待，还是首次执行。
+   * Đăng ký một yêu cầu idempotent.
+   * Trả về kết quả: phát lại, chờ đợi, hay thực thi lần đầu.
    */
   begin(input: {
     key: string;
@@ -104,12 +104,12 @@ export class IdempotencyStore {
         .run(input.key, input.apiKeyId, input.endpoint, input.fingerprint, now, now);
       return { fresh: true };
     } catch {
-      // 并发下另一个请求刚插进去：让本次走「处理中」，不重复打上游
+      // Khi đồng thời một yêu cầu khác vừa chèn vào: chuyển lượt này sang "đang xử lý", không gọi lặp lại upstream
       return { inProgress: true };
     }
   }
 
-  /** 处理成功后落库最终结果，供后续同键请求回放。 */
+  /** Sau khi xử lý thành công, lưu kết quả cuối cùng vào DB để phát lại cho các yêu cầu cùng key tiếp theo. */
   complete(input: {
     key: string;
     apiKeyId: string;
@@ -137,8 +137,8 @@ export class IdempotencyStore {
   }
 
   /**
-   * 处理失败时释放这把键。
-   * 失败的请求不该把幂等键永久占住——客户端重试同一把键应当能重新执行。
+   * Giải phóng key này khi xử lý thất bại.
+   * Yêu cầu thất bại không nên chiếm giữ vĩnh viễn key idempotent — client thử lại với cùng key phải được phép thực thi lại.
    */
   release(key: string, apiKeyId: string, endpoint: string): void {
     this.#db
@@ -146,7 +146,7 @@ export class IdempotencyStore {
       .run(key, apiKeyId, endpoint);
   }
 
-  /** 清理过期记录（§18 定时清理）。 */
+  /** Dọn dẹp bản ghi hết hạn (dọn dẹp định kỳ §18). */
   purgeOlderThan(cutoff: number): number {
     const result = this.#db.prepare('DELETE FROM idempotency_keys WHERE created_at < ?').run(cutoff);
     return Number(result.changes);
@@ -161,28 +161,28 @@ export class IdempotencyStore {
   }
 }
 
-/** 执行完成后调用其一：非流式落库可回放结果、流式/失败释放这把键。 */
+/** Sau khi thực thi xong gọi một trong hai: non-stream ghi kết quả có thể phát lại, stream/thất bại giải phóng key này. */
 export interface IdempotencyHandle {
   complete: (statusCode: number, body: unknown, responseId: string | null) => void;
   release: () => void;
 }
 
 export interface IdempotencyGuardResult {
-  /** 命中回放：直接把这个发给客户端，不必再跑一次业务逻辑 */
+  /** Khớp phát lại: gửi thẳng cái này về client, không cần chạy lại business logic */
   replay?: { statusCode: number; body: unknown };
-  /** 首次执行：业务逻辑跑完后调用 handle.complete()（成功）或 handle.release()（失败） */
+  /** Thực thi lần đầu: sau khi chạy xong business logic gọi handle.complete() (thành công) hoặc handle.release() (thất bại) */
   handle?: IdempotencyHandle;
 }
 
 /**
- * 接进 `POST /v1/responses` 与 `POST /v1/chat/completions` 的统一入口
- * （对应实施计划 §18）。没带 `Idempotency-Key` 时直接放行（`{}`）。
+ * Cổng vào thống nhất kết nối vào `POST /v1/responses` và `POST /v1/chat/completions`
+ * (tương ứng kế hoạch triển khai §18). Không mang `Idempotency-Key` thì cho qua trực tiếp (`{}`).
  *
- * 流式（`stream:true`）请求**不做回放**：SSE 是一次性推给客户端的事件流，
- * 连接关闭后没有办法把已经吐出去的内容重新放一遍；但仍然要挡住并发同键——
- * 这一点由 `store.begin()` 的 `inProgress` 分支保证，与是否流式无关。
- * 因此流式请求执行完（无论成功失败）一律 `release()` 这把键，而不是 `complete()`：
- * 键被清空后，后续同键请求会被当成全新的一次执行，而不是收到一份陈旧的回放结果。
+ * Yêu cầu streaming (`stream:true`) **không phát lại**: SSE là luồng sự kiện đẩy một chiều tới client,
+ * sau khi đóng kết nối không có cách nào phát lại nội dung đã bắn ra; nhưng vẫn phải chặn trùng key đồng thời —
+ * điểm này được đảm bảo bởi nhánh `inProgress` của `store.begin()`, không liên quan đến việc có stream hay không.
+ * Do đó sau khi hoàn thành yêu cầu stream (dù thành công hay thất bại) đều gọi `release()` key này thay vì `complete()`:
+ * sau khi key bị xóa, các yêu cầu tiếp theo với cùng key sẽ được xem là một lần thực thi mới tinh, thay vì nhận được kết quả phát lại cũ.
  */
 export function beginIdempotency(input: {
   store: IdempotencyStore;

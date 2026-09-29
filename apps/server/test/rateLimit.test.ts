@@ -4,8 +4,8 @@ import { RateLimiter } from '../src/gateway/rateLimit.js';
 import type { ApiKeyRow } from '../src/repo/apiKeys.js';
 
 /**
- * API Key 级限额（§10）：有效限额永远是 min(Key 自身设置, 全局天花板)，
- * 超限返回可用的 retryAfterSeconds，接口/模型白名单不匹配给出清晰拒绝原因。
+ * Hạn ngạch cấp API Key (§10): Hạn ngạch hiệu lực luôn là min(thiết lập của Key, trần toàn cục),
+ * vượt hạn ngạch trả về retryAfterSeconds khả dụng, không khớp whitelist endpoint/model sẽ đưa ra lý do từ chối rõ ràng.
  */
 
 function makeKey(overrides: Partial<ApiKeyRow> = {}): ApiKeyRow {

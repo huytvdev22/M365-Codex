@@ -7,7 +7,7 @@ function tryParseJson(text: string): { parsed: unknown; strategy: 'direct' | 'ex
   try {
     return { parsed: JSON.parse(trimmed), strategy: 'direct' };
   } catch {
-    // 常见偏差：外面包了一层 Markdown 代码块或说明文字，尝试抠出第一个 {...}
+    // Sai lệch phổ biến: Bên ngoài bọc một khối code Markdown hoặc văn bản giải thích, thử trích xuất {...} đầu tiên
     const start = trimmed.indexOf('{');
     const end = trimmed.lastIndexOf('}');
     if (start >= 0 && end > start) {
@@ -27,7 +27,7 @@ function hasExpectedShape(value: unknown): boolean {
   return 'answer' in record && 'confidence' in record;
 }
 
-/** #11 结构化 JSON 输出：约束提示词能否稳定拿到有效 JSON。 */
+/** #11 Đầu ra JSON có cấu trúc: Prompt ràng buộc có thể lấy được JSON hợp lệ một cách ổn định hay không. */
 export async function caseStructuredJsonOutput(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, JSON_OUTPUT_PROMPT);

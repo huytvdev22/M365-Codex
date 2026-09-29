@@ -3,12 +3,12 @@ import { openDatabase, runMigrations, type Database } from '../src/db/index.js';
 import { MIGRATIONS } from '../src/db/migrations.js';
 
 /**
- * 迁移 v8：放宽 responses 表的 UNIQUE (api_key_id, idempotency_key) 约束（§18）。
+ * Migration v8: Nới lỏng ràng buộc UNIQUE (api_key_id, idempotency_key) của bảng responses (§18).
  *
- * 背景：M003 建表时把这条唯一约束直接放在 responses 表上，是"完整语义在 M7"之前
- * 的占位；M7 把幂等的唯一性保证收敛到独立的 idempotency_keys 表后，这条表级约束
- * 反而会跟"流式请求执行完释放键、同键可重新执行"冲突（第二次 INSERT 撞见旧约束）。
- * 这里验证：升级路径保留旧数据、外键引用不受影响，且约束确实被放宽。
+ * Bối cảnh: Khi M003 tạo bảng đã đặt ràng buộc duy nhất này trực tiếp lên bảng responses, là chỗ giữ trước khi có "ngữ nghĩa hoàn chỉnh ở M7";
+ * M7 gom việc đảm bảo tính duy nhất của idempotency về bảng idempotency_keys độc lập, ràng buộc cấp bảng này
+ * lại xung đột với "yêu cầu stream thực thi xong giải phóng key, cùng key có thể thực thi lại" (lần INSERT thứ hai đụng ràng buộc cũ).
+ * Ở đây xác minh: Đường dẫn nâng cấp giữ lại dữ liệu cũ, tham chiếu khóa ngoại không bị ảnh hưởng, và ràng buộc thực sự được nới lỏng.
  */
 
 function seedUpToV7(db: Database, apiKeyId: string): void {
@@ -35,12 +35,12 @@ function seedUpToV7(db: Database, apiKeyId: string): void {
 describe('迁移 v8：放宽 responses 的幂等键唯一约束', () => {
   it('升级后旧数据（含关联的 tool_calls、conversation_bindings）原样保留', () => {
     const db = openDatabase(':memory:');
-    // 先跑到 v7（不含 v8），再手动插入模拟旧数据
+    // Chạy trước đến v7 (chưa gồm v8), sau đó chèn thủ công dữ liệu cũ mô phỏng
     const v7Only = MIGRATIONS.filter((m) => m.version <= 7);
     runMigrations(db, v7Only);
     seedUpToV7(db, 'ak_1');
 
-    // 再补上 v8
+    // Sau đó bổ sung v8
     runMigrations(db, MIGRATIONS);
 
     const response = db.prepare('SELECT * FROM responses WHERE id = ?').get('resp_old_1') as {

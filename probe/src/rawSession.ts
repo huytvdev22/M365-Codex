@@ -12,16 +12,16 @@ import { classifyCloseCode, classifyHttpStatus, UpstreamError } from '../../apps
 import type { InvocationOutcome } from './types.js';
 
 /**
- * 探针自己的「原始会话」引擎。
+ * Engine "phiên thô" (raw session) của chính probe.
  *
- * 复用 `apps/server/src/adapter` 的协议常量、编解码器与错误分类
+ * Tái sử dụng hằng số giao thức, codec và phân loại lỗi của `apps/server/src/adapter`
  * （`FrameReassembler` / `MESSAGE_TYPE` / codec / `classifyHttpStatus` /
- * `classifyCloseCode`），但**不**复用 `SydneyConnection`：那一层的职责是把
- * 上游帧归一化成 `UpstreamEvent` 供业务层使用，会丢弃原始帧结构；而 M0
- * 探针的核心任务恰恰是把原始帧结构采集下来去校准 `codecV1.ts`（见
- * `report.ts` 的「协议差异清单」)，所以这里需要一份既拿归一化事件、
- * 又拿原始帧的连接循环。除了帧结构采集，其余生命周期语义（握手、心跳、
- * 空闲超时、取消）都与 `SydneyConnection` 一致。
+ * (`classifyCloseCode`), nhưng **không** tái sử dụng `SydneyConnection`: Trách nhiệm tầng đó là
+ * chuẩn hóa frame upstream thành `UpstreamEvent` cho tầng nghiệp vụ sử dụng, sẽ loại bỏ cấu trúc frame gốc; trong khi đó
+ * nhiệm vụ cốt lõi của probe M0 lại chính là thu thập cấu trúc frame gốc để hiệu chuẩn `codecV1.ts` (xem
+ * "Danh sách sai khác giao thức" trong `report.ts`), vì vậy ở đây cần một vòng kết nối vừa lấy sự kiện chuẩn hóa,
+ * vừa lấy frame gốc. Ngoài việc thu thập cấu trúc frame, các ngữ nghĩa vòng đời còn lại (bắt tay, heartbeat,
+ * timeout rảnh rỗi, hủy) đều nhất quán với `SydneyConnection`.
  */
 
 export interface RawSessionOptions {
@@ -34,28 +34,28 @@ export interface RawSessionOptions {
   tools?: readonly ToolDeclaration[] | undefined;
   toolResults?: readonly ToolResultInput[] | undefined;
   handshakeTimeoutMs: number;
-  /** 握手必须带的 X-Scenario 头；不带一律 403 */
+  /** Header X-Scenario bắt buộc phải có khi bắt tay; không có đều bị 403 */
   scenario: string;
   /**
-   * 账号的对象 ID，编码成 invocation 里的 `participant.id`。
+   * Object ID của tài khoản, được mã hóa thành `participant.id` trong invocation.
    *
-   * M0 实测：真实上游能正确解析的请求，`arguments[0]` 顶层都带这个字段。
-   * 探针的目的是贴近真实客户端的形态，缺了它探出来的结论就不可信。
+   * Thực nghiệm M0: Các yêu cầu mà upstream thật phân tích đúng đều có trường này ở cấp cao nhất `arguments[0]`.
+   * Mục đích của probe là bám sát hình thái client thật, thiếu nó thì kết luận thăm dò sẽ không đáng tin cậy.
    */
   oid?: string | undefined;
   idleTimeoutMs: number;
-  /** 整个 invocation 的硬超时（含握手），超过则判定失败并关闭连接 */
+  /** Timeout cứng của toàn bộ invocation (bao gồm bắt tay), vượt quá sẽ coi là thất bại và đóng kết nối */
   totalTimeoutMs: number;
   signal?: AbortSignal | undefined;
-  /** 每收到一个归一化事件就同步回调一次，供「取消」类用例在首个分片后触发取消 */
+  /** Mỗi khi nhận được một sự kiện chuẩn hóa thì gọi callback đồng bộ một lần, dùng cho các case kiểu "hủy" kích hoạt hủy sau chunk đầu */
   onEvent?: ((event: UpstreamEvent, raw: RawMessage) => void) | undefined;
   /**
-   * 取消时是否先发送 `encodeCancel` 停止帧（默认 true，对应 §3.1 第 17 项「发送 stop 帧」）。
-   * 传 false 表示直接断开连接、不发任何取消帧（对应第 29 项「客户端断开后上游是否可取消」，
-   * 模拟客户端异常掉线而不是主动优雅取消）。
+   * Khi hủy có gửi stop frame `encodeCancel` trước hay không (mặc định true, tương ứng §3.1 mục 17 "gửi stop frame").
+   * Truyền false biểu thị ngắt kết nối trực tiếp, không gửi bất kỳ frame hủy nào (tương ứng mục 29 "Upstream có thể hủy sau khi client ngắt kết nối không",
+   * mô phỏng việc client bị rớt mạng bất thường thay vì chủ động hủy một cách nhẹ nhàng).
    */
   sendCancelOnAbort?: boolean | undefined;
-  /** 测试注入用；默认使用 `ws` 库连真实/模拟上游 */
+  /** Dùng để inject trong test; mặc định dùng thư viện `ws` để nối upstream thật/mô phỏng */
   wsFactory?: ((url: string) => WebSocket) | undefined;
 }
 
@@ -83,7 +83,7 @@ function bufferToString(data: unknown): string {
   return String(data);
 }
 
-/** 跑一次 invocation，收集原始帧与归一化事件，返回聚合结果（不抛异常，异常都归到 errorCategory）。 */
+/** Chạy một invocation, thu thập frame gốc và sự kiện chuẩn hóa, trả về kết quả tổng hợp (không ném ngoại lệ, ngoại lệ đều quy về errorCategory). */
 export async function runRawSession(options: RawSessionOptions): Promise<InvocationOutcome> {
   const startedAt = Date.now();
   const events: UpstreamEvent[] = [];
@@ -94,7 +94,7 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
     let settled = false;
     let handshakeAcked = false;
     const reassembler = new FrameReassembler();
-    // X-Scenario 是上游放行的硬条件，缺了它无论凭据多正确都是 403
+    // X-Scenario là điều kiện cứng để upstream chấp thuận, thiếu nó thì dù thông tin xác thực đúng đến đâu cũng bị 403
     const ws = (options.wsFactory ??
       ((url: string): WebSocket =>
         new WebSocket(url, { headers: { 'X-Scenario': options.scenario } })))(options.url);
@@ -114,7 +114,7 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
       try {
         ws.close();
       } catch {
-        // 关闭异常忽略，反正马上会 terminate
+        // Bỏ qua ngoại lệ đóng, đằng nào cũng sẽ terminate ngay
       }
       try {
         ws.terminate();
@@ -162,7 +162,7 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
             ws.send(options.codec.encodeCancel(options.invocationId));
           }
         } catch {
-          // 取消是尽力而为
+          // Việc hủy là nỗ lực tối đa (best-effort)
         }
       }
       finish({
@@ -174,7 +174,7 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
     };
     if (options.signal !== undefined) {
       if (options.signal.aborted) {
-        // 已经取消：等 open 之后再处理，避免竞态
+        // Đã hủy: Chờ sau khi open mới xử lý để tránh race condition
         ws.once('open', onAbort);
       } else {
         options.signal.addEventListener('abort', onAbort, { once: true });
@@ -218,7 +218,7 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
           return;
         }
         handshakeAcked = true;
-        // 握手没有独立 ack，首帧当普通消息继续处理（不 return）
+        // Bắt tay không có ack độc lập, frame đầu coi như tin nhắn thông thường và xử lý tiếp (không return)
       }
 
       for (const message of reassembler.push(text)) {
@@ -271,10 +271,10 @@ export async function runRawSession(options: RawSessionOptions): Promise<Invocat
 }
 
 /**
- * 从原始消息里试探性地找出会话/对话标识。
+ * Tìm kiếm thăm dò định danh phiên/hội thoại từ tin nhắn gốc.
  *
- * 真实字段名待 M0 校准，这里按常见命名启发式尝试几种候选键，
- * 找到第一个非空字符串就采用——找不到就是 `unknown`，如实反映在报告里。
+ * Tên trường thực tế chờ M0 hiệu chuẩn, ở đây thử nghiệm heuristic vài key ứng viên theo cách đặt tên phổ biến,
+ * tìm thấy chuỗi không rỗng đầu tiên thì sử dụng — không tìm thấy thì là `unknown`, phản ánh trung thực trong báo cáo.
  */
 function extractConversationRef(message: RawMessage): string | null {
   const args = Array.isArray(message.arguments) ? message.arguments : [];

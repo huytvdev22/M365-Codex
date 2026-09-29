@@ -69,7 +69,7 @@ describe('cases 对模拟上游的端到端行为', () => {
 
   it('用例内部抛异常时 runCaseSafely 接住转成 unknown，而不是让整轮探测中断（§6）', async () => {
     server = await startMockSydneyServer({ kind: 'normal', chunks: ['ok'] });
-    // ctx.tokenManager 是个空对象，调用 .refresh() 会直接抛 TypeError
+    // ctx.tokenManager là object rỗng, gọi .refresh() sẽ ném trực tiếp TypeError
     const ctx = makeFakeContext(server.url);
     const definition = ALL_CASES.find((c) => c.id === 'access_token_refresh');
     expect(definition).toBeDefined();

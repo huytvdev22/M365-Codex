@@ -1,11 +1,11 @@
 import type { RawMessage } from '../../apps/server/dist/adapter/protocol.js';
 
 /**
- * 从原始帧里按键名模式做启发式检索（用量、模型名等 §3.1 第 18/20/21 项）。
+ * Tìm kiếm heuristic theo mẫu tên key trong frame gốc (lượng sử dụng, tên mô hình v.v. §3.1 mục 18/20/21).
  *
- * 真实字段名未知，只能广度优先扫描键名。数值/布尔值本身是「结构化元数据」，
- * 不算「内容」，可以直接保留在证据里；字符串值仍按 `evidence.ts` 的规则处理
- * （调用方决定是否需要把命中的字符串也放进 allowlist）。
+ * Tên trường thực tế chưa biết, chỉ có thể quét tên key theo chiều rộng. Bản thân số/boolean là "metadata có cấu trúc",
+ * không tính là "nội dung", có thể giữ trực tiếp trong bằng chứng; giá trị chuỗi vẫn xử lý theo quy tắc của `evidence.ts`
+ * (phía gọi quyết định xem có cần đưa chuỗi khớp vào allowlist hay không).
  */
 export interface FieldHit {
   path: string;

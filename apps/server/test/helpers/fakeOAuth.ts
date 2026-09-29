@@ -3,10 +3,10 @@ import type { OAuthClient, TokenResponse } from '../../src/oauth/client.js';
 import { OAuthRequestError } from '../../src/oauth/client.js';
 
 /**
- * 模拟 Microsoft identity 端点。
+ * Mock identity endpoint của Microsoft.
  *
- * 集成测试一律用它，绝不接触真实网络与真实凭据。
- * 生成的「Token」是结构合法但完全虚构的 JWT，值里带明显的 fake 标记。
+ * Test tích hợp đều dùng nó, tuyệt đối không chạm mạng thật và thông tin xác thực thật.
+ * "Token" sinh ra là JWT có cấu trúc hợp lệ nhưng hoàn toàn hư cấu, giá trị mang dấu hiệu fake rõ ràng.
  */
 
 export interface FakeIdentity {
@@ -16,7 +16,7 @@ export interface FakeIdentity {
   name?: string;
 }
 
-/** 造一个签名部分为占位符的 JWT——只有 payload 有意义，本项目也只读 payload。 */
+/** Tạo một JWT có phần chữ ký là placeholder — chỉ payload có ý nghĩa, dự án này cũng chỉ đọc payload. */
 export function makeFakeJwt(claims: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
@@ -48,28 +48,28 @@ export function makeFakeTokenResponse(
 }
 
 export interface FakeOAuthClientOptions {
-  /** 授权码 → 身份。未登记的 code 会被拒绝 */
+  /** Mã ủy quyền → danh tính. Code chưa đăng ký sẽ bị từ chối */
   codes?: Map<string, FakeIdentity>;
   authorizeBase?: string;
 }
 
-/** 可编程的假 OAuth 客户端：能注入错误、统计调用次数、模拟慢响应。 */
+/** OAuth client giả có thể lập trình: Có thể inject lỗi, thống kê số lần gọi, mô phỏng phản hồi chậm. */
 export class FakeOAuthClient implements OAuthClient {
   readonly codes: Map<string, FakeIdentity>;
   readonly exchangeCalls: { code: string; codeVerifier: string }[] = [];
   readonly refreshCalls: { refreshToken: string }[] = [];
 
-  /** 下一次 exchangeCode 抛出的错误 */
+  /** Lỗi sẽ ném ra trong lần exchangeCode tiếp theo */
   nextExchangeError: Error | null = null;
-  /** 下一次 refresh 抛出的错误 */
+  /** Lỗi sẽ ném ra trong lần refresh tiếp theo */
   nextRefreshError: Error | null = null;
-  /** refresh 返回的身份；不设则从 refreshToken 反查 */
+  /** Danh tính trả về khi refresh; không đặt thì tra cứu ngược từ refreshToken */
   refreshIdentity: FakeIdentity | null = null;
-  /** refresh 是否下发新的 refresh_token */
+  /** refresh có cấp refresh_token mới hay không */
   refreshIssuesNewRefreshToken = true;
-  /** 人为延迟，用于测试并发单飞 */
+  /** Độ trễ nhân tạo, dùng để test xử lý đơn lẻ khi đồng thời */
   refreshDelayMs = 0;
-  /** 每次 refresh 返回的 access_token 标记递增，便于区分是不是同一次刷新的结果 */
+  /** Dấu hiệu access_token trả về mỗi lần refresh tăng dần, thuận tiện phân biệt có phải kết quả cùng lần refresh không */
   #refreshCounter = 0;
 
   readonly #authorizeBase: string;
@@ -79,7 +79,7 @@ export class FakeOAuthClient implements OAuthClient {
     this.#authorizeBase = options.authorizeBase ?? 'https://login.example.invalid/authorize';
   }
 
-  /** 登记一个可用的授权码。 */
+  /** Đăng ký một mã ủy quyền khả dụng. */
   registerCode(code: string, identity: FakeIdentity): void {
     this.codes.set(code, identity);
   }
@@ -135,7 +135,7 @@ export class FakeOAuthClient implements OAuthClient {
   }
 }
 
-/** 构造一个 nativeclient 形态的回调地址，和用户助手里粘贴的格式一致。 */
+/** Tạo một callback URL dạng nativeclient, cùng định dạng dán trong wizard người dùng. */
 export function makeCallbackUrl(code: string, state: string): string {
   const url = new URL('https://login.microsoftonline.com/common/oauth2/nativeclient');
   url.searchParams.set('code', code);

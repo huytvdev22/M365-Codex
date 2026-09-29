@@ -4,10 +4,10 @@ import type { OAuthConfig } from '../config/index.js';
 import { hostnameFromUrl, shouldBypassProxy } from '../util/noProxy.js';
 
 /**
- * 与 Microsoft identity platform 的 HTTP 交互。
+ * Tương tác HTTP với Microsoft identity platform.
  *
- * 抽成接口是为了让上层（授权流程、Token 刷新）能在测试里替换掉真实网络，
- * 集成测试不依赖任何真实凭据。
+ * Tách thành interface để tầng trên (luồng cấp quyền, làm mới Token) có thể thay thế mạng thực trong test,
+ * các bài test tích hợp không phụ thuộc vào thông tin xác thực thật.
  */
 
 export interface TokenResponse {
@@ -19,10 +19,10 @@ export interface TokenResponse {
   scope?: string;
 }
 
-/** Microsoft 返回的标准 OAuth 错误体。 */
+/** Body lỗi OAuth tiêu chuẩn trả về từ Microsoft. */
 export class OAuthRequestError extends Error {
   readonly status: number;
-  /** 例如 `invalid_grant`、`invalid_client`、`interaction_required` */
+  /** Ví dụ `invalid_grant`, `invalid_client`, `interaction_required` */
   readonly errorCode: string;
   readonly description: string;
 
@@ -34,7 +34,7 @@ export class OAuthRequestError extends Error {
     this.description = description;
   }
 
-  /** refresh_token 已失效，必须重新走一次完整授权。 */
+  /** refresh_token đã mất hiệu lực, bắt buộc phải thực hiện lại toàn bộ luồng cấp quyền. */
   get requiresReauth(): boolean {
     return (
       this.errorCode === 'invalid_grant' ||
@@ -48,17 +48,17 @@ export interface OAuthClient {
   buildAuthorizeUrl(params: { state: string; codeChallenge: string }): string;
   exchangeCode(params: { code: string; codeVerifier: string }): Promise<TokenResponse>;
   /**
-   * `proxyUrl` 可选：按账号解析出的出口代理（对应实施计划 §13.1「OAuth 与
-   * Copilot 分别配置代理」）。不传则使用客户端构造时的全局默认代理。
+   * `proxyUrl` tùy chọn: proxy đầu ra phân giải theo tài khoản (tương ứng kế hoạch triển khai §13.1 "cấu hình proxy riêng cho OAuth và
+   * Copilot"). Nếu không truyền sẽ dùng proxy mặc định toàn cục khi khởi tạo client.
    */
   refresh(params: { refreshToken: string; proxyUrl?: string | null }): Promise<TokenResponse>;
 }
 
 export interface HttpOAuthClientOptions {
   config: OAuthConfig;
-  /** 出口代理，对应 HTTPS_PROXY / HTTP_PROXY */
+  /** Proxy đầu ra, tương ứng HTTPS_PROXY / HTTP_PROXY */
   proxyUrl?: string | null;
-  /** NO_PROXY 排除列表；token 端点主机命中时即使配了代理也直连 */
+  /** Danh sách loại trừ NO_PROXY; host của endpoint token khi khớp sẽ kết nối trực tiếp dù đã cấu hình proxy */
   noProxy?: string | null;
   timeoutMs?: number;
 }
@@ -86,7 +86,7 @@ export class HttpOAuthClient implements OAuthClient {
     url.searchParams.set('state', params.state);
     url.searchParams.set('code_challenge', params.codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
-    // 强制选择账号：账号池场景下要能连续授权多个账号，不能被浏览器的既有会话粘住
+    // Bắt buộc chọn tài khoản: trong kịch bản pool tài khoản cần cấp quyền liên tục nhiều tài khoản, không bị bám vào session có sẵn của trình duyệt
     url.searchParams.set('prompt', 'select_account');
     return url.toString();
   }
@@ -116,10 +116,9 @@ export class HttpOAuthClient implements OAuthClient {
 
   async #postToken(form: Record<string, string>, proxyUrlOverride?: string | null): Promise<TokenResponse> {
     const body = new URLSearchParams(form).toString();
-    // 账号绑定了专属代理时，逐次调用临时切换 dispatcher；否则用构造时的全局默认值。
-    // token 端点主机命中 NO_PROXY 时，resolveDispatcherForTokenUrl 无论传入什么
-    // proxyUrl 都会返回 undefined——这条判断优先于账号代理覆盖，语义上「这个
-    // 主机不走代理」应当是硬约束。
+    // Khi tài khoản gắn proxy riêng, mỗi lần gọi sẽ tạm thời chuyển dispatcher; nếu không sẽ dùng mặc định toàn cục lúc khởi tạo.
+    // Khi host endpoint token khớp NO_PROXY, resolveDispatcherForTokenUrl sẽ trả về undefined bất kể proxyUrl truyền vào là gì
+    // — điều kiện này được ưu tiên hơn proxy ghi đè của tài khoản, theo ngữ nghĩa "host này không đi qua proxy" là ràng buộc cứng.
     const dispatcher =
       proxyUrlOverride === undefined
         ? this.#dispatcher
@@ -155,15 +154,15 @@ export class HttpOAuthClient implements OAuthClient {
   }
 }
 
-/** 代理 URL 为空/未设置时不建 dispatcher，走 undici 默认（直连）。 */
+/** Proxy URL rỗng/chưa cấu hình thì không tạo dispatcher, dùng mặc định của undici (kết nối trực tiếp). */
 function toDispatcher(proxyUrl?: string | null): Dispatcher | undefined {
   return proxyUrl == null || proxyUrl === '' ? undefined : new ProxyAgent(proxyUrl);
 }
 
 /**
- * 按 token 端点目标主机决定要不要建代理 dispatcher：命中 NO_PROXY 时始终直连，
- * 不管 `proxyUrl` 传的是全局默认还是账号专属代理。导出为纯函数是为了能在不
- * 发真实网络请求的前提下单独测试这条判断逻辑。
+ * Quyết định có tạo proxy dispatcher hay không dựa trên host đích của endpoint token: khi khớp NO_PROXY luôn kết nối trực tiếp,
+ * bất kể `proxyUrl` truyền vào là proxy mặc định toàn cục hay proxy riêng của tài khoản. Export dạng hàm thuần túy để có thể kiểm thử riêng
+ * logic phán đoán này mà không cần gửi request mạng thật.
  */
 export function resolveDispatcherForTokenUrl(
   tokenUrl: string,
@@ -176,8 +175,8 @@ export function resolveDispatcherForTokenUrl(
 }
 
 /**
- * 解析 Microsoft 的错误响应。
- * 错误描述里可能带有内部标识，只保留首行并截断，避免噪音进日志。
+ * Phân tích cú pháp phản hồi lỗi từ Microsoft.
+ * Mô tả lỗi có thể chứa định danh nội bộ, chỉ giữ lại dòng đầu và cắt ngắn, tránh rác log.
  */
 export function parseOAuthError(status: number, rawBody: string): OAuthRequestError {
   let errorCode = 'unknown_error';
@@ -189,12 +188,12 @@ export function parseOAuthError(status: number, rawBody: string): OAuthRequestEr
       description = parsed.error_description.split('\n')[0]?.slice(0, 300) ?? '';
     }
   } catch {
-    // 非 JSON 响应（网关错误页等）保持原样截断
+    // Phản hồi không phải JSON (trang lỗi gateway...) giữ nguyên và cắt ngắn
   }
   return new OAuthRequestError(status, errorCode, description);
 }
 
-/** 解出 JWT 的 payload。只用于读取 tid/oid/email 等声明，**不做签名校验**。 */
+/** Giải mã payload của JWT. Chỉ dùng để đọc claim tid/oid/email..., **không xác thực chữ ký**. */
 export function decodeJwtClaims(token: string): Record<string, unknown> {
   const parts = token.split('.');
   if (parts.length < 2 || parts[1] === undefined) return {};
@@ -215,8 +214,8 @@ export interface IdentityClaims {
 }
 
 /**
- * 从 id_token / access_token 中提取账号身份。
- * 优先用 id_token，它的声明更完整；两者都缺 tid 或 oid 时视为不可用。
+ * Trích xuất danh tính tài khoản từ id_token / access_token.
+ * Ưu tiên dùng id_token vì claim đầy đủ hơn; nếu cả hai đều thiếu tid hoặc oid thì coi như không khả dụng.
  */
 export function extractIdentity(tokens: TokenResponse): IdentityClaims | null {
   const claims = {

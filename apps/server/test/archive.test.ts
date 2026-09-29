@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { packArchive, unpackArchive } from '../src/backup/archive.js';
 
 /**
- * 备份包格式：能自洽往返，且**能被系统 tar 打开**——备份的价值在于
- * 没有本项目时也读得出来。
+ * Định dạng gói sao lưu: Có thể roundtrip nhất quán và **mở được bằng tar của hệ thống** — giá trị của sao lưu là
+ * khi không có dự án này vẫn đọc ra được.
  */
 
 const NOW = 1_700_000_000_000;
@@ -54,12 +54,12 @@ describe('路径安全', () => {
   });
 
   it('解包时同样拒绝逃逸路径', () => {
-    // 手工造一个带 ../ 的合法 tar：先打包正常路径，再篡改头部里的文件名
+    // Thủ công tạo một file tar hợp lệ có chứa ../: Trước tiên đóng gói đường dẫn bình thường, sau đó giả mạo tên file trong header
     const packed = packArchive([{ path: 'safe/name', content: Buffer.from('x') }], NOW);
     const raw = gunzipSync(packed);
     raw.fill(0, 0, 100);
     raw.write('../evil', 0, 100, 'utf8');
-    // 重算校验和
+    // Tính lại checksum
     raw.write('        ', 148, 8, 'ascii');
     let checksum = 0;
     for (const byte of raw.subarray(0, 512)) checksum += byte;
@@ -83,9 +83,9 @@ describe('与系统 tar 的互操作', () => {
       const archivePath = join(dir, 'backup.tar.gz');
       writeFileSync(archivePath, archive);
 
-      // 只在「环境里根本没有 tar」时跳过。tar 存在却解不开必须报错——
-      // 之前这里 catch 得太宽，把「系统 tar 说格式无法识别」也当成了跳过，
-      // 结果一个真实的格式 bug 在绿色的测试结果下藏了过去。
+      // Chỉ bỏ qua khi "môi trường hoàn toàn không có tar". Có tar mà không giải nén được bắt buộc phải báo lỗi —
+      // trước đây catch ở đây quá rộng, coi cả việc "tar hệ thống báo định dạng không nhận diện được" là bỏ qua,
+      // dẫn đến một bug định dạng thực tế bị che giấu dưới kết quả test xanh.
       let hasTar = true;
       try {
         execFileSync('tar', ['--version'], { stdio: 'ignore' });
@@ -94,10 +94,10 @@ describe('与系统 tar 的互操作', () => {
       }
       if (!hasTar) return;
 
-      // 用 cwd + 相对文件名调用 tar，不要把 `C:\…` 这种 Windows 绝对路径传给它：
-      // MSYS/Git-Bash 附带的 GNU tar 会把 `C:` 当成 `host:path` 的远程语法，
-      // 报 "Cannot connect to C: resolve failed"——同一份包在别的 tar 上却能解开，
-      // 于是这条测试在不同机器上时绿时红。
+      // Gọi tar bằng cwd + tên file tương đối, không truyền đường dẫn tuyệt đối Windows kiểu `C:\…` cho nó:
+      // GNU tar đi kèm MSYS/Git-Bash sẽ coi `C:` là cú pháp từ xa `host:path`,
+      // báo "Cannot connect to C: resolve failed" — cùng một file gói trên tar khác lại giải nén được,
+      // khiến bài test này lúc xanh lúc đỏ trên các máy khác nhau.
       const listing = execFileSync('tar', ['-tzf', 'backup.tar.gz'], { encoding: 'utf8', cwd: dir });
       expect(listing).toContain('manifest.json');
       expect(listing).toContain('files/a/1');

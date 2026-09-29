@@ -31,8 +31,8 @@ import type {
 } from './types';
 
 /**
- * WebUI 会用到的全部管理端能力。真实实现（client.ts）与模拟实现（mock.ts）
- * 都实现这同一个接口，页面代码不关心当前跑的是哪一个。
+ * Toàn bộ năng lực quản trị mà WebUI sử dụng. Cả bản triển khai thực tế (client.ts) và giả lập (mock.ts)
+ * đều triển khai cùng một giao diện này, mã giao diện không cần quan tâm đang chạy bản nào.
  */
 export interface AdminApi {
   login(password: string): Promise<LoginResponse>;

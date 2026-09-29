@@ -6,9 +6,9 @@ import type { TokenManager } from '../../../apps/server/dist/oauth/tokenManager.
 import type { ProbeContext } from '../../src/types.js';
 
 /**
- * 测试用的最小 `ProbeContext`：只把「跑一次 invocation」所需的字段填真，
- * Token 刷新相关的依赖（`accounts`/`oauthClient`/`tokenManager`）用不会被
- * 调用到的占位对象填充——用到的用例会在各自的测试里替换成真正的 fake。
+ * `ProbeContext` tối thiểu dùng cho test: Chỉ điền thật các trường cần thiết để "chạy một invocation",
+ * các dependency liên quan đến refresh Token (`accounts`/`oauthClient`/`tokenManager`) được điền bằng
+ * placeholder object không bao giờ bị gọi tới — case nào cần dùng sẽ tự thay thế bằng fake thật trong test tương ứng.
  */
 export function makeFakeContext(mockServerUrl: string, overrides: Partial<ProbeContext> = {}): ProbeContext {
   return {

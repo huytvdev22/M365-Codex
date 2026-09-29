@@ -4,14 +4,14 @@ import type { SseEvent } from './types.js';
 import type { ResponseObject } from './types.js';
 
 /**
- * `/v1/chat/completions` ↔ Responses 的双向转换（对应实施计划 §M6）。
+ * Chuyển đổi hai chiều `/v1/chat/completions` ↔ Responses (tương ứng kế hoạch triển khai §M6).
  *
- * 硬约束：**不建第二套推理逻辑**。这里只做协议转换：Chat 请求转成一个
- * Responses 请求对象（交给现有 `parseResponsesRequest` + `ResponsesService`
- * 处理推理/工具循环/账号调度），再把 Responses 的结果/事件流转回 Chat 形态。
+ * Ràng buộc cứng: **Không xây dựng bộ logic suy luận thứ hai**. Ở đây chỉ làm chuyển đổi giao thức: yêu cầu Chat được chuyển thành một
+ * đối tượng yêu cầu Responses (giao cho `parseResponsesRequest` + `ResponsesService` hiện có
+ * xử lý suy luận/vòng lặp công cụ/điều phối tài khoản), rồi chuyển kết quả/luồng sự kiện của Responses quay lại hình thái Chat.
  *
- * `model`、`temperature`、`max_tokens`、`tools`、`tool_choice`、
- * `parallel_tool_calls` 原样透传给 Responses 请求，不新造别名、不改写取值。
+ * `model`, `temperature`, `max_tokens`, `tools`, `tool_choice`,
+ * `parallel_tool_calls` được truyền nguyên bản sang yêu cầu Responses, không đặt tên định danh mới, không viết lại giá trị.
  */
 
 const chatContentPart = z.object({ type: z.string() }).passthrough();
@@ -44,8 +44,8 @@ export const chatCompletionRequestSchema = z
     tools: z.array(z.unknown()).optional(),
     tool_choice: z.unknown().optional(),
     parallel_tool_calls: z.boolean().optional(),
-    // 部分 OpenAI 兼容客户端（如 o 系列模型）用这个键传思考等级；
-    // 原样映射到 Responses 的 reasoning.effort，不枚举、不改写取值。
+    // Một số client tương thích OpenAI (như dòng mô hình o) dùng key này để truyền mức độ tư duy (reasoning level);
+    // Được map nguyên trạng sang reasoning.effort của Responses, không enum hóa, không sửa đổi giá trị.
     reasoning_effort: z.string().optional(),
   })
   .passthrough();
@@ -62,7 +62,7 @@ export function parseChatCompletionRequest(payload: unknown): ChatCompletionRequ
   return result.data;
 }
 
-/** 把 Chat 的 content（string 或 part 数组）映射成 Responses 的 content 形态。 */
+/** Chuyển content của Chat (string hoặc mảng part) thành hình thái content của Responses. */
 function mapContent(content: ChatMessage['content']): string | Record<string, unknown>[] {
   if (content === null || content === undefined) return '';
   if (typeof content === 'string') return content;
@@ -75,7 +75,7 @@ function mapContent(content: ChatMessage['content']): string | Record<string, un
       const url = typeof imageUrl === 'string' ? imageUrl : imageUrl?.url;
       return { type: 'input_image', image_url: url };
     }
-    // 未识别的 part 类型：原样透传，交给 Responses 侧「未识别 part 不猜测、不报错」的兜底逻辑
+    // Loại part chưa nhận diện: giữ nguyên chuyển tiếp, giao cho logic fallback của Responses ("part chưa nhận diện không đoán mò, không báo lỗi")
     return part;
   });
 }
@@ -89,14 +89,14 @@ function contentToPlainText(content: ChatMessage['content']): string {
 }
 
 /**
- * messages → Responses `input`（对应实施计划 §M6「messages 到 input 的映射覆盖
- * system/developer/user/assistant/tool 五种 role」）。
+ * messages → Responses `input` (tương ứng kế hoạch triển khai §M6 "ánh xạ messages sang input bao phủ
+ * cả 5 loại role system/developer/user/assistant/tool").
  *
- * - `tool` 消息转成 `function_call_output`；
- * - 助手消息带 `tool_calls` 时，每个 tool_call 转成一条 `function_call`
- *   历史回放项（Responses 侧本就支持解析，见 schema.ts 的多轮历史重建）；
- *   若同时还带了文字内容，文字部分再作为一条独立的 assistant message 跟上；
- * - 其余角色按 role 直接转成 message 项。
+ * - Tin nhắn `tool` chuyển thành `function_call_output`;
+ * - Tin nhắn trợ lý kèm `tool_calls`, mỗi tool_call chuyển thành một mục
+ *   lịch sử `function_call` (phía Responses vốn đã hỗ trợ phân tích, xem tái dựng lịch sử nhiều lượt ở schema.ts);
+ *   nếu đồng thời còn có nội dung văn bản, phần văn bản sẽ đóng vai trò là một assistant message độc lập đi kèm;
+ * - Các vai trò khác chuyển trực tiếp thành mục message theo role tương ứng.
  */
 export function chatMessagesToInput(messages: readonly ChatMessage[]): unknown[] {
   const input: unknown[] = [];
@@ -130,7 +130,7 @@ export function chatMessagesToInput(messages: readonly ChatMessage[]): unknown[]
   return input;
 }
 
-/** 组装交给 `parseResponsesRequest` 的原始对象；字段原样透传，不新造别名。 */
+/** Lắp ráp đối tượng nguyên bản giao cho `parseResponsesRequest`; các trường truyền nguyên dạng, không tạo bí danh mới. */
 export function chatRequestToResponsesPayload(chat: ChatCompletionRequest): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     model: chat.model,
@@ -160,7 +160,7 @@ function mapFinishReason(status: ResponseStatus, hasToolCalls: boolean): string 
   }
 }
 
-/** 非流式：Responses 的最终对象 → `chat.completion`。 */
+/** Non-streaming: Đối tượng cuối cùng của Responses → `chat.completion`. */
 export function responseToChatCompletion(response: ResponseObject): Record<string, unknown> {
   const textParts: string[] = [];
   const toolCalls: Record<string, unknown>[] = [];
@@ -175,7 +175,7 @@ export function responseToChatCompletion(response: ResponseObject): Record<strin
         function: { name: item.name, arguments: item.arguments },
       });
     }
-    // reasoning 项：chat.completion 没有对应字段承载，不体现（不是丢弃语义，只是这个协议没地方放）
+    // Mục reasoning: chat.completion không có trường tương ứng để chứa, không thể hiện (không phải vứt bỏ ngữ nghĩa, mà chỉ là giao thức này không có chỗ chứa)
   }
 
   const message: Record<string, unknown> = {
@@ -201,15 +201,15 @@ export function responseToChatCompletion(response: ResponseObject): Record<strin
 }
 
 /**
- * 流式：把 Responses 的 SSE 事件流逐个翻译成 `chat.completion.chunk`。
- * 有状态（要记住每个工具调用分到第几个 tool_calls 下标），所以是个类。
+ * Streaming: Dịch luồng sự kiện SSE của Responses từng cái một thành `chat.completion.chunk`.
+ * Có trạng thái (cần ghi nhớ mỗi lệnh gọi công cụ được chia vào index thứ mấy của tool_calls), nên là một class.
  */
 export class ChatStreamTranslator {
   readonly #id: string;
   readonly #model: string;
   readonly #createdAt: number;
   readonly #toolCallIndex = new Map<string, number>();
-  /** `function_call_arguments.delta` 本身不带工具名，name 来自更早的 output_item.added。 */
+  /** Bản thân `function_call_arguments.delta` không mang tên công cụ, name đến từ output_item.added sớm hơn. */
   readonly #names = new Map<string, string>();
   #nextToolCallIndex = 0;
   #sawToolCall = false;
@@ -224,17 +224,17 @@ export class ChatStreamTranslator {
     return this.#sawToolCall;
   }
 
-  /** 首个 chunk：只带 role，与 OpenAI 真实流式行为一致。 */
+  /** Chunk đầu tiên: chỉ mang role, nhất quán với hành vi streaming thực tế của OpenAI. */
   start(): Record<string, unknown> {
     return this.#chunk({ role: 'assistant' }, null);
   }
 
-  /** 把一个 Responses SSE 事件翻译成 0 或 1 个 chat chunk。 */
+  /** Dịch một sự kiện Responses SSE thành 0 hoặc 1 chat chunk. */
   translate(event: SseEvent): Record<string, unknown> | null {
     switch (event.event) {
       case 'response.output_item.added': {
-        // function_call 项一开始就带完整的工具名，但 arguments 增量事件本身不带名字，
-        // 这里先记下来，供后面翻译 function_call_arguments.delta 时拼出首个 chunk
+        // Mục function_call ngay từ đầu đã mang tên công cụ đầy đủ, nhưng sự kiện delta của arguments tự thân nó không mang name,
+        // ở đây ghi nhận trước để sau này dịch function_call_arguments.delta thì ghép được vào chunk đầu tiên
         const item = event.data.item as { type?: string; call_id?: string; name?: string } | undefined;
         if (item?.type === 'function_call' && typeof item.call_id === 'string' && typeof item.name === 'string') {
           this.#names.set(item.call_id, item.name);

@@ -8,16 +8,16 @@ import { useAsync } from '../hooks/useAsync';
 import { formatDateTime } from '../util/format';
 
 const STATUS_OPTIONS: Array<{ value: ResponseStatus | ''; label: string }> = [
-  { value: '', label: '全部状态' },
-  { value: 'queued', label: '排队中' },
-  { value: 'in_progress', label: '进行中' },
-  { value: 'completed', label: '已完成' },
-  { value: 'incomplete', label: '未完成' },
-  { value: 'failed', label: '失败' },
-  { value: 'cancelled', label: '已取消' },
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'queued', label: 'Đang xếp hàng' },
+  { value: 'in_progress', label: 'Đang xử lý' },
+  { value: 'completed', label: 'Đã hoàn tất' },
+  { value: 'incomplete', label: 'Chưa hoàn tất' },
+  { value: 'failed', label: 'Thất bại' },
+  { value: 'cancelled', label: 'Đã hủy' },
 ];
 
-/** 不含提示词与输出正文——隐私模式 strict 下服务端本来就不留，这里只展示元数据。 */
+/** Không chứa prompt và nội dung văn bản đầu ra — trong chế độ riêng tư strict phía server không lưu trữ, tại đây chỉ hiển thị metadata. */
 export function RequestsPage() {
   const [status, setStatus] = useState<ResponseStatus | ''>('');
   const [limit, setLimit] = useState(50);
@@ -27,11 +27,11 @@ export function RequestsPage() {
   );
 
   return (
-    <Layout title="请求" subtitle="请求记录（不含提示词与输出正文）">
+    <Layout title="Nhật ký yêu cầu" subtitle="Lịch sử các yêu cầu (không chứa prompt và văn bản phản hồi)">
       <div className="card">
         <div className="form-row">
           <div className="field">
-            <label htmlFor="req-status">状态筛选</label>
+            <label htmlFor="req-status">Lọc theo trạng thái</label>
             <select id="req-status" value={status} onChange={(e) => setStatus(e.target.value as ResponseStatus | '')}>
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -41,7 +41,7 @@ export function RequestsPage() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="req-limit">显示条数</label>
+            <label htmlFor="req-limit">Số dòng hiển thị</label>
             <input
               id="req-limit"
               type="number"
@@ -60,24 +60,24 @@ export function RequestsPage() {
         data={data}
         onRetry={reload}
         isEmpty={(res) => res.items.length === 0}
-        emptyTitle="没有符合条件的请求"
+        emptyTitle="Không có yêu cầu phù hợp"
       >
         {(res) => (
           <div className="card table-wrap">
             <div className="text-muted" style={{ marginBottom: 10 }}>
-              共 {res.total} 条，当前显示 {res.items.length} 条
+              Tổng cộng {res.total} mục, hiện đang hiển thị {res.items.length} mục
             </div>
             <table>
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>状态</th>
-                  <th>模型</th>
-                  <th>推理强度</th>
-                  <th>账号</th>
-                  <th>工具轮次 / 累计调用</th>
-                  <th>创建时间</th>
-                  <th>错误</th>
+                  <th>Trạng thái</th>
+                  <th>Mô hình</th>
+                  <th>Reasoning Effort</th>
+                  <th>Tài khoản</th>
+                  <th>Lượt công cụ / Tổng lần gọi</th>
+                  <th>Thời gian tạo</th>
+                  <th>Lỗi</th>
                 </tr>
               </thead>
               <tbody>

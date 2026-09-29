@@ -20,9 +20,8 @@ export function LoginPage() {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
-    // 登录成功后不用在这里手动 navigate：login() 内部会把 status 切到 'authenticated'，
-    // 组件顶部已有的 `status === 'authenticated'` 分支会在下一次渲染里用 <Navigate> 跳转，
-    // 两处各写一遍反而是重复的命令式/声明式跳转并存，登录失败的路径也不会受影响。
+    // Đăng nhập thành công không cần navigate thủ công tại đây: login() bên trong sẽ chuyển status sang 'authenticated',
+    // nhánh `status === 'authenticated'` ở đầu component sẽ tự động chuyển hướng qua <Navigate> trong lần render kế tiếp.
     login(password)
       .catch((err: unknown) => setError(err))
       .finally(() => setSubmitting(false));
@@ -40,14 +39,14 @@ export function LoginPage() {
         </div>
         <div className="card">
           <h1 className="page-title" style={{ marginBottom: 4 }}>
-            管理员登录
+            Đăng nhập Quản trị viên
           </h1>
           <p className="page-subtitle" style={{ marginBottom: 20 }}>
-            使用 <code>M365_CODEX_ADMIN_PASSWORD</code> 登录，与对外 API Key 完全隔离。
+            Đăng nhập bằng <code>M365_CODEX_ADMIN_PASSWORD</code>, hoàn toàn tách biệt với API Key đối ngoại.
           </p>
           <form onSubmit={handleSubmit}>
             <div className="field">
-              <label htmlFor="admin-password">管理员密码</label>
+              <label htmlFor="admin-password">Mật khẩu quản trị viên</label>
               <input
                 id="admin-password"
                 type="password"
@@ -64,12 +63,12 @@ export function LoginPage() {
               </div>
             )}
             <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={submitting}>
-              {submitting ? '登录中…' : '登录'}
+              {submitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
             </button>
           </form>
         </div>
         <p className="text-faint" style={{ marginTop: 14, fontSize: 12 }}>
-          令牌只保存在内存与本标签页的会话存储中，关闭标签页后需要重新登录。
+          Token chỉ được lưu trong bộ nhớ và session storage của tab này, cần đăng nhập lại sau khi đóng tab.
         </p>
       </div>
     </div>

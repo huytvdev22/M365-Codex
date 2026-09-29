@@ -17,46 +17,46 @@ import type { Metrics } from '../observability/metrics.js';
 import type { AccountPool } from './accountPool.js';
 
 /**
- * 上游调度器：把「一次对话请求」路由到某个账号的上游连接，并在失败时
- * 按错误分类做刷新 / 冷却 / 切换（对应实施计划 §M3 DoD）。
+ * Upstream Dispatcher: Điều phối "một yêu cầu hội thoại" tới kết nối upstream của một tài khoản cụ thể, và khi thất bại
+ * sẽ thực hiện làm mới (refresh) / làm nguội (cooldown) / chuyển đổi (failover) theo phân loại lỗi (tương ứng kế hoạch triển khai §M3 DoD).
  *
- * 失败处置：
- * - 401 → 刷新一次 Token，在同一账号重试一次；
- * - 403 / 策略关闭 → 冷却该账号并切换，不无限切换（账号进排除集）；
- * - 429 → 按 Retry-After 冷却该账号，切换到别的账号；
- * - 5xx / WS 断开 → 有限次重试，可切换；
- * - 4xx（非 401/403/429）→ 视为致命，直接失败。
+ * Xử lý thất bại:
+ * - 401 → Làm mới Token một lần, thử lại một lần trên cùng tài khoản;
+ * - 403 / chính sách bị đóng → Cooldown tài khoản này và chuyển sang tài khoản khác, không chuyển đổi vô hạn (tài khoản vào tập loại trừ);
+ * - 429 → Cooldown tài khoản theo Retry-After, chuyển sang tài khoản khác;
+ * - 5xx / WS ngắt kết nối → Thử lại số lần hữu hạn, có thể chuyển đổi;
+ * - 4xx (không phải 401/403/429) → Coi là lỗi nghiêm trọng (fatal), thất bại trực tiếp.
  *
- * 「切账号用本地内容重建上下文」：本层每次尝试都用**原始请求文本**重新发起
- * invocation。因此**只有在尚未向下游吐出任何内容时**才做切换/重试；一旦已经
- * 有 text_delta 流出，中途失败会如实抛出——干净的断点续传与工具幂等属于 M4/M5。
+ * "Chuyển tài khoản dùng nội dung cục bộ tái dựng ngữ cảnh": Tầng này mỗi lần thử đều dùng **văn bản request ban đầu** để phát lại
+ * invocation. Do đó **chỉ khi chưa xuất bất kỳ nội dung nào xuống downstream** mới thực hiện chuyển đổi / thử lại; một khi đã
+ * có text_delta chảy ra, nếu giữa chừng thất bại sẽ ném lỗi chân thực — việc tiếp tục từ điểm ngắt sạch sẽ và tính idempotent của công cụ thuộc về M4/M5.
  */
 
 export interface DispatchRequest {
-  /** 用户本轮输入的纯文本（M3 仅文本） */
+  /** Văn bản thuần do người dùng nhập ở vòng này (M3 chỉ có văn bản) */
   text: string;
-  /** 粘性绑定：上一轮用的账号与上游会话引用 */
+  /** Liên kết bám dính: Tài khoản và tham chiếu phiên upstream đã dùng ở vòng trước */
   sticky?: { accountId: string; conversationRef: string | null } | null;
-  /** 透传给上游的参数（model / reasoning.effort 等，不改写） */
+  /** Các tham số chuyển tiếp cho upstream (model / reasoning.effort v.v., không viết lại) */
   passthrough?: Record<string, unknown> | undefined;
-  /** 本轮可用的工具声明（M5） */
+  /** Khai báo các công cụ khả dụng ở vòng này (M5) */
   tools?: readonly ToolDeclaration[] | undefined;
-  /** 工具执行结果回传（M5，续接时带上） */
+  /** Kết quả thực thi công cụ gửi lại (M5, mang theo khi tiếp nối) */
   toolResults?: readonly ToolResultInput[] | undefined;
   /**
-   * 本次请求是否可能触发副作用（携带工具结果回传时为真）。
-   * 副作用阶段禁止自动跨账号重放——一旦失败不切换账号，如实抛出。
+   * Request này có khả năng kích hoạt tác dụng phụ hay không (true khi mang kết quả công cụ gửi lại).
+   * Giai đoạn tác dụng phụ cấm tự động phát lại qua tài khoản khác — một khi thất bại không chuyển tài khoản, ném lỗi trực tiếp.
    */
   sideEffect?: boolean | undefined;
   signal?: AbortSignal | undefined;
 }
 
 export interface DispatchResult {
-  /** 本次实际使用的账号 */
+  /** Tài khoản thực tế sử dụng lần này */
   accountId: string;
-  /** 上游会话引用（供上层持久化，实现续接） */
+  /** Tham chiếu phiên upstream (để tầng trên lưu trữ, phục vụ tiếp nối) */
   conversationRef: string | null;
-  /** 归一化事件流 */
+  /** Luồng sự kiện đã chuẩn hóa */
   events: AsyncGenerator<UpstreamEvent>;
 }
 
@@ -68,20 +68,20 @@ export interface DispatcherDeps {
   tokens: TokenManager;
   logger: Logger;
   proxyUrl?: string | null;
-  /** NO_PROXY 排除列表，透传给连接层；命中的目标主机即使配了代理也直连 */
+  /** Danh sách loại trừ NO_PROXY, chuyển tiếp cho tầng kết nối; host mục tiêu khớp danh sách sẽ kết nối trực tiếp dù có cấu hình proxy */
   noProxy?: string | null;
   /**
-   * 按账号解析出口代理（对应实施计划 §13.1「账号绑定代理后保持出口粘性」）。
-   * 返回 null 表示该账号未绑定代理或绑定的节点已停用，回退到 `proxyUrl` 全局默认值。
+   * Phân giải proxy đầu ra theo tài khoản (tương ứng kế hoạch triển khai §13.1 "Tài khoản liên kết proxy duy trì tính bám dính đầu ra").
+   * Trả về null biểu thị tài khoản này chưa liên kết proxy hoặc node liên kết đã dừng hoạt động, fallback về giá trị mặc định toàn cục `proxyUrl`.
    */
   resolveProxyForAccount?: (accountId: string) => string | null;
-  /** 注入连接实现，测试用 */
+  /** Inject triển khai kết nối, dùng cho kiểm thử */
   connectionFactory?: (deps: ConnectionDeps) => SydneyConnection;
-  /** 单次请求最多尝试多少个账号（含重试），默认 4 */
+  /** Số lượng tài khoản tối đa thử cho một request đơn (bao gồm cả thử lại), mặc định 4 */
   maxAttempts?: number;
-  /** 403 / 429 之外的默认冷却时长（毫秒） */
+  /** Thời gian cooldown mặc định (mili giây) ngoài 403 / 429 */
   defaultCooldownMs?: number;
-  /** M8：上游调用与错误分类打点（§17） */
+  /** M8: Thu thập số liệu lần gọi upstream và phân loại lỗi (§17) */
   metrics?: Metrics;
 }
 
@@ -97,12 +97,12 @@ export class UpstreamDispatcher {
   }
 
   /**
-   * 调度一次对话。返回选中的账号、上游会话引用，以及事件流。
-   * 事件流内部完成账号选择与失败切换；池中无可用账号时抛
-   * `503 account_pool_exhausted`。
+   * Điều phối một lượt hội thoại. Trả về tài khoản được chọn, tham chiếu phiên upstream, cùng luồng sự kiện.
+   * Bên trong luồng sự kiện sẽ hoàn thành việc chọn tài khoản và chuyển đổi khi thất bại; khi pool không còn tài khoản khả dụng sẽ ném
+   * `503 account_pool_exhausted`.
    */
   dispatch(request: DispatchRequest): DispatchResult {
-    // 先确定首选账号是否可用，以便同步返回 accountId；真正的连接在事件流里建立
+    // Xác định trước xem tài khoản ưu tiên có khả dụng không để trả về accountId đồng bộ; kết nối thực sự được thiết lập trong luồng sự kiện
     const state: { accountId: string; conversationRef: string | null } = {
       accountId: '',
       conversationRef: request.sticky?.conversationRef ?? null,
@@ -136,7 +136,7 @@ export class UpstreamDispatcher {
       });
 
       if (account === null) {
-        // 区分「池里本来就没有可用账号」与「都被本次请求排除了」
+        // Phân biệt "pool ban đầu không có tài khoản khả dụng" và "tất cả đều bị loại trừ trong request này"
         if (!pool.hasAnySchedulable()) {
           throw new ApiError({
             type: 'account_pool_exhausted',
@@ -144,7 +144,7 @@ export class UpstreamDispatcher {
             message: '没有可用的 Microsoft 账号',
           });
         }
-        break; // 有可用账号但都被排除，退出循环由下面统一处理
+        break; // Có tài khoản khả dụng nhưng đều bị loại trừ, thoát vòng lặp để xử lý tập trung bên dưới
       }
 
       attempts += 1;
@@ -153,14 +153,14 @@ export class UpstreamDispatcher {
       this.#deps.metrics?.upstreamAttempts.inc({ result: 'started' });
 
       try {
-        // 取 Token（必要时刷新）
+        // Lấy Token (làm mới nếu cần)
         let accessToken: string;
         try {
           accessToken = await this.#deps.tokens.getAccessToken(account.id);
         } catch (error) {
           if (error instanceof TokenUnavailableError) {
             lastError = error;
-            // 账号本身取不到 Token（需重新授权等）：排除后换账号
+            // Bản thân tài khoản không lấy được Token (cần tái ủy quyền, v.v.): loại trừ và đổi tài khoản
             excluded.add(account.id);
             logger.warn({ account_id: account.id, reason: error.reason }, '账号 Token 不可用，切换');
             continue;
@@ -175,7 +175,7 @@ export class UpstreamDispatcher {
           accessToken,
         });
 
-        // 账号绑定的出口优先：同一账号的长连接固定走同一个代理，避免频繁切换网络出口
+        // Ưu tiên đầu ra liên kết của tài khoản: Kết nối dài của cùng một tài khoản đi cố định qua cùng một proxy, tránh đổi đầu ra mạng liên tục
         const proxyUrl = this.#deps.resolveProxyForAccount?.(account.id) ?? this.#deps.proxyUrl ?? null;
         const connection = (this.#deps.connectionFactory ?? defaultConnectionFactory)({
           config: this.#deps.config,
@@ -200,8 +200,8 @@ export class UpstreamDispatcher {
             toolResults: request.toolResults,
             signal: request.signal,
           })) {
-            // 文本、推理、工具调用都算「已产出内容」——之后失败不再切换账号，
-            // 避免副作用工具调用被跨账号重放执行（§M5）
+            // Văn bản, suy luận, gọi công cụ đều tính là "đã xuất nội dung" — thất bại sau đó sẽ không đổi tài khoản nữa,
+            // tránh việc lệnh gọi công cụ có tác dụng phụ bị phát lại thực thi qua tài khoản khác (§M5)
             if (
               event.kind === 'text_delta' ||
               event.kind === 'reasoning_delta' ||
@@ -210,12 +210,12 @@ export class UpstreamDispatcher {
               emittedContent = true;
             }
             if (event.kind === 'upstream_error' && !event.retryable) {
-              // 上游在流内报了不可重试的错误
+              // Upstream báo lỗi không thể thử lại trong luồng
               this.#deps.accounts.recordFailure(account.id, 'upstream_error');
             }
             yield event;
           }
-          // 正常跑完
+          // Chạy xong bình thường
           this.#deps.accounts.recordSuccess(account.id);
           this.#deps.metrics?.upstreamAttempts.inc({ result: 'success' });
           return;
@@ -232,14 +232,14 @@ export class UpstreamDispatcher {
           this.#deps.metrics?.upstreamAttempts.inc({ result: 'error' });
           this.#deps.metrics?.upstreamErrors.inc({ disposition: upstreamError.disposition });
 
-          // 已经吐过内容就不能干净切换，如实抛出
+          // Đã xuất nội dung thì không thể chuyển đổi sạch sẽ, ném lỗi trực tiếp
           if (emittedContent) {
             this.#deps.accounts.recordFailure(account.id, upstreamError.disposition);
             throw this.#toApiError(upstreamError);
           }
 
-          // 副作用请求（回传工具结果）禁止跨账号重放：即便还没吐内容，
-          // 换账号重发也可能让已执行过的副作用工具再执行一次，故直接失败
+          // Request có tác dụng phụ (gửi lại kết quả công cụ) cấm phát lại qua tài khoản khác: Cho dù chưa xuất nội dung,
+          // việc đổi tài khoản gửi lại cũng có thể khiến công cụ tác dụng phụ đã thực thi bị chạy lại lần nữa, nên báo thất bại trực tiếp
           if (request.sideEffect === true) {
             this.#deps.accounts.recordFailure(account.id, upstreamError.disposition);
             throw this.#toApiError(upstreamError);
@@ -250,11 +250,11 @@ export class UpstreamDispatcher {
             throw this.#toApiError(upstreamError);
           }
           if (decision === 'refresh_retry' && !retriedAfterRefresh) {
-            // 401：刷新一次，在同一账号再试一次（不排除）
+            // 401: Làm mới một lần, thử lại một lần trên cùng tài khoản (không loại trừ)
             retriedAfterRefresh = true;
             try {
               await this.#deps.tokens.refresh(account.id);
-              attempts -= 1; // 这次刷新重试不计入尝试上限
+              attempts -= 1; // Lần thử lại sau khi refresh này không tính vào trần số lần thử
             } catch {
               excluded.add(account.id);
             }
@@ -269,7 +269,7 @@ export class UpstreamDispatcher {
       }
     }
 
-    // 尝试用尽或账号都被排除
+    // Đã hết số lần thử hoặc tất cả tài khoản đều bị loại trừ
     if (lastError !== null) {
       if (lastError instanceof UpstreamError) throw this.#toApiError(lastError);
       throw new ApiError({
@@ -286,8 +286,8 @@ export class UpstreamDispatcher {
   }
 
   /**
-   * 按错误分类更新账号状态并决定后续动作。
-   * 返回 'switch' 换账号 / 'refresh_retry' 刷新重试同账号 / 'fatal' 直接失败。
+   * Cập nhật trạng thái tài khoản theo phân loại lỗi và quyết định hành động tiếp theo.
+   * Trả về 'switch' đổi tài khoản / 'refresh_retry' làm mới thử lại cùng tài khoản / 'fatal' thất bại trực tiếp.
    */
   #applyDisposition(
     accountId: string,

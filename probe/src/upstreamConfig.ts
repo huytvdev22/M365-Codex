@@ -9,9 +9,9 @@ import { selectCodec } from '../../apps/server/dist/adapter/codecV1.js';
 import type { ProbeUpstreamConfig } from './types.js';
 
 /**
- * 探针自己的上游配置，字段与 `apps/server/src/config/index.ts` 的 `UpstreamConfig`
- * 一一对应。默认值直接取网关的默认值，`UPSTREAM_*` 环境变量与网关同名同义，
- * 方便把探针指向模拟上游（自测）或未来漂移后的真实上游端点，不需要另记一套变量名。
+ * Cấu hình upstream của chính probe, các trường tương ứng một-một với `UpstreamConfig`
+ * trong `apps/server/src/config/index.ts`. Giá trị mặc định lấy trực tiếp từ gateway, các biến môi trường `UPSTREAM_*` cùng tên và cùng nghĩa với gateway,
+ * thuận tiện để trỏ probe tới mock upstream (tự test) hoặc endpoint upstream thật sau này khi thay đổi, không cần nhớ thêm một bộ tên biến khác.
  */
 export function loadProbeUpstreamConfig(env: NodeJS.ProcessEnv = process.env): ProbeUpstreamConfig {
   return {

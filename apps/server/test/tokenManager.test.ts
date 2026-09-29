@@ -167,7 +167,7 @@ describe('invalid_grant 处理', () => {
     await expect(fixture.manager.refresh(fixture.accountId)).rejects.toThrow(/需要重新授权/);
     expect(fixture.accounts.findById(fixture.accountId)?.status).toBe('reauth_required');
 
-    // 已经是 reauth_required 的账号不再打上游
+    // Tài khoản đã ở trạng thái reauth_required sẽ không gọi lên upstream nữa
     const callsBefore = fixture.client.refreshCount;
     await expect(fixture.manager.getAccessToken(fixture.accountId)).rejects.toThrow(/重新授权/);
     expect(fixture.client.refreshCount).toBe(callsBefore);

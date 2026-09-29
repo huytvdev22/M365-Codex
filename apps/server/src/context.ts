@@ -37,8 +37,8 @@ import { SettingsService } from './settings/service.js';
 import { APP_VERSION } from './version.js';
 
 /**
- * 运行时上下文：把配置、数据库、加密器、日志与各服务集中传递，
- * 便于测试时注入内存数据库、静默日志与模拟上游。
+ * Ngữ cảnh thực thi (Runtime Context): Truyền tập trung cấu hình, cơ sở dữ liệu, bộ mã hóa, logger và các dịch vụ,
+ * giúp dễ dàng inject in-memory database, logger yên lặng và mock upstream trong kiểm thử.
  */
 export interface AppContext {
   readonly config: AppConfig;
@@ -65,26 +65,26 @@ export interface AppContext {
   readonly uploadRepo: UploadRepository;
   readonly fileStorage: FileStorage;
   readonly files: FilesService;
-  /** M7：请求幂等（§18），接进 /v1/responses 与 /v1/chat/completions */
+  /** M7: Tính bất biến / Idempotency yêu cầu (§18), tích hợp vào /v1/responses và /v1/chat/completions */
   readonly idempotency: IdempotencyStore;
-  /** M7：API Key 级限额（§10），进程内计数，单容器前提 */
+  /** M7: Giới hạn mức API Key (§10), đếm trong tiến trình, điều kiện tiên quyết đơn container */
   readonly rateLimiter: RateLimiter;
-  /** M7：出口代理池（§13.1） */
+  /** M7: Nhóm proxy outbound (§13.1) */
   readonly proxyNodes: ProxyNodeRepository;
-  /** M7：代理健康检查，测试可注入假实现 */
+  /** M7: Kiểm tra sức khỏe proxy, có thể inject mock implementation khi kiểm thử */
   readonly proxyChecker: ProxyChecker;
-  /** M7：设置读写（契约 §2.3） */
+  /** M7: Đọc/ghi cài đặt (Hợp đồng §2.3) */
   readonly settingsRepo: SettingsRepository;
   readonly settings: SettingsService;
-  /** 当前生效的日志隐私模式；log_privacy_mode 热切换（含 debug 自动过期）都改这里 */
+  /** Chế độ bảo mật log hiện đang có hiệu lực; chuyển đổi động log_privacy_mode (gồm tự hết hạn debug) đều cập nhật tại đây */
   readonly privacyMode: PrivacyModeHolder;
-  /** M7：定时清理任务调度（§18），已注册好各清理 job，未 start（由 server.ts 决定何时启动） */
+  /** M7: Lập lịch tác vụ dọn dẹp định kỳ (§18), đã đăng ký sẵn các job dọn dẹp, chưa start (do server.ts quyết định thời điểm bật) */
   readonly scheduler: MaintenanceScheduler;
-  /** 指标注册表，接了 GET /metrics（M8，§17） */
+  /** Bảng đăng ký metrics, tích hợp GET /metrics (M8, §17) */
   readonly metrics: Metrics;
-  /** M8：备份包生成/恢复（§15.4） */
+  /** M8: Tạo / khôi phục gói sao lưu (§15.4) */
   readonly backup: BackupService;
-  /** M8：备份包在磁盘上的存放与清理（契约 §三） */
+  /** M8: Lưu trữ và dọn dẹp gói sao lưu trên ổ đĩa (Hợp đồng §3) */
   readonly backupStore: BackupStore;
   readonly startedAt: number;
 }
@@ -94,17 +94,17 @@ export interface CreateContextOptions {
   db: Database;
   logger: Logger;
   startedAt?: number;
-  /** 注入模拟上游，集成测试用；不传则走真实 HTTP */
+  /** Inject mock upstream, dùng cho integration test; nếu không truyền thì dùng HTTP thật */
   oauthClient?: OAuthClient;
-  /** 注入假的代理健康检查，测试用；不传则走真实 TCP 探测 */
+  /** Inject bộ kiểm tra sức khỏe proxy giả lập, dùng cho test; nếu không truyền thì dò quét TCP thật */
   proxyChecker?: ProxyChecker;
 }
 
 export function createContext(options: CreateContextOptions): AppContext {
   const { config, db, logger } = options;
   const cryptor = new Cryptor(config.masterKey, config.masterKeyVersion);
-  // 提前构造：账号/Token/调度三层都要接指标（§17），构造时就传进去，
-  // 不必事后再补一层包装
+  // Khởi tạo sớm: Ba tầng tài khoản / Token / điều phối đều cần gắn metrics (§17), truyền vào ngay khi khởi tạo,
+  // không cần bọc thêm một lớp wrapper sau này
   const metrics = new Metrics();
 
   const accounts = new AccountRepository(db, cryptor, metrics);
@@ -118,8 +118,8 @@ export function createContext(options: CreateContextOptions): AppContext {
       noProxy: config.noProxy,
     });
 
-  // 账号绑定了专属出口代理时（§13.1），Token 刷新与上游长连接都走这一个出口，
-  // 保持粘性；节点不存在或被停用时回退到全局默认代理
+  // Khi tài khoản gắn proxy outbound chuyên dụng (§13.1), làm mới Token và kết nối dài upstream đều đi qua outbound này,
+  // duy trì tính bám dính (sticky); khi node không tồn tại hoặc bị vô hiệu hóa sẽ fallback về proxy mặc định toàn cục
   const resolveProxyForAccount = (accountId: string): string | null => {
     const account = accounts.findById(accountId);
     if (account?.proxy_node_id == null) return null;
@@ -153,7 +153,7 @@ export function createContext(options: CreateContextOptions): AppContext {
     toolCalls: toolCallRepo,
     tools: config.tools,
     logger,
-    // M6 新增：input_file 按 file-id 取文本、input_image 按配置决定是否放行
+    // M6 thêm mới: input_file lấy văn bản theo file-id, input_image quyết định cho qua theo cấu hình
     files: filesService,
     upstreamImageInput: config.upstreamImageInput,
     contextMaxChars: config.contextMaxChars,
@@ -232,8 +232,8 @@ export function createContext(options: CreateContextOptions): AppContext {
 }
 
 /**
- * 注册全部定时清理任务（对应实施计划 §18）。只注册、不 start——是否启动定时器
- * 由 `server.ts` 决定（测试用 `createContext` 时不希望后台定时器悄悄跑起来）。
+ * Đăng ký tất cả các tác vụ dọn dẹp định kỳ (tương ứng với Kế hoạch thực hiện §18). Chỉ đăng ký, không start —
+ * việc khởi động timer do `server.ts` quyết định (khi test dùng `createContext` không muốn timer ngầm tự động chạy).
  */
 function registerMaintenanceJobs(
   scheduler: MaintenanceScheduler,
@@ -255,8 +255,8 @@ function registerMaintenanceJobs(
   const interval = deps.config.cleanup.intervalMs;
 
   scheduler.register({
-    // debug 日志隐私模式到期检查（§15.3）：复用清理任务共用的调度间隔即可，
-    // 不必为此单独加一个配置项——过期粒度精确到分钟没有实际意义
+    // Kiểm tra hết hạn chế độ riêng tư debug log (§15.3): Tái sử dụng chu kỳ lịch chung của tác vụ dọn dẹp,
+    // không cần thêm cấu hình riêng — độ chi tiết hết hạn đến phút không có ý nghĩa thực tế
     name: 'log_privacy_debug_expiry',
     intervalMs: interval,
     run: () => deps.settings.enforceDebugExpiry(),
@@ -286,8 +286,8 @@ function registerMaintenanceJobs(
   scheduler.register({
     name: 'responses_cleanup',
     intervalMs: interval,
-    // 级联删除 tool_calls 与 conversation_bindings（外键 ON DELETE CASCADE），
-    // 因此“过期 Response”与“超期请求记录”是同一件事，不必再拆一个任务
+    // Xóa theo tầng tool_calls và conversation_bindings (khóa ngoại ON DELETE CASCADE),
+    // vì vậy "Response hết hạn" và "bản ghi yêu cầu quá hạn" là cùng một việc, không cần tách tác vụ
     run: () => deps.responseRepo.purgeFinishedOlderThan(Date.now() - deps.config.cleanup.responseRetentionMs),
   });
   scheduler.register({
@@ -308,8 +308,8 @@ function registerMaintenanceJobs(
   scheduler.register({
     name: 'backups_cleanup',
     intervalMs: interval,
-    // 只保留最近 N 份（§15.4），旧的直接删文件——备份包不进数据库，
-    // 不存在“级联删除”的顾虑
+    // Chỉ giữ lại N bản gần nhất (§15.4), các bản cũ xóa trực tiếp tệp — file sao lưu không lưu trong CSDL,
+    // không lo ngại vấn đề "xóa tầng (cascade)"
     run: () => deps.backupStore.prune(deps.config.backup.retentionCount),
   });
 }

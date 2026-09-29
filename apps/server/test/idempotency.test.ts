@@ -4,8 +4,8 @@ import { fingerprintRequest, IdempotencyStore } from '../src/gateway/idempotency
 import { openDatabase, runMigrations, type Database } from '../src/db/index.js';
 
 /**
- * 请求幂等（§18）。核心诉求是**不重复提交可能产生工具调用的上游请求**：
- * 重放一次 POST /v1/responses 意味着模型可能再决定执行一次有副作用的工具。
+ * Tính idempotent của yêu cầu (§18). Yêu cầu cốt lõi là **không gửi lặp lại các yêu cầu upstream có thể sinh ra lệnh gọi công cụ**:
+ * Gửi lại một lần POST /v1/responses đồng nghĩa với việc mô hình có thể lại quyết định thực thi một công cụ có tác dụng phụ.
  */
 
 let db: Database;

@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createTestHarness, loginAdmin, type TestHarness } from './helpers/testApp.js';
 
 /**
- * `GET /metrics`（对应实施计划 §17，契约 §三）。
+ * `GET /metrics` (tương ứng kế hoạch triển khai §17, hợp đồng §3).
  *
- * 覆盖点：默认要求管理会话鉴权、可配置关闭鉴权、可配置整体关闭、
- * Prometheus 文本格式、抓取时现填的 gauge、不含任何用户内容。
+ * Độ bao phủ: Mặc định yêu cầu xác thực phiên admin, có thể cấu hình tắt xác thực, có thể cấu hình tắt toàn bộ,
+ * định dạng văn bản Prometheus, gauge điền tại thời điểm scrape, không chứa bất kỳ nội dung người dùng nào.
  */
 
 let harness: TestHarness | undefined;
@@ -74,7 +74,7 @@ describe('抓取时的即时值', () => {
     harness = await createTestHarness({ METRICS_REQUIRE_AUTH: 'false' });
     await harness.app.inject({ method: 'GET', url: '/healthz' });
     const res = await harness.app.inject({ method: 'GET', url: '/metrics' });
-    // 标签清洗把空格换成下划线（sanitizeLabelValue），"GET /healthz" 变成 "GET_/healthz"
+    // Làm sạch label thay khoảng trắng bằng gạch dưới (sanitizeLabelValue), "GET /healthz" thành "GET_/healthz"
     expect(res.body).toContain('m365codex_requests_total{endpoint="GET_/healthz",status="200"}');
     expect(res.body).toContain('m365codex_request_duration_seconds_count{endpoint="GET_/healthz"}');
   });

@@ -1,6 +1,6 @@
 /**
- * M365-Codex 共享类型与常量。
- * 服务端与管理 WebUI 共用，禁止在此引入任何 Node 专有依赖。
+ * Các kiểu dữ liệu và hằng số dùng chung của M365-Codex.
+ * Dùng chung giữa Server và WebUI quản trị, nghiêm cấm import các thư viện đặc thù của Node.js vào đây.
  */
 
 export * from './errors.js';

@@ -2,7 +2,7 @@ import type { ResponseStatus } from '@m365-codex/shared';
 import { asRow, asRows, type Database } from '../db/index.js';
 import type { ResponseObject } from '../responses/types.js';
 
-/** Responses 持久化：请求记录 + 会话粘性绑定。 */
+/** Lưu trữ Responses: Bản ghi yêu cầu + ràng buộc dính phiên hội thoại (affinity binding). */
 
 export interface ResponseRow {
   id: string;
@@ -17,9 +17,9 @@ export interface ResponseRow {
   idempotency_key: string | null;
   body: string | null;
   error_message: string | null;
-  /** 本 Response 处在对话链的第几轮工具调用（§7.4 最大工具轮次） */
+  /** Response này thuộc lượt gọi công cụ thứ mấy trong chuỗi hội thoại (§7.4 số lượt công cụ tối đa) */
   tool_round: number;
-  /** 本对话链累计发出的工具调用数（§7.4 最大累计工具调用数） */
+  /** Tổng số lệnh gọi công cụ tích lũy phát ra trong chuỗi hội thoại này (§7.4 số lệnh gọi công cụ tích lũy tối đa) */
   tool_calls_total: number;
   created_at: number;
   updated_at: number;
@@ -41,7 +41,7 @@ export interface CreateResponseInput {
   upstreamModelParameter: string | null;
   previousResponseId: string | null;
   idempotencyKey: string | null;
-  /** 继承自上一轮的计数；新对话为 0 */
+  /** Kế thừa bộ đếm từ vòng trước; hội thoại mới là 0 */
   toolRound?: number;
   toolCallsTotal?: number;
 }
@@ -78,7 +78,7 @@ export class ResponseRepository {
       );
   }
 
-  /** 记录本轮实际发出的工具调用数，供下一轮继承计数。 */
+  /** Ghi nhận số lệnh gọi công cụ thực tế phát ra trong lượt này, phục vụ lượt kế tiếp kế thừa bộ đếm. */
   setToolCounters(id: string, round: number, total: number, now = Date.now()): void {
     this.#db
       .prepare('UPDATE responses SET tool_round = ?, tool_calls_total = ?, updated_at = ? WHERE id = ?')
@@ -90,9 +90,9 @@ export class ResponseRepository {
   }
 
   /**
-   * 找出某 API Key 下最近一次用过某幂等键的记录（仅供审计/回溯查看，
-   * 唯一性保证已经收敛到 `idempotency_keys` 表，这里的 key 不再是唯一的，
-   * 流式请求 release 后同一把键可能对应多个历史记录，取最近一条）。
+   * Tìm bản ghi gần nhất từng dùng một idempotency key cụ thể dưới một API Key (chỉ phục vụ kiểm toán/truy vết,
+   * việc đảm bảo tính duy nhất đã gom về bảng `idempotency_keys`, key ở đây không còn là duy nhất,
+   * sau khi request streaming release thì cùng một key có thể tương ứng với nhiều bản ghi lịch sử, lấy bản ghi gần nhất).
    */
   findByIdempotencyKey(apiKeyId: string, key: string): ResponseRow | undefined {
     return asRow<ResponseRow>(
@@ -114,7 +114,7 @@ export class ResponseRepository {
     this.#db.prepare('UPDATE responses SET status = ?, updated_at = ? WHERE id = ?').run(status, now, id);
   }
 
-  /** 完成时落库最终 Response JSON 与上游自报模型。 */
+  /** Khi hoàn thành lưu JSON Response cuối cùng và model do upstream tự báo vào DB. */
   complete(
     id: string,
     status: ResponseStatus,
@@ -137,7 +137,7 @@ export class ResponseRepository {
       );
   }
 
-  /** 读取完成后的 Response 对象；未完成或无 body 时返回 null。 */
+  /** Đọc đối tượng Response sau khi hoàn thành; chưa hoàn thành hoặc không có body trả về null. */
   readBody(id: string): ResponseObject | null {
     const row = this.findById(id);
     if (row?.body == null) return null;
@@ -166,12 +166,12 @@ export class ResponseRepository {
     );
   }
 
-  /** 按状态找出全部记录（重启恢复用，§18）。 */
+  /** Tìm toàn bộ bản ghi theo trạng thái (dùng cho phục hồi sau khởi động lại, §18). */
   listByStatus(status: ResponseStatus): ResponseRow[] {
     return asRows<ResponseRow>(this.#db.prepare('SELECT * FROM responses WHERE status = ?').all(status));
   }
 
-  /** 管理端请求记录列表（契约 §2.2），按创建时间倒序，可选按状态/API Key 过滤。 */
+  /** Danh sách bản ghi yêu cầu phía quản trị (hợp đồng §2.2), sắp xếp giảm dần theo thời gian tạo, tùy chọn lọc theo trạng thái/API Key. */
   listForAdmin(filters: { limit: number; status?: string; apiKeyId?: string }): { items: ResponseRow[]; total: number } {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
@@ -196,7 +196,7 @@ export class ResponseRepository {
     return { items, total: totalRow?.count ?? 0 };
   }
 
-  /** 某时间点之后创建的请求数（供 /admin/overview 的 requests.last_hour）。 */
+  /** Số yêu cầu tạo sau một mốc thời gian (cung cấp cho requests.last_hour của /admin/overview). */
   countCreatedSince(sinceMs: number): number {
     const row = asRow<{ count: number }>(
       this.#db.prepare('SELECT COUNT(*) AS count FROM responses WHERE created_at >= ?').get(sinceMs),
@@ -204,7 +204,7 @@ export class ResponseRepository {
     return row?.count ?? 0;
   }
 
-  /** 某时间点之后失败的请求数（供 /admin/overview 的 requests.failed_last_hour）。 */
+  /** Số yêu cầu thất bại sau một mốc thời gian (cung cấp cho requests.failed_last_hour của /admin/overview). */
   countFailedSince(sinceMs: number): number {
     const row = asRow<{ count: number }>(
       this.#db
@@ -215,9 +215,9 @@ export class ResponseRepository {
   }
 
   /**
-   * 清理已结束（completed/failed/cancelled/incomplete）且早于 cutoff 的记录
-   * （对应实施计划 §18 定时清理）。级联删除 `tool_calls`（`ON DELETE CASCADE`）
-   * 与 `conversation_bindings`（同上），因此不需要单独再清一次。
+   * Dọn dẹp các bản ghi đã kết thúc (completed/failed/cancelled/incomplete) và cũ hơn mốc cutoff
+   * (tương ứng dọn dẹp định kỳ trong kế hoạch triển khai §18). Xóa theo tầng cascade `tool_calls` (`ON DELETE CASCADE`)
+   * và `conversation_bindings` (tương tự), vì vậy không cần dọn dẹp riêng lần nữa.
    */
   purgeFinishedOlderThan(cutoff: number): number {
     const result = this.#db
@@ -230,8 +230,8 @@ export class ResponseRepository {
   }
 
   /**
-   * 清理指向已被删除账号的会话绑定（失效会话绑定，§18）。
-   * `account_id` 没有 `ON DELETE` 动作，账号被删后绑定会变成悬空引用。
+   * Dọn dẹp liên kết phiên trỏ tới tài khoản đã bị xóa (liên kết phiên mất hiệu lực, §18).
+   * `account_id` không có hành động `ON DELETE`, sau khi tài khoản bị xóa thì liên kết sẽ trở thành tham chiếu treo.
    */
   purgeStaleBindings(): number {
     const result = this.#db

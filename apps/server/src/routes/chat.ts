@@ -13,12 +13,12 @@ import { parseResponsesRequest } from '../responses/schema.js';
 import type { SseEvent } from '../responses/types.js';
 
 /**
- * `POST /v1/chat/completions`（对应实施计划 §M6）。
+ * `POST /v1/chat/completions` (tương ứng kế hoạch triển khai §M6).
  *
- * **复用 Responses 内核，绝不另建一套推理逻辑**：把 Chat 请求转成
- * `ResponsesRequest` 交给现有 `ResponsesService`，再把结果/事件流转回
- * Chat 形态。账号调度、工具代理循环、SSE 生命周期全部沿用 `/v1/responses`
- * 已有实现，这里只做协议转换（见 `responses/chatBridge.ts`）。
+ * **Tái sử dụng nhân Responses, tuyệt đối không xây dựng thêm một logic suy luận riêng**: Chuyển request Chat thành
+ * `ResponsesRequest` giao cho `ResponsesService` hiện có, rồi chuyển kết quả/luồng sự kiện ngược lại
+ * hình thái Chat. Điều phối tài khoản, vòng lặp proxy công cụ, vòng đời SSE đều dùng lại toàn bộ
+ * triển khai sẵn có của `/v1/responses`, ở đây chỉ làm chuyển đổi giao thức (xem `responses/chatBridge.ts`).
  */
 export function registerChatRoutes(app: FastifyInstance, context: AppContext): void {
   const apiKeyGuard = createApiKeyGuard(context);
@@ -43,7 +43,7 @@ export function registerChatRoutes(app: FastifyInstance, context: AppContext): v
     }
 
     try {
-      // 客户端断开 → 取消上游（与 /v1/responses 共用同一套取消机制）
+      // Client ngắt kết nối → Hủy upstream (dùng chung cơ chế hủy với /v1/responses)
       const controller = new AbortController();
       const execution = context.responses.create({
         request: responsesRequest,
@@ -54,8 +54,8 @@ export function registerChatRoutes(app: FastifyInstance, context: AppContext): v
       });
       context.inFlight.register(execution.responseId, controller);
 
-      // 见 routes/v1.ts 同名变量的注释：hijack 后 onResponse 不再触发，
-      // 靠这个标记区分「流未结束时客户端断开」（算中断）与「流已收尾后连接关闭」
+      // Xem chú thích biến cùng tên trong routes/v1.ts: sau khi hijack thì onResponse không còn kích hoạt nữa,
+      // dựa vào cờ này để phân biệt "client ngắt kết nối khi luồng chưa kết thúc" (tính là gián đoạn) và "kết nối đóng sau khi luồng đã hoàn tất"
       let handlerDone = false;
       const onClose = (): void => {
         if (!handlerDone && chat.stream === true) {
@@ -76,7 +76,7 @@ export function registerChatRoutes(app: FastifyInstance, context: AppContext): v
           idem.handle?.complete(0, null, null);
           return streamed;
         }
-        // 非流式：把事件流跑干（驱动上游），再把最终 Response 对象转成 chat.completion
+        // Không stream: Chạy cạn luồng sự kiện (thúc đẩy upstream), rồi chuyển đối tượng Response cuối cùng thành chat.completion
         for await (const _event of execution.stream) {
           void _event;
         }
@@ -98,7 +98,7 @@ export function registerChatRoutes(app: FastifyInstance, context: AppContext): v
   });
 }
 
-/** 以 `chat.completion.chunk` 的 SSE 形态流式回传，末尾发 `data: [DONE]`。 */
+/** Truyền phát trực tuyến dưới dạng SSE `chat.completion.chunk`, cuối cùng gửi `data: [DONE]`. */
 async function streamChatCompletion(
   reply: FastifyReply,
   stream: AsyncGenerator<SseEvent>,
@@ -119,8 +119,8 @@ async function streamChatCompletion(
   const write = async (payload: Record<string, unknown>): Promise<void> => {
     if (reply.raw.destroyed) return;
     const ok = reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
-    // 客户端断开后 'drain' 永远不会来（见 routes/v1.ts 的 waitForDrainOrClose 同款注释），
-    // 必须同时听 'close'，否则这里会永久挂起，inFlight 也就永远释放不掉
+    // Sau khi client ngắt kết nối thì sự kiện 'drain' sẽ không bao giờ tới (xem chú thích tương tự waitForDrainOrClose trong routes/v1.ts),
+    // bắt buộc phải đồng thời lắng nghe 'close', nếu không tại đây sẽ bị treo vĩnh viễn và inFlight cũng không bao giờ được giải phóng
     if (!ok) await waitForDrainOrClose(reply);
   };
 
@@ -132,8 +132,8 @@ async function streamChatCompletion(
     }
     if (!reply.raw.destroyed) reply.raw.write('data: [DONE]\n\n');
   } catch (error) {
-    // 事件流内部理应已把错误转为 response.failed（会译成带 finish_reason 的 chunk）；
-    // 走到这里是意外，与 /v1/responses 的对应处理保持一致
+    // Bên trong luồng sự kiện về lý thuyết đã chuyển lỗi thành response.failed (sẽ dịch thành chunk có finish_reason);
+    // chạy tới đây là trường hợp ngoài ý muốn, giữ cách xử lý nhất quán với /v1/responses
     reply.request.log.error({ err: error }, 'Chat Completions SSE 流意外中断');
   } finally {
     if (!reply.raw.writableEnded && !reply.raw.destroyed) reply.raw.end();
@@ -156,7 +156,7 @@ function waitForDrainOrClose(reply: FastifyReply): Promise<void> {
   });
 }
 
-/** `process.hrtime.bigint()` 起点转换成耗时秒数，供直方图打点用。 */
+/** Chuyển đổi điểm bắt đầu `process.hrtime.bigint()` thành số giây đã trôi qua, phục vụ ghi nhận histogram. */
 function elapsedSeconds(startedAt: bigint): number {
   return Number(process.hrtime.bigint() - startedAt) / 1e9;
 }

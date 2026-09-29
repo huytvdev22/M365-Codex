@@ -34,10 +34,10 @@ import {
 } from './errors.js';
 
 /**
- * §3.1 全 29 项能力探测的注册表，按序号排列。
+ * Registry toàn bộ 29 mục thăm dò năng lực theo §3.1, sắp xếp theo số thứ tự.
  *
- * `index.ts`（CLI 入口）按顺序逐项跑、每项之间插入 `--delay-ms` 间隔；
- * 任何一项抛异常都被 `runCaseSafely` 接住转成 `unknown` 状态，不影响后续用例。
+ * `index.ts` (CLI entry) chạy từng mục theo thứ tự, chèn khoảng nghỉ `--delay-ms` giữa mỗi mục;
+ * Bất kỳ mục nào ném ngoại lệ đều được `runCaseSafely` bắt lại và chuyển thành trạng thái `unknown`, không ảnh hưởng các case tiếp theo.
  */
 interface RawCase {
   id: string;
@@ -93,7 +93,7 @@ const CASES: readonly RawCase[] = [
   { id: 'client_disconnect_cancel', index: 29, name: '客户端断开后上游是否可取消', fn: caseClientDisconnectCancel },
 ];
 
-/** 对外导出的用例注册表：每项包一层 `runCaseSafely`，异常不中断整轮探测。 */
+/** Registry các case xuất ra bên ngoài: mỗi mục được bọc một tầng `runCaseSafely`, ngoại lệ không làm gián đoạn toàn bộ lượt thăm dò. */
 export const ALL_CASES: readonly CaseDefinition[] = CASES.map((c) => ({
   id: c.id,
   index: c.index,

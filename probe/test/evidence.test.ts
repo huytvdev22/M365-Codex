@@ -43,7 +43,7 @@ describe('buildStructureSample', () => {
   it('数组超过上限会截断并记录剩余数量', () => {
     const arr = Array.from({ length: 25 }, (_, i) => i);
     const sample = buildStructureSample(arr) as unknown[];
-    expect(sample).toHaveLength(21); // 20 项 + 1 条截断提示
+    expect(sample).toHaveLength(21); // 20 mục + 1 gợi ý cắt ngắn
     expect(sample[20]).toBe('<truncated:5-more-items>');
   });
 
@@ -74,7 +74,7 @@ describe('maskEmail / redactWsUrl（复用自 apps/server）', () => {
   it('WebSocket URL 的 access_token 会被脱敏', () => {
     const masked = redactWsUrl('wss://substrate.office.com/chat?access_token=super-secret-value');
     expect(masked).not.toContain('super-secret-value');
-    // URL 的 searchParams.set 会对值做百分号编码，解码后应能看到脱敏占位符
+    // searchParams.set của URL sẽ mã hóa percent cho giá trị, sau khi decode sẽ thấy placeholder khử nhạy cảm
     expect(decodeURIComponent(masked)).toContain('已脱敏');
   });
 });

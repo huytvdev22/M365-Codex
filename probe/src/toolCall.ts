@@ -8,16 +8,16 @@ import { extractText, runText } from './caseHelpers.js';
 import type { InvocationOutcome, ProbeContext } from './types.js';
 
 /**
- * 工具调用探测的共用逻辑（§3.1 第 12-16 项 + §3.5 提示词模拟门槛）。
+ * Logic dùng chung cho thăm dò gọi công cụ (§3.1 mục 12-16 + ngưỡng mô phỏng prompt §3.5).
  *
- * 上游是否有原生结构化工具概念尚未确认，所以每次请求同时打开两条通道：
- * - 原生：`InvocationInput.tools` 带结构化声明，若上游真的支持，
- *   `codecV1.mapMessageToEvents` 会从 `msg.toolCalls` 产出 `tool_call_*` 事件；
- * - 提示词：把工具目录写进文本（复用 `tools/promptProtocol.ts` 的
- *   `buildToolInstruction`），回来的正文用同一个 `PromptToolScanner` 解析。
+ * Upstream có khái niệm công cụ có cấu trúc gốc hay không vẫn chưa được xác nhận, nên mỗi yêu cầu mở đồng thời cả hai kênh:
+ * - Gốc: `InvocationInput.tools` mang khai báo có cấu trúc, nếu upstream thực sự hỗ trợ,
+ *   `codecV1.mapMessageToEvents` sẽ sinh các sự kiện `tool_call_*` từ `msg.toolCalls`;
+ * - Prompt: Viết danh mục công cụ vào văn bản (tái sử dụng `buildToolInstruction`
+ *   trong `tools/promptProtocol.ts`), nội dung trả về được phân tích bằng cùng một `PromptToolScanner`.
  *
- * 两条通道命中的判定完全独立，因此单次请求就能确定「上游走了哪条」，
- * 不需要靠猜测或额外请求去区分。
+ * Việc phán đoán khớp hai kênh hoàn toàn độc lập, vì vậy một yêu cầu đơn lẻ có thể xác định "upstream đã đi theo kênh nào",
+ * không cần đoán mò hay gửi thêm yêu cầu để phân biệt.
  */
 
 export function toParsedTools(declarations: readonly ToolDeclaration[]): ParsedTool[] {
@@ -33,7 +33,7 @@ export function buildRegistry(declarations: readonly ToolDeclaration[]): ToolReg
   return new ToolRegistry(toParsedTools(declarations));
 }
 
-/** 把提示语与工具目录拼成同时打开「原生 + 提示词」两条通道的最终文本。 */
+/** Ghép prompt và danh mục công cụ thành văn bản cuối cùng mở đồng thời cả hai kênh "gốc + prompt". */
 export function buildDualChannelText(promptText: string, declarations: readonly ToolDeclaration[]): string {
   const instruction = buildToolInstruction(toParsedTools(declarations));
   return instruction === '' ? promptText : `${promptText}\n\n${instruction}`;
@@ -46,15 +46,15 @@ export interface ToolCallDetection {
   name: string | null;
   callId: string | null;
   argumentsJson: string | null;
-  /** 是否调用了未在 registry 中声明的工具（大小写/空格不一致也算未声明） */
+  /** Có gọi công cụ chưa được khai báo trong registry hay không (không khớp chữ hoa/thường hoặc khoảng trắng cũng tính là chưa khai báo) */
   undeclared: boolean;
-  /** 解析工具调用后剩下的正文（native 通道下就是完整正文，因为工具调用本就不在文本里） */
+  /** Nội dung còn lại sau khi bóc tách gọi công cụ (dưới kênh native thì là toàn bộ nội dung, vì gọi công cụ vốn không nằm trong văn bản) */
   bodyText: string;
-  /** 正文里是否仍然疑似把工具调用 JSON 当内容重复输出了一遍 */
+  /** Trong nội dung có nghi vấn lặp lại JSON gọi công cụ dưới dạng nội dung hay không */
   duplicateJsonInBody: boolean;
-  /** 本轮命中的全部原生 tool_call_begin 数（用于并行工具调用判定） */
+  /** Tổng số tool_call_begin gốc khớp trong vòng này (dùng để phán đoán gọi công cụ song song) */
   nativeCallCount: number;
-  /** 本轮命中的全部提示词 tool_call 数（用于并行工具调用判定） */
+  /** Tổng số tool_call prompt khớp trong vòng này (dùng để phán đoán gọi công cụ song song) */
   promptCallCount: number;
 }
 
@@ -68,7 +68,7 @@ function collectArgs(events: readonly UpstreamEvent[], callId: string): string {
     .join('');
 }
 
-/** 从一次 invocation 结果中检测工具调用，判定走了原生还是提示词通道。 */
+/** Phát hiện gọi công cụ từ kết quả một invocation, phán đoán đã đi theo kênh gốc hay prompt. */
 export function detectToolCall(outcome: InvocationOutcome, registry: ToolRegistry): ToolCallDetection {
   const nativeBegins = outcome.events.filter(
     (event): event is Extract<UpstreamEvent, { kind: 'tool_call_begin' }> => event.kind === 'tool_call_begin',
@@ -129,7 +129,7 @@ export function detectToolCall(outcome: InvocationOutcome, registry: ToolRegistr
   };
 }
 
-/** 启发式判断：解析/剥离之后的正文里，是否仍疑似把工具调用当内容重复输出了一遍。 */
+/** Phán đoán heuristic: Trong nội dung sau khi phân tích/bóc tách có còn nghi vấn xuất lặp lại JSON gọi công cụ như nội dung văn bản không. */
 function looksLikeDuplicateToolJson(bodyText: string, toolName: string): boolean {
   if (bodyText.includes('<tool_call>')) return true;
   const nameHit = bodyText.includes(toolName);
@@ -137,7 +137,7 @@ function looksLikeDuplicateToolJson(bodyText: string, toolName: string): boolean
   return nameHit && jsonShapeHit;
 }
 
-/** 单次工具调用统计（§3.5 门槛用）。 */
+/** Thống kê gọi công cụ đơn lẻ (dùng cho ngưỡng §3.5). */
 export interface ToolCallStats {
   trials: number;
   toolNameRecognized: number;
@@ -145,7 +145,7 @@ export interface ToolCallStats {
   passWithinTwoRepairs: number;
   undeclaredToolCalls: number;
   duplicateJsonInBody: number;
-  /** 实际观察到的通道分布，供校准建议使用 */
+  /** Phân bố kênh thực tế quan sát được, dùng cho khuyến nghị hiệu chuẩn */
   nativeHits: number;
   promptHits: number;
   noCallHits: number;
@@ -182,8 +182,8 @@ export function mergeStats(...stats: readonly ToolCallStats[]): ToolCallStats {
 }
 
 /**
- * 单个试次：发起一次「触发 probe_get_time 调用」的请求，检测通道，
- * 若参数不满足 schema 则最多请求两次修复（§7.3 上限），返回本次试次的统计增量。
+ * Lượt thử đơn lẻ: Gửi một yêu cầu "kích hoạt gọi probe_get_time", phát hiện kênh,
+ * nếu tham số không thỏa mãn schema thì yêu cầu sửa tối đa hai lần (mức trần §7.3), trả về số gia thống kê của lượt thử này.
  */
 export async function runSingleToolTrial(
   ctx: ProbeContext,
@@ -214,7 +214,7 @@ export async function runSingleToolTrial(
     return { stats, lastDetection: detection, lastOutcome: outcome };
   }
 
-  // 最多两次修复（§7.3 上限），复用同一个会话标识续接（若上游返回过的话）
+  // Tối đa 2 lần sửa (mức trần §7.3), tái sử dụng cùng định danh phiên để nối tiếp (nếu upstream từng trả về)
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const repairPrompt = `你上一次调用 ${detection.name ?? '该工具'} 的参数不满足要求：${validation.errors.join('；')}。请重新按 JSON Schema 输出一次正确的工具调用。`;
     outcome = await runText(ctx, repairPrompt, {

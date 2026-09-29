@@ -3,14 +3,14 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * 文件磁盘存储（对应实施计划 §11：「文件名不得直接作为磁盘路径」）。
+ * Lưu trữ tệp trên đĩa (tương ứng với Kế hoạch thực hiện §11: "Tên tệp không được trực tiếp làm đường dẫn đĩa").
  *
- * 布局：
- *   <DATA_DIR>/files/<file-id>/content              —— 已完成文件的内容
- *   <DATA_DIR>/files/uploads/<upload-id>/<part-id>  —— 分片上传的每个分片
+ * Bố cục:
+ *   <DATA_DIR>/files/<file-id>/content              —— Nội dung tệp đã hoàn thành
+ *   <DATA_DIR>/files/uploads/<upload-id>/<part-id>  —— Từng mảnh của upload phân đoạn
  *
- * 目录名一律用系统生成的 id（UUID），原始文件名只入库、绝不拼进路径，
- * 避免路径穿越（`../`）与非法文件名字符问题。
+ * Tên thư mục luôn dùng id (UUID) do hệ thống sinh ra, tên tệp gốc chỉ lưu vào CSDL, tuyệt đối không ghép vào đường dẫn,
+ * tránh lỗ hổng Path Traversal (`../`) và vấn đề ký tự tên tệp không hợp lệ.
  */
 export class FileStorage {
   readonly #root: string;

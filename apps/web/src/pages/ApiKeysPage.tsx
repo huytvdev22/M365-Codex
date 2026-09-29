@@ -48,29 +48,29 @@ function CreateApiKeyForm({ onCreated }: { onCreated: (key: string) => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="card">
-      <h2 style={{ marginTop: 0 }}>创建新的 API Key</h2>
+      <h2 style={{ marginTop: 0 }}>Tạo API Key mới</h2>
       <div className="form-row">
         <div className="field">
-          <label htmlFor="key-name">名称</label>
+          <label htmlFor="key-name">Tên gợi nhớ</label>
           <input id="key-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="field">
-          <label htmlFor="key-rpm">每分钟限制</label>
-          <input id="key-rpm" type="number" min={1} value={rpmLimit} onChange={(e) => setRpmLimit(e.target.value)} placeholder="不限" />
+          <label htmlFor="key-rpm">Giới hạn RPM (mỗi phút)</label>
+          <input id="key-rpm" type="number" min={1} value={rpmLimit} onChange={(e) => setRpmLimit(e.target.value)} placeholder="Không giới hạn" />
         </div>
         <div className="field">
-          <label htmlFor="key-daily">每日限额</label>
-          <input id="key-daily" type="number" min={1} value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} placeholder="不限" />
+          <label htmlFor="key-daily">Hạn mức mỗi ngày</label>
+          <input id="key-daily" type="number" min={1} value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} placeholder="Không giới hạn" />
         </div>
         <div className="field">
-          <label htmlFor="key-concurrency">最大并发</label>
+          <label htmlFor="key-concurrency">Đồng thời tối đa</label>
           <input
             id="key-concurrency"
             type="number"
             min={1}
             value={maxConcurrency}
             onChange={(e) => setMaxConcurrency(e.target.value)}
-            placeholder="不限"
+            placeholder="Không giới hạn"
           />
         </div>
       </div>
@@ -80,7 +80,7 @@ function CreateApiKeyForm({ onCreated }: { onCreated: (key: string) => void }) {
         </div>
       )}
       <button type="submit" className="btn btn-primary" disabled={submitting || name.trim().length === 0}>
-        {submitting ? '创建中…' : '创建'}
+        {submitting ? 'Đang tạo…' : 'Tạo mới'}
       </button>
     </form>
   );
@@ -103,7 +103,7 @@ export function ApiKeysPage() {
   };
 
   const handleRevoke = (key: ApiKeyView) => {
-    if (!window.confirm(`确认撤销「${key.name}」？撤销后不可恢复。`)) return;
+    if (!window.confirm(`Xác nhận thu hồi "${key.name}"? Sau khi thu hồi sẽ không thể khôi phục.`)) return;
     setBusyId(key.id);
     setRowError(null);
     api
@@ -114,7 +114,7 @@ export function ApiKeysPage() {
   };
 
   return (
-    <Layout title="API Key" subtitle="对外密钥的创建、限额与撤销">
+    <Layout title="API Key" subtitle="Tạo, phân bổ hạn mức và thu hồi khóa API đối ngoại">
       <CreateApiKeyForm
         onCreated={(key) => {
           setRevealKey(key);
@@ -128,20 +128,20 @@ export function ApiKeysPage() {
         data={data}
         onRetry={reload}
         isEmpty={(list) => list.length === 0}
-        emptyTitle="还没有创建任何 API Key"
+        emptyTitle="Chưa có API Key nào được tạo"
       >
         {(keys) => (
           <div className="card table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>名称</th>
-                  <th>密钥</th>
-                  <th>状态</th>
-                  <th>限额</th>
-                  <th>最近使用</th>
-                  <th>创建时间</th>
-                  <th>操作</th>
+                  <th>Tên</th>
+                  <th>Khóa bí mật</th>
+                  <th>Trạng thái</th>
+                  <th>Hạn mức</th>
+                  <th>Dùng gần nhất</th>
+                  <th>Thời gian tạo</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -150,13 +150,13 @@ export function ApiKeysPage() {
                     <td>{key.name}</td>
                     <td className="mono">{key.masked_key}</td>
                     <td>
-                      <BoolBadge value={key.enabled} trueLabel="启用中" falseLabel={key.revoked_at !== null ? '已撤销' : '已停用'} />
+                      <BoolBadge value={key.enabled} trueLabel="Đang bật" falseLabel={key.revoked_at !== null ? 'Đã thu hồi' : 'Đã tắt'} />
                     </td>
                     <td className="text-muted">
-                      {key.rpm_limit !== null ? `${key.rpm_limit}/分钟 · ` : ''}
-                      {key.daily_limit !== null ? `${key.daily_limit}/天 · ` : ''}
-                      {key.max_concurrency !== null ? `并发 ${key.max_concurrency}` : ''}
-                      {key.rpm_limit === null && key.daily_limit === null && key.max_concurrency === null && '不限'}
+                      {key.rpm_limit !== null ? `${key.rpm_limit}/phút · ` : ''}
+                      {key.daily_limit !== null ? `${key.daily_limit}/ngày · ` : ''}
+                      {key.max_concurrency !== null ? `Đồng thời ${key.max_concurrency}` : ''}
+                      {key.rpm_limit === null && key.daily_limit === null && key.max_concurrency === null && 'Không giới hạn'}
                     </td>
                     <td>{formatDateTime(key.last_used_at)}</td>
                     <td>{formatDateTime(key.created_at)}</td>
@@ -168,7 +168,7 @@ export function ApiKeysPage() {
                           disabled={busyId === key.id || key.revoked_at !== null}
                           onClick={() => toggleEnabled(key)}
                         >
-                          {key.enabled ? '停用' : '启用'}
+                          {key.enabled ? 'Tắt' : 'Bật'}
                         </button>
                         <button
                           type="button"
@@ -176,7 +176,7 @@ export function ApiKeysPage() {
                           disabled={busyId === key.id || key.revoked_at !== null}
                           onClick={() => handleRevoke(key)}
                         >
-                          撤销
+                          Thu hồi
                         </button>
                       </div>
                       {rowError?.id === key.id && (

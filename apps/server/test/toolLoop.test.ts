@@ -3,8 +3,8 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * M5 工具调用完整代理循环：路由→服务→状态机→调度器→连接→模拟 Sydney 上游。
- * 覆盖 function_call 产出、参数校验与修复、function_call_output 回传续接、幂等。
+ * Vòng lặp agent gọi công cụ hoàn chỉnh M5: Route → Service → State machine → Dispatcher → Connection → Mock Sydney upstream.
+ * Bao phủ việc sinh function_call, kiểm tra & sửa tham số, truyền lại function_call_output để nối tiếp, tính idempotent.
  */
 
 let harness: TestHarness | undefined;
@@ -109,7 +109,7 @@ describe('产出 function_call', () => {
     expect(names).toContain('response.function_call_arguments.delta');
     expect(names).toContain('response.function_call_arguments.done');
     expect(names.at(-1)).toBe('response.completed');
-    // 序号单调
+    // Số thứ tự đơn điệu
     const seqs = events.map((e) => e.data.sequence_number as number);
     for (let i = 1; i < seqs.length; i += 1) expect(seqs[i]).toBe((seqs[i - 1] as number) + 1);
   });
@@ -144,7 +144,7 @@ describe('参数修复', () => {
       kind: 'tool-call-repair',
       callId: 'call_r',
       name: 'get_weather',
-      badArgs: '{"wrong":1}', // 缺 city、含多余字段
+      badArgs: '{"wrong":1}', // Thiếu city, chứa trường thừa
       goodArgs: '{"city":"深圳"}',
     });
     const res = await h.app.inject({
@@ -157,7 +157,7 @@ describe('参数修复', () => {
     const body = res.json() as { output: { type: string; arguments?: string }[] };
     const fc = body.output.find((i) => i.type === 'function_call');
     expect(fc?.arguments).toBe('{"city":"深圳"}');
-    // 至少发起了两次 invocation（首轮 + 修复）
+    // Đã khởi tạo ít nhất 2 lần invocation (vòng đầu + sửa)
     expect(server?.invocationCount).toBeGreaterThanOrEqual(2);
   });
 
@@ -166,7 +166,7 @@ describe('参数修复', () => {
       kind: 'tool-call',
       callId: 'call_bad',
       name: 'get_weather',
-      arguments: '{"nope":1}', // 永远不合法
+      arguments: '{"nope":1}', // Luôn không hợp lệ
     });
     const res = await h.app.inject({
       method: 'POST',
@@ -175,7 +175,7 @@ describe('参数修复', () => {
       payload: { model: 'm', input: 'q', tools: [weatherTool] },
     });
     expect(res.statusCode).toBe(200);
-    // 首轮 + 最多 2 次修复 = 3 次 invocation
+    // Vòng đầu + tối đa 2 lần sửa = 3 lần invocation
     expect(server?.invocationCount).toBe(3);
     const body = res.json() as { output: { type: string }[] };
     expect(body.output.some((i) => i.type === 'function_call')).toBe(true);
@@ -187,7 +187,7 @@ describe('只调声明过的工具', () => {
     const { h, apiKey } = await setupWith({
       kind: 'tool-call',
       callId: 'call_u',
-      name: 'delete_everything', // 请求里没声明
+      name: 'delete_everything', // Yêu cầu không khai báo
       arguments: '{}',
     });
     const res = await h.app.inject({
@@ -197,7 +197,7 @@ describe('只调声明过的工具', () => {
       payload: { model: 'm', input: 'q', tools: [weatherTool] },
     });
     expect(res.statusCode).toBe(502);
-    // 既没发给客户端，也没落库
+    // Vừa không gửi cho client, vừa không ghi vào database
     expect(res.body).not.toContain('call_u');
     const row = h.db.prepare('SELECT * FROM tool_calls WHERE call_id = ?').get('call_u');
     expect(row).toBeUndefined();
@@ -249,7 +249,7 @@ describe('提示词模拟模式', () => {
     const text = body.output.find((i) => i.type === 'message')?.content?.[0]?.text ?? '';
     expect(text).toBe('我来查一下。稍等。');
     expect(text).not.toContain('tool_call');
-    // 工具目录约束确实发给了上游
+    // Ràng buộc danh mục công cụ thực sự đã gửi cho upstream
     expect(server?.invocationTexts[0]).toContain('get_weather');
   });
 });
@@ -370,7 +370,7 @@ describe('function_call_output 回传续接', () => {
   });
 
   it('回传工具结果 → 标记完成 → 续推理产出文本', async () => {
-    // 第一轮返回工具调用，第二轮（带工具结果）返回文本
+    // Vòng 1 trả về gọi công cụ, vòng 2 (kèm kết quả công cụ) trả về văn bản
     server = await startMockSydneyServer({
       kind: 'tool-call',
       callId: 'call_c',
@@ -396,7 +396,7 @@ describe('function_call_output 回传续接', () => {
     const fc = first.output.find((i) => i.type === 'function_call');
     expect(fc?.call_id).toBe('call_c');
 
-    // 切换 mock 行为为返回文本，然后回传工具结果
+    // Chuyển hành vi mock sang trả về văn bản, sau đó truyền lại kết quả công cụ
     server.setBehavior({ kind: 'normal', chunks: ['杭州晴'] });
     const second = await h.app.inject({
       method: 'POST',
@@ -414,7 +414,7 @@ describe('function_call_output 回传续接', () => {
     const message = body.output.find((i) => i.type === 'message');
     expect(message?.content?.[0]?.text).toBe('杭州晴');
 
-    // 工具调用被标记完成
+    // Lệnh gọi công cụ được đánh dấu hoàn thành
     const row = h.db.prepare('SELECT status, output FROM tool_calls WHERE call_id = ?').get('call_c') as {
       status: string;
       output: string;
@@ -460,9 +460,9 @@ describe('function_call_output 回传续接', () => {
         },
       });
     await submit();
-    await submit(); // 重复提交
+    await submit(); // Gửi lại lần nữa
 
-    // 状态仍是 completed，output 保留首次写入的值（markCompleted 只在 emitted→completed 生效）
+    // Trạng thái vẫn là completed, output giữ nguyên giá trị ghi lần đầu (markCompleted chỉ có hiệu lực ở emitted→completed)
     const row = h.db.prepare('SELECT status, output FROM tool_calls WHERE call_id = ?').get('call_i') as {
       status: string;
       output: string;
@@ -489,8 +489,8 @@ describe('API Key 级工具调用上限（§10.1）', () => {
       source: 'oauth',
       tokens: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600_000 },
     });
-    // 全局 TOOLS_MAX_TOTAL_CALLS 默认很宽松，这里让该 Key 收紧到 0：
-    // 任何一次工具调用（1）都会超过这个上限
+    // TOOLS_MAX_TOTAL_CALLS toàn cục mặc định rất rộng rãi, ở đây cho Key này siết chặt về 0:
+    // Bất kỳ một lần gọi công cụ nào (1) cũng sẽ vượt quá giới hạn trên này
     const key = harness.context.apiKeys.create({ name: '受限 Key', maxToolCalls: 0 });
 
     const res = await harness.app.inject({
@@ -519,8 +519,8 @@ describe('API Key 级工具调用上限（§10.1）', () => {
       source: 'oauth',
       tokens: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600_000 },
     });
-    // Key 自己设置成 10（比全局上限 1 更松），但有效上限必须仍是全局的 1，
-    // 不允许 Key 自行突破——这里第一次工具调用就恰好等于 1，能正常通过
+    // Key tự đặt là 10 (rộng hơn giới hạn 1 toàn cục), nhưng giới hạn hiệu lực vẫn phải là 1 toàn cục,
+    // không cho phép Key tự ý vượt qua — ở đây lần gọi công cụ đầu tiên đúng bằng 1, vượt qua bình thường
     const key = harness.context.apiKeys.create({ name: '想突破全局上限', maxToolCalls: 10 });
 
     const res = await harness.app.inject({

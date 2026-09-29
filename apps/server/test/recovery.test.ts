@@ -6,8 +6,8 @@ import { ToolCallRepository } from '../src/repo/toolCalls.js';
 import { openDatabase, runMigrations, type Database } from '../src/db/index.js';
 
 /**
- * 重启恢复（§18）：queued 保持原状可查询；in_progress 无法确认进度，
- * 一律标记为 incomplete；已发出的工具调用原样保留、绝不自动重放。
+ * Phục hồi sau khởi động lại (§18): queued giữ nguyên trạng có thể tra cứu; in_progress không thể xác nhận tiến độ,
+ * đều được đánh dấu là incomplete; các lệnh gọi công cụ đã gửi được giữ nguyên, tuyệt đối không tự động phát lại.
  */
 
 let db: Database;

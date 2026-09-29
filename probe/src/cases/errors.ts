@@ -6,13 +6,13 @@ import type { CapabilityResult, ProbeContext } from '../types.js';
 const PING_TEXT = '请回复「收到」二字即可，用于连通性与错误分类基线测试。';
 
 /**
- * #24 401/403/429/5xx 与 WebSocket 关闭码的错误分类。
+ * #24 Phân loại lỗi cho 401/403/429/5xx và close code của WebSocket.
  *
- * 分类函数本身（`classifyHttpStatus` / `classifyCloseCode`）在 M3 已用模拟上游
- * 做了穷举式单测（`connection.test.ts`），这里只做一次真实请求，如实记录
- * 本次命中的分类；完整的错误矩阵覆盖依赖多次运行里自然出现的各种状态码，
- * 由 `report.ts` 汇总全轮所有 case 的 `errorCategory` 分布来呈现，不在这里
- * 主动构造 401/403/429（构造会消耗真实配额，且有触发风控之虞，见 README 风险声明）。
+ * Bản thân hàm phân loại (`classifyHttpStatus` / `classifyCloseCode`) đã được test vét cạn ở M3 với mock upstream
+ * (`connection.test.ts`), ở đây chỉ gửi một yêu cầu thật để ghi nhận trung thực
+ * phân loại khớp trong lần này; độ bao phủ ma trận lỗi đầy đủ phụ thuộc vào các status code xuất hiện tự nhiên qua nhiều lần chạy,
+ * do `report.ts` tổng hợp phân bố `errorCategory` của tất cả các case trong toàn bộ lượt chạy, không chủ động
+ * tạo dựng 401/403/429 ở đây (việc tạo dựng sẽ tiêu tốn quota thật và có nguy cơ kích hoạt kiểm soát rủi ro, xem tuyên bố rủi ro trong README).
  */
 export async function caseErrorClassification(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
@@ -37,8 +37,8 @@ export async function caseErrorClassification(ctx: ProbeContext): Promise<Capabi
 }
 
 /**
- * #25 Retry-After 与限流行为：同样采用被动观察——本探针默认串行 + 间隔，
- * 不主动打爆账号触发限流；若本轮自然遇到 429，这里会如实记录解析出的冷却时间。
+ * #25 Retry-After và hành vi giới hạn tần suất: Tương tự áp dụng quan sát thụ động — probe này mặc định chạy tuần tự + có khoảng nghỉ,
+ * không chủ động đánh sập tài khoản để kích hoạt rate limit; nếu lượt này tự nhiên gặp 429, ở đây sẽ ghi nhận trung thực thời gian chờ đã phân tích được.
  */
 export async function caseRetryAfterBehavior(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
@@ -61,8 +61,8 @@ export async function caseRetryAfterBehavior(ctx: ProbeContext): Promise<Capabil
 }
 
 /**
- * #26 账号 / 租户能力差异：单个账号自身无法体现「差异」，这里只产出本账号的
- * 能力指纹供 `report.ts` 在 `--all` 多账号场景下做横向比较；不发起额外请求。
+ * #26 Khác biệt năng lực tài khoản / tenant: Một tài khoản đơn lẻ không thể tự thể hiện "khác biệt", ở đây chỉ sinh ra
+ * dấu vân tay năng lực của tài khoản này để `report.ts` so sánh ngang trong kịch bản nhiều tài khoản `--all`; không phát thêm yêu cầu.
  */
 export function caseAccountTenantVariance(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
@@ -87,8 +87,8 @@ const BINDING_REMEMBER_PROMPT = `请记住一个标记词：「${BINDING_MARK}�
 const BINDING_RECALL_PROMPT = '我刚才让你记住的标记词是什么？只回复那个词，不知道就说不知道。';
 
 /**
- * #27 会话与账号绑定关系：用一个「凭空捏造、从未由上游签发」的 conversationRef
- * 去续接，检查是否会意外读到本账号其他真实会话的内容（绑定完整性的安全相关检查）。
+ * #27 Mối quan hệ ràng buộc giữa phiên và tài khoản: Dùng một conversationRef "tự bịa ra, chưa từng được upstream cấp"
+ * để nối tiếp, kiểm tra xem có vô tình đọc được nội dung phiên thật khác của tài khoản này hay không (kiểm tra liên quan đến tính toàn vẹn ràng buộc bảo mật).
  */
 export async function caseSessionAccountBinding(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();

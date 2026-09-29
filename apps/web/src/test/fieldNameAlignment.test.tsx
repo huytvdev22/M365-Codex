@@ -7,11 +7,7 @@ import { FilesPage } from '../pages/FilesPage';
 import type { BulkImportProxyResult, FileListItem, FilesCleanupResult } from '../api';
 
 /**
- * 服务端 `apps/server/src/routes/adminOps.ts` 的两处真实返回字段：
- *   - POST /admin/proxies/bulk  -> { created, failed, results: [{ line, ok, id?, error? }] }
- *   - POST /admin/files/cleanup -> { deleted_files, deleted_uploads, freed_bytes }
- * 之前前端类型/页面用的是 { succeeded, errors } 与 { deleted }，真实联调时会渲染成 undefined。
- * 这里直接用服务端真实形状的数据驱动页面，断言 UI 读到的是正确字段而不是 undefined。
+ * Kiểm tra các trường trả về thực tế từ server được render chính xác, không bị undefined.
  */
 
 const listProxies = vi.fn<() => Promise<[]>>();
@@ -33,19 +29,19 @@ vi.mock('../api', async () => {
   };
 });
 
-describe('代理批量导入结果字段对齐服务端', () => {
+describe('Kết quả nhập proxy hàng loạt khớp với server', () => {
   beforeEach(() => {
     listProxies.mockReset().mockResolvedValue([]);
     bulkImportProxies.mockReset();
   });
 
-  it('用服务端真实形状 {created, failed, results} 渲染，不出现 undefined', async () => {
+  it('Render đúng cấu trúc {created, failed, results} từ server, không xuất hiện undefined', async () => {
     bulkImportProxies.mockResolvedValue({
       created: 1,
       failed: 1,
       results: [
         { line: 'http://1.2.3.4:8080', ok: true, id: 'proxy_9' },
-        { line: 'not-a-url', ok: false, error: 'url 不是合法的 URL' },
+        { line: 'not-a-url', ok: false, error: 'url không phải là URL hợp lệ' },
       ],
     });
 
@@ -57,23 +53,23 @@ describe('代理批量导入结果字段对齐服务端', () => {
       </MemoryRouter>,
     );
 
-    const textarea = await screen.findByLabelText('每行一个地址');
+    const textarea = await screen.findByLabelText('Mỗi dòng một địa chỉ URL');
     fireEvent.change(textarea, { target: { value: 'http://1.2.3.4:8080\nnot-a-url' } });
-    fireEvent.click(screen.getByRole('button', { name: '批量导入' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Nhập hàng loạt' }));
 
-    await screen.findByText('成功 1 条，失败 1 条');
-    expect(screen.getByText(/url 不是合法的 URL/)).toBeTruthy();
+    await screen.findByText('Thành công 1 mục, thất bại 1 mục');
+    expect(screen.getByText(/url không phải là URL hợp lệ/)).toBeTruthy();
     expect(document.body.textContent?.includes('undefined')).toBe(false);
   });
 });
 
-describe('文件清理结果字段对齐服务端', () => {
+describe('Kết quả dọn dẹp tệp khớp với server', () => {
   beforeEach(() => {
     listFiles.mockReset().mockResolvedValue({ items: [], total_bytes: 0 });
     cleanupFiles.mockReset();
   });
 
-  it('用服务端真实形状 {deleted_files, deleted_uploads, freed_bytes} 渲染，不出现 undefined', async () => {
+  it('Render đúng cấu trúc {deleted_files, deleted_uploads, freed_bytes} từ server, không xuất hiện undefined', async () => {
     cleanupFiles.mockResolvedValue({ deleted_files: 3, deleted_uploads: 2, freed_bytes: 5_242_880 });
 
     render(
@@ -84,9 +80,9 @@ describe('文件清理结果字段对齐服务端', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '立即清理' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Dọn dẹp ngay' }));
 
-    await screen.findByText(/删除文件 3 个、未完成上传 2 个/);
+    await screen.findByText(/Đợt trước đã xóa 3 tệp, 2 lượt tải dang dở/);
     expect(screen.getByText(/5\.00 MB/)).toBeTruthy();
     expect(document.body.textContent?.includes('undefined')).toBe(false);
   });

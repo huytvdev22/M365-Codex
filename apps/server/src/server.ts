@@ -13,17 +13,17 @@ import { buildEnvOverridesFromSettings } from './settings/service.js';
 import { APP_VERSION } from './version.js';
 
 /**
- * 进程入口：加载配置 → 打开数据库 → 执行迁移 → 启动 HTTP 服务。
- * 收到 SIGTERM/SIGINT 时优雅退出，先停止接收新请求再关闭数据库。
+ * Điểm vào tiến trình: Tải cấu hình → Mở CSDL → Chạy migration → Khởi chạy dịch vụ HTTP.
+ * Thoát an toàn khi nhận SIGTERM/SIGINT: dừng nhận request mới trước khi đóng CSDL.
  */
 
-/** 首次按纯环境变量加载配置——只为了拿到 dataDir/masterKey 等，打开数据库。 */
+/** Lần đầu tải cấu hình hoàn toàn từ biến môi trường — để lấy dataDir/masterKey mở CSDL. */
 function loadConfigOrExit(env: NodeJS.ProcessEnv): AppConfig {
   try {
     return loadConfig(env);
   } catch (error) {
     if (error instanceof ConfigError) {
-      process.stderr.write(`\n[M365-Codex] 启动失败：\n${error.message}\n\n请参考 .env.example 补全配置。\n`);
+      process.stderr.write(`\n[M365-Codex] Khởi động thất bại:\n${error.message}\n\nVui lòng tham khảo .env.example để bổ sung cấu hình.\n`);
       process.exit(78); // EX_CONFIG
     }
     throw error;
@@ -31,9 +31,9 @@ function loadConfigOrExit(env: NodeJS.ProcessEnv): AppConfig {
 }
 
 /**
- * 把 `settings` 表里「需要重启才生效」的历史改动（§M7、契约 §2.3）合成一层
- * env 覆盖，重新走一遍 `loadConfig`，让上一次通过 `/admin/settings` 保存的配置
- * 在这次启动时真正生效。环境变量本身显式设置过的项不会被覆盖。
+ * Lấy các thay đổi lịch sử trong bảng `settings` cần khởi động lại mới có hiệu lực
+ * gộp thành lớp ghi đè biến môi trường, tải lại `loadConfig` để cấu hình lưu lần trước
+ * qua `/admin/settings` thực sự có hiệu lực. Các mục được đặt trực tiếp qua biến môi trường sẽ không bị ghi đè.
  */
 function reloadConfigWithSettings(db: Database, initialConfig: AppConfig): AppConfig {
   const overrides = buildEnvOverridesFromSettings(new SettingsRepository(db), initialConfig.envKeysPresent);
@@ -49,31 +49,20 @@ export interface ShutdownDeps {
 }
 
 /**
- * 优雅关闭（对应实施计划 §19）。
+ * Đóng an toàn (Graceful Shutdown).
  *
- * 此前这里只是「停调度器 → app.close() → db.close()」：没有主动处理在途
- * 请求——`InFlightRegistry` 里的上游连接不会被中止，仍处于 `in_progress`
- * 的 Response 只能指望**下次启动**时 `recovery.ts` 的兜底；一旦排空超时被
- * SIGKILL，这次兜底永远不会发生，数据库里会留下永久卡死的 in_progress 行。
+ * Thứ tự xử lý:
+ * 1. Dừng lịch trình nhiệm vụ định kỳ;
+ * 2. Hủy `AbortController` của toàn bộ request đang xử lý — kết thúc sớm kết nối WebSocket/dispatch ngược dòng;
+ * 3. Đánh dấu các Response còn `in_progress` thành `incomplete` vào CSDL;
+ * 4. Chờ Fastify giải phóng/đóng kết nối HTTP;
+ * 5. Đóng cơ sở dữ liệu.
  *
- * 处置顺序：
- * 1. 停止定时任务调度；
- * 2. 中止全部在途请求的 `AbortController`——促使上游 WebSocket / dispatch
- *    循环尽快收尾。`responses/service.ts` 会识别出这是关闭触发的中止
- *    （`SHUTDOWN_ABORT_REASON`），自己不再落库，把写状态的职责完全交给这里，
- *    避免两处并发写同一行、产生竞争或两套不一致的终态语义；
- * 3. 把仍处于 `in_progress` 的 Response 落库为 `incomplete`——处置逻辑
- *    直接复用 `maintenance/recovery.ts` 给重启恢复用的同一个函数，只是
- *    `reason` 换成 `SHUTDOWN_INCOMPLETE_REASON`，不是另一套语义；
- * 4. 等 Fastify 排空/关闭 HTTP 连接；
- * 5. 关闭数据库。
- *
- * 绝不自动重放任何有副作用的操作：已发出的工具调用原样保留、仍可查询，
- * 这里不做任何补偿性动作。
+ * Tuyệt đối không tự động phát lại bất kỳ thao tác nào có tác dụng phụ.
  */
 export async function gracefulShutdown(deps: ShutdownDeps, signal: string): Promise<void> {
   const { context, app, db, logger } = deps;
-  logger.info({ signal }, '收到退出信号，开始优雅关闭');
+  logger.info({ signal }, 'Nhận tín hiệu thoát, bắt đầu đóng an toàn');
 
   context.scheduler.stop();
 
@@ -82,13 +71,13 @@ export async function gracefulShutdown(deps: ShutdownDeps, signal: string): Prom
   if (abortedIds.length > 0 || markedIncomplete.length > 0) {
     logger.info(
       { aborted: abortedIds.length, marked_incomplete: markedIncomplete.length },
-      '已中止在途请求的上游连接，并将仍处于 in_progress 的记录落库为 incomplete',
+      'Đã hủy kết nối ngược dòng của các request đang xử lý và lưu bản ghi in_progress thành incomplete',
     );
   }
 
   await app.close();
   db.close();
-  logger.info('已完成优雅关闭');
+  logger.info('Đã hoàn tất đóng an toàn');
 }
 
 async function main(): Promise<void> {
@@ -97,7 +86,7 @@ async function main(): Promise<void> {
   const db = openDatabase(resolveDatabasePath(bootConfig.dataDir));
   const migration = runMigrations(db);
 
-  // 迁移跑完、settings 表可读之后，才能把上次保存的设置合并进配置
+  // Sau khi migration chạy xong và bảng settings đọc được, gộp cài đặt đã lưu vào cấu hình
   const config = reloadConfigWithSettings(db, bootConfig);
 
   const logger = createLogger({
@@ -106,25 +95,24 @@ async function main(): Promise<void> {
     pretty: process.env.NODE_ENV === 'development',
   });
 
-  logger.info({ version: APP_VERSION, config: summarizeConfig(config) }, 'M365-Codex 启动中');
+  logger.info({ version: APP_VERSION, config: summarizeConfig(config) }, 'M365-Codex đang khởi động');
   if (migration.applied.length > 0) {
-    logger.info({ applied: migration.applied, schema_version: migration.schemaVersion }, '数据库迁移完成');
+    logger.info({ applied: migration.applied, schema_version: migration.schemaVersion }, 'Migration CSDL hoàn tất');
   }
 
   const context = createContext({ config, db, logger });
 
   const readiness = evaluateReadiness(context);
   if (readiness.status !== 'ready') {
-    logger.fatal({ checks: readiness.checks }, '就绪检查未通过，拒绝启动');
+    logger.fatal({ checks: readiness.checks }, 'Kiểm tra readiness không đạt, từ chối khởi động');
     db.close();
     process.exit(78);
   }
 
-  // 重启恢复（§18）：queued 保持原状可查询；无法确认进度的 in_progress 标记为
-  // incomplete，绝不自动重放任何有副作用的操作
+  // Khôi phục sau khởi động lại: giữ nguyên queued; đánh dấu in_progress không xác định được tiến độ thành incomplete
   const recovery = recoverOnStartup({ responses: context.responseRepo, logger });
   if (recovery.inProgressMarkedIncomplete > 0 || recovery.queuedKept > 0) {
-    logger.info({ recovery }, '重启恢复完成');
+    logger.info({ recovery }, 'Phục hồi sau khởi động lại hoàn tất');
   }
 
   const app = buildApp(context);
@@ -137,7 +125,7 @@ async function main(): Promise<void> {
     void gracefulShutdown({ context, app, db, logger }, signal)
       .then(() => process.exit(0))
       .catch((error: unknown) => {
-        logger.error({ err: error }, '优雅关闭失败');
+        logger.error({ err: error }, 'Đóng an toàn thất bại');
         process.exit(1);
       });
   };
@@ -146,19 +134,17 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   await app.listen({ host: '0.0.0.0', port: config.port });
-  logger.info({ port: config.port }, 'M365-Codex 已就绪');
+  logger.info({ port: config.port }, 'M365-Codex đã sẵn sàng');
 }
 
 /**
- * 只有直接执行本文件（`node dist/server.js` / `tsx src/server.ts`）才跑
- * `main()`；被测试用例 `import` 只为了拿 `gracefulShutdown` 之类的导出时，
- * 不能顺带把整个进程入口跑起来——否则测试环境缺的 `.env` 配置会导致
- * `main()` 里的 `loadConfigOrExit` 直接 `process.exit`，把测试进程带走。
+ * Chỉ khi thực thi trực tiếp tệp này (`node dist/server.js` / `tsx src/server.ts`) mới chạy `main()`;
+ * khi được test import để lấy `gracefulShutdown` sẽ không khởi chạy toàn bộ tiến trình.
  */
 const isMainModule = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMainModule) {
   main().catch((error: unknown) => {
-    process.stderr.write(`[M365-Codex] 启动异常：${String(error)}\n`);
+    process.stderr.write(`[M365-Codex] Bất thường khi khởi động: ${String(error)}\n`);
     process.exit(1);
   });
 }

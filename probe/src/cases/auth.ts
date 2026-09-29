@@ -3,10 +3,10 @@ import { TokenUnavailableError } from '../../../apps/server/dist/oauth/tokenMana
 import type { CapabilityResult, ProbeContext } from '../types.js';
 
 /**
- * Token 刷新相关用例（§3.1 第 22/23/28 项）。
+ * Các case liên quan đến refresh Token (§3.1 mục 22/23/28).
  *
- * 铁律：这里只在内存中比较「刷新前后是否变化」的布尔结果，绝不把 access/refresh
- * token 的明文、长度特征或任何可还原片段写进 `CapabilityResult.evidence`。
+ * Quy tắc sắt: Ở đây chỉ so sánh kết quả boolean "có thay đổi trước và sau refresh hay không" trong bộ nhớ, tuyệt đối không đưa
+ * plain text, đặc trưng độ dài hoặc bất kỳ đoạn nào có thể khôi phục của access/refresh token vào `CapabilityResult.evidence`.
  */
 
 interface RefreshComparison {
@@ -45,7 +45,7 @@ async function refreshAndCompare(ctx: ProbeContext): Promise<RefreshComparison> 
   return { success: true, accessTokenExpiryExtended, refreshTokenRotated, errorMessage: null };
 }
 
-/** #22 Access Token 刷新：能否成功换取新的 access token（且过期时间确实延后）。 */
+/** #22 Refresh Access Token: Có đổi thành công access token mới hay không (và thời gian hết hạn thực sự được gia hạn). */
 export async function caseAccessTokenRefresh(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const result = await refreshAndCompare(ctx);
@@ -69,7 +69,7 @@ export async function caseAccessTokenRefresh(ctx: ProbeContext): Promise<Capabil
   });
 }
 
-/** #23 Refresh Token 轮换：Microsoft 并非每次刷新都下发新的 refresh_token，这里只如实记录是否轮换。 */
+/** #23 Xoay vòng Refresh Token: Microsoft không phải lần refresh nào cũng cấp refresh_token mới, ở đây chỉ ghi nhận trung thực việc có xoay vòng hay không. */
 export async function caseRefreshTokenRotation(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const result = await refreshAndCompare(ctx);
@@ -77,7 +77,7 @@ export async function caseRefreshTokenRotation(ctx: ProbeContext): Promise<Capab
   let status: CapabilityResult['status'];
   if (!result.success) status = 'unknown';
   else if (result.refreshTokenRotated === null) status = 'unknown';
-  else status = 'native'; // 轮换与否都是「网关能正确观察并处理」的既有能力，二者皆判定为 native
+  else status = 'native'; // Dù xoay vòng hay không đều là năng lực vốn có "gateway quan sát và xử lý chính xác", cả hai đều đánh giá là native
 
   return makeResult({
     id: 'refresh_token_rotation',
@@ -106,7 +106,7 @@ const REMEMBER_NAME = '探针续接标记九号';
 const REMEMBER_PROMPT = `请记住一个标记词：「${REMEMBER_NAME}」，仅回复「已记住」。`;
 const RECALL_PROMPT = '我刚才让你记住的标记词是什么？只回复那个词。';
 
-/** #28 同一会话在刷新 Token 后能否继续：先建立会话，强制刷新 Token，再用新 Token 续接同一 conversationRef。 */
+/** #28 Cùng một phiên có thể tiếp tục sau khi refresh Token không: trước tiên thiết lập phiên, ép buộc refresh Token, sau đó dùng Token mới để nối tiếp cùng conversationRef. */
 export async function caseSessionContinueAfterTokenRefresh(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const first = await runText(ctx, REMEMBER_PROMPT);
@@ -139,7 +139,7 @@ export async function caseSessionContinueAfterTokenRefresh(ctx: ProbeContext): P
     });
   }
 
-  // ctx.getAccessToken() 会重新读库，此时应已经拿到刷新后的新 access token
+  // ctx.getAccessToken() sẽ đọc lại DB, lúc này lẽ ra đã nhận được access token mới sau khi refresh
   const resumed = await runText(ctx, RECALL_PROMPT, { conversationRef: first.conversationRef });
   const remembered = extractText(resumed).includes(REMEMBER_NAME);
 

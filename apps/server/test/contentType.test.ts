@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createTestHarness, loginAdmin, TEST_ADMIN_PASSWORD, type TestHarness } from './helpers/testApp.js';
 
 /**
- * Content-Type 兜底行为。
+ * Hành vi fallback của Content-Type.
  *
- * 起因：真实客户端（如 PowerShell 的 Invoke-RestMethod）在 POST 无请求体时
- * 仍会带上 application/x-www-form-urlencoded，导致本来不需要请求体的端点回 415。
+ * Nguyên nhân: Client thật (như Invoke-RestMethod của PowerShell) khi POST không có body
+ * vẫn kèm application/x-www-form-urlencoded, dẫn đến endpoint vốn không cần body lại trả về 415.
  */
 
 let harness: TestHarness | undefined;
@@ -63,7 +63,7 @@ describe('不支持的 Content-Type 且有请求体', () => {
     harness = await createTestHarness();
     const token = await loginAdmin(harness.app);
 
-    // application/xml 没有解析器，会落到兜底的 `*` 解析器上
+    // application/xml không có parser, sẽ rơi vào parser dự phòng `*`
     const response = await harness.app.inject({
       method: 'POST',
       url: '/admin/api-keys',

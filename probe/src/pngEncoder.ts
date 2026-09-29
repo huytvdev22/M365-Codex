@@ -1,11 +1,11 @@
 import { deflateSync } from 'node:zlib';
 
 /**
- * 极简 PNG 编码器：只用于生成探针自带的纯色测试图片（§3.2「单张自带的测试图片」）。
+ * Bộ mã hóa PNG tối giản: Chỉ dùng để tạo ảnh thử nghiệm đơn sắc có sẵn của probe (§3.2 "Một ảnh thử nghiệm có sẵn").
  *
- * 不引入任何图像库，也不使用用户文件——图片内容完全由本文件确定性生成，
- * 与文件解析（`files/ooxml.ts`）手写 ZIP 的风格一致：自己写、用真实工具验证过格式，
- * 而不是引入依赖只为了一张几像素的纯色图。
+ * Không import bất kỳ thư viện ảnh nào, cũng không dùng file của người dùng — nội dung ảnh được tạo hoàn toàn tất định bởi file này,
+ * đồng nhất với phong cách tự viết ZIP trong phân tích file (`files/ooxml.ts`): tự viết, đã kiểm chứng định dạng bằng công cụ thực tế,
+ * thay vì đưa dependency vào chỉ vì một bức ảnh đơn sắc vài pixel.
  */
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -49,7 +49,7 @@ export interface SolidColorPngOptions {
   rgb?: readonly [number, number, number];
 }
 
-/** 生成一张 `size x size` 的纯色 PNG（8 位真彩色、无滤波）。 */
+/** Tạo một ảnh PNG đơn sắc kích thước `size x size` (truecolor 8-bit, không filter). */
 export function generateSolidColorPng(options: SolidColorPngOptions = {}): Buffer {
   const size = options.size ?? 4;
   const [r, g, b] = options.rgb ?? [90, 140, 255];
@@ -57,8 +57,8 @@ export function generateSolidColorPng(options: SolidColorPngOptions = {}): Buffe
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // 位深
-  ihdr[9] = 2; // 颜色类型：truecolor RGB
+  ihdr[8] = 8; // Bit depth
+  ihdr[9] = 2; // Color type: truecolor RGB
   ihdr[10] = 0;
   ihdr[11] = 0;
   ihdr[12] = 0;
@@ -66,7 +66,7 @@ export function generateSolidColorPng(options: SolidColorPngOptions = {}): Buffe
   const rowBytes = 1 + size * 3;
   const raw = Buffer.alloc(rowBytes * size);
   for (let y = 0; y < size; y += 1) {
-    raw[y * rowBytes] = 0; // 每行 filter type：0（无滤波）
+    raw[y * rowBytes] = 0; // Filter type mỗi dòng: 0 (không lọc)
     for (let x = 0; x < size; x += 1) {
       const offset = y * rowBytes + 1 + x * 3;
       raw[offset] = r;
@@ -83,7 +83,7 @@ export function generateSolidColorPng(options: SolidColorPngOptions = {}): Buffe
   ]);
 }
 
-/** 生成 data URL 形态，供 `ImageInputDescriptor.url` 使用。 */
+/** Tạo dạng data URL, dùng cho `ImageInputDescriptor.url`. */
 export function generateSolidColorPngDataUrl(options: SolidColorPngOptions = {}): string {
   return `data:image/png;base64,${generateSolidColorPng(options).toString('base64')}`;
 }

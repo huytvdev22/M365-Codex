@@ -6,8 +6,7 @@ import { SystemSettingsPage } from '../pages/SystemSettingsPage';
 import type { SettingsResponse } from '../api';
 
 /**
- * source="env" 的设置项：容器编排是唯一真源，界面必须禁用输入并明确提示
- * 「改这里不会生效」，不能让人误以为保存按钮真的能覆盖环境变量。
+ * Mục cài đặt source=env là cố định bởi môi trường, giao diện vô hiệu hóa chỉnh sửa.
  */
 const settingsFixture: SettingsResponse = {
   network: {
@@ -64,8 +63,8 @@ vi.mock('../api', async () => {
   };
 });
 
-describe('设置页 source=env 的禁用展示', () => {
-  it('env 来源的字段渲染为禁用输入，并提示改这里不会生效', async () => {
+describe('Hiển thị vô hiệu hóa của source=env trong trang cài đặt', () => {
+  it('Trường có nguồn env được render ở dạng vô hiệu hóa và có thông báo sửa không có hiệu lực', async () => {
     render(
       <MemoryRouter initialEntries={['/settings/system']}>
         <AuthProvider>
@@ -74,18 +73,18 @@ describe('设置页 source=env 的禁用展示', () => {
       </MemoryRouter>,
     );
 
-    const input = (await screen.findByLabelText(/对外 API Base URL/)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Base URL API đối ngoại/)) as HTMLInputElement;
     expect(input.disabled).toBe(true);
     expect(input.value).toBe('http://192.168.0.5:8080/v1');
 
-    expect(screen.getAllByText('由环境变量固定，改这里不会生效。').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Được cố định bởi biến môi trường, sửa tại đây sẽ không có hiệu lực.').length).toBeGreaterThan(0);
 
-    // 同一分组里 source=db 的字段应保持可编辑，不能被 env 字段的禁用状态误伤
-    const adminUrlInput = (await screen.findByLabelText(/管理界面公开地址/)) as HTMLInputElement;
+    // Cùng nhóm nhưng source=db vẫn có thể chỉnh sửa
+    const adminUrlInput = (await screen.findByLabelText(/Địa chỉ công khai giao diện quản trị/)) as HTMLInputElement;
     expect(adminUrlInput.disabled).toBe(false);
   });
 
-  it('max_arg_repairs 输入框限制在 0-2 之间，并说明这是协议规则', async () => {
+  it('Ô nhập max_arg_repairs giới hạn trong khoảng 0-2 theo quy tắc giao thức', async () => {
     render(
       <MemoryRouter initialEntries={['/settings/system']}>
         <AuthProvider>
@@ -94,9 +93,9 @@ describe('设置页 source=env 的禁用展示', () => {
       </MemoryRouter>,
     );
 
-    const input = (await screen.findByLabelText(/参数修复最大次数/)) as HTMLInputElement;
+    const input = (await screen.findByLabelText(/Số lần sửa tham số tối đa/)) as HTMLInputElement;
     expect(input.min).toBe('0');
     expect(input.max).toBe('2');
-    expect(screen.getByText(/协议规则封顶 2 次/)).toBeTruthy();
+    expect(screen.getByText(/Quy tắc giao thức giới hạn tối đa 2 lần/)).toBeTruthy();
   });
 });

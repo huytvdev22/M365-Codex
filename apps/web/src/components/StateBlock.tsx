@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ErrorBanner } from './ErrorBanner';
 
-export function LoadingBlock({ label = '加载中…' }: { label?: string }) {
+export function LoadingBlock({ label = 'Đang tải…' }: { label?: string }) {
   return (
     <div className="state-block" role="status">
       <span className="spinner" aria-hidden="true" />
@@ -20,7 +20,7 @@ export function EmptyBlock({ title, hint }: { title: string; hint?: string }) {
 }
 
 /**
- * 加载 / 错误 / 空 / 有数据 四态的统一入口，页面只需要关心「有数据时怎么画」。
+ * Điểm điều phối thống nhất 4 trạng thái: Đang tải / Lỗi / Trống / Có dữ liệu, trang chỉ cần định nghĩa cách hiển thị khi có dữ liệu.
  */
 export function AsyncSection<T>({
   loading,
@@ -45,7 +45,7 @@ export function AsyncSection<T>({
 }) {
   if (loading) return <LoadingBlock label={loadingLabel} />;
   if (error !== null && error !== undefined) return <ErrorBanner error={error} onRetry={onRetry} />;
-  if (data === null) return <EmptyBlock title={emptyTitle ?? '暂无数据'} hint={emptyHint} />;
-  if (isEmpty?.(data) === true) return <EmptyBlock title={emptyTitle ?? '暂无数据'} hint={emptyHint} />;
+  if (data === null) return <EmptyBlock title={emptyTitle ?? 'Chưa có dữ liệu'} hint={emptyHint} />;
+  if (isEmpty?.(data) === true) return <EmptyBlock title={emptyTitle ?? 'Chưa có dữ liệu'} hint={emptyHint} />;
   return <>{children(data)}</>;
 }

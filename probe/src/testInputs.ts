@@ -2,12 +2,12 @@ import type { ToolDeclaration } from '../../apps/server/dist/adapter/protocol.js
 import { generateSolidColorPngDataUrl } from './pngEncoder.js';
 
 /**
- * §3.2 固定测试输入。
+ * Đầu vào thử nghiệm cố định theo §3.2.
  *
- * 全部是本探针自己生成/编写的无敏感信息内容，不含用户真实文件、真实对话。
- * 每个 case 明确知道自己发了什么，因此可以把这些字面量原样传给
- * `evidence.ts` 的 allowlist，在脱敏证据里保留可读性，而不影响「其余字符串一律
- * 替换成 <string:长度>」这条硬规则。
+ * Toàn bộ là nội dung không có thông tin nhạy cảm do chính probe này tự tạo/viết, không chứa file thật, hội thoại thật của người dùng.
+ * Mỗi case biết rõ mình đã gửi những gì, do đó có thể truyền các chuỗi nguyên bản này cho
+ * allowlist của `evidence.ts` để giữ tính dễ đọc trong bằng chứng đã khử nhạy cảm, mà không ảnh hưởng quy tắc cứng
+ * "tất cả các chuỗi còn lại đều thay bằng <string:độ_dài>".
  */
 
 export const TEXT_SHORT = '你好，这是 M365-Codex 探针的简短测试文本，请用一句话回复确认收到。';
@@ -15,7 +15,7 @@ export const TEXT_SHORT = '你好，这是 M365-Codex 探针的简短测试文�
 export const TEXT_INSTRUCTIONS =
   '你是 M365-Codex 探针使用的测试助手。回答一律使用简体中文，且不超过两句话，不要输出与本次测试无关的内容。';
 
-/** 长文本：重复固定段落到约 20000 字符，末尾带一个明确问题，测试长上下文承载能力。 */
+/** Văn bản dài: Lặp lại đoạn văn cố định đến khoảng 20.000 ký tự, cuối đoạn kèm một câu hỏi rõ ràng, kiểm tra khả năng chịu tải ngữ cảnh dài. */
 export const TEXT_LONG = buildLongText();
 
 function buildLongText(): string {
@@ -41,7 +41,7 @@ export const JSON_OUTPUT_PROMPT =
 export const CANCELLATION_PROMPT =
   '请用不少于 300 字详细介绍分布式系统中的 CAP 定理，包含具体例子（本请求会在收到首个分片后被主动取消，用于测试取消行为）。';
 
-/** 探针自带的纯色测试图片（4x4，蓝色），不使用用户文件。 */
+/** Ảnh thử nghiệm đơn sắc có sẵn của probe (4x4, màu xanh lam), không sử dụng file của người dùng. */
 export const TEST_IMAGE_DATA_URL = generateSolidColorPngDataUrl({ size: 4, rgb: [90, 140, 255] });
 
 export const IMAGE_PROMPT = '这张图片的主要颜色是什么？请用一个颜色词回答（例如：红色/蓝色/绿色）。';
@@ -78,7 +78,7 @@ export const TOOL_PROMPT_PARALLEL =
 export const TOOL_PROMPT_BAD_ARGS_HINT =
   '请调用 probe_get_time 工具查询时间。';
 
-/** 出现在探针发出的固定测试文本集合，供 `evidence.ts` 的结构采样按字面量放行。 */
+/** Tập hợp văn bản thử nghiệm cố định xuất hiện trong các lượt gửi của probe, dùng cho việc lấy mẫu cấu trúc của `evidence.ts` cho phép theo nguyên bản. */
 export function ownLiterals(...extra: readonly string[]): ReadonlySet<string> {
   return new Set<string>([
     TEXT_SHORT,

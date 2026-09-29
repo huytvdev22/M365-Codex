@@ -8,15 +8,15 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * 补齐集成测试矩阵（实施计划 §21.2）里尚未覆盖的三项：
- * - 并行工具调用（一轮里多个工具调用被正常接受、全部下发）；
- * - 文件输入的完整链路（真实上传 → 提取文本 → 拼进发给上游的 invocation）；
- * - 客户端断开（真实 TCP 连接中途关闭 → 上游收到取消 → sseInterrupted 打点）。
+ * Bổ sung ba hạng mục còn thiếu trong ma trận test tích hợp (kế hoạch triển khai §21.2):
+ * - Gọi công cụ song song (nhiều lệnh gọi công cụ trong một vòng được chấp nhận bình thường, gửi xuống toàn bộ);
+ * - Toàn bộ luồng nhập file (upload thật → trích xuất text → ghép vào invocation gửi upstream);
+ * - Client ngắt kết nối (kết nối TCP thật bị đóng giữa chừng → upstream nhận lệnh hủy → ghi nhận metric sseInterrupted).
  *
- * 其余矩阵项（文本/SSE/单工具调用/function_call_output/previous_response_id/
- * 上游超时/401/403/429/全不可用/重启恢复/Chat Completions）已由
+ * Các hạng mục ma trận còn lại (text/SSE/gọi công cụ đơn/function_call_output/previous_response_id/
+ * upstream timeout/401/403/429/toàn bộ không khả dụng/phục hồi sau khởi động lại/Chat Completions) đã được bao phủ bởi
  * responsesRoutes.test.ts / toolLoop.test.ts / connection.test.ts /
- * dispatcher.test.ts / recovery.test.ts / chatRoutes.test.ts 覆盖，这里不重复。
+ * dispatcher.test.ts / recovery.test.ts / chatRoutes.test.ts, ở đây không lặp lại.
  */
 
 let harness: TestHarness | undefined;
@@ -79,7 +79,7 @@ describe('并行工具调用', () => {
     expect(calls.map((c) => c.call_id).sort()).toEqual(['call_a', 'call_b']);
     expect(calls.every((c) => c.name === 'get_weather')).toBe(true);
 
-    // 两个调用都落库为 emitted，且都带 side_effect
+    // Cả hai lệnh gọi đều được lưu DB ở trạng thái emitted và đều có side_effect
     const rows = harness.db.prepare('SELECT call_id, status FROM tool_calls ORDER BY call_id').all() as {
       call_id: string;
       status: string;
@@ -136,7 +136,7 @@ describe('文件输入完整链路', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    // 提取出的文件文本确实到达了发给模拟上游的 invocation
+    // Văn bản file trích xuất được thực sự đã đến invocation gửi cho mock upstream
     expect(server.invocationTexts[0]).toContain('营收增长百分之十七');
     expect(server.invocationTexts[0]).toContain('report.txt');
   });
@@ -172,18 +172,18 @@ describe('客户端断开', () => {
         },
         (res) => {
           res.once('data', () => {
-            // 收到第一块 SSE 数据（流还没结束）就直接销毁连接，模拟客户端断开
+            // Nhận chunk dữ liệu SSE đầu tiên (stream chưa kết thúc) thì hủy kết nối trực tiếp, mô phỏng client ngắt kết nối
             req.destroy();
             resolve();
           });
           res.on('error', () => resolve());
         },
       );
-      req.on('error', () => resolve()); // destroy() 自身会触发一次 error，属于预期
+      req.on('error', () => resolve()); // Bản thân destroy() sẽ kích hoạt một error, đúng như kỳ vọng
       req.write(body);
     });
 
-    // 给服务端一点时间处理 'close' 事件、向上游发取消帧、更新指标
+    // Cho server một chút thời gian xử lý sự kiện 'close', gửi frame hủy lên upstream, cập nhật metric
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     expect(harness.context.inFlight.size).toBe(0);

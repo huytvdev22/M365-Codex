@@ -2,26 +2,26 @@ import { maskEmail } from '../../apps/server/dist/util/redact.js';
 import { redactWsUrl } from '../../apps/server/dist/adapter/endpoint.js';
 
 /**
- * 强制脱敏层（对应实施计划 §3.3 的硬红线）。
+ * Tầng khử nhạy cảm bắt buộc (tương ứng ranh giới đỏ cứng §3.3 kế hoạch triển khai).
  *
- * 铁律：报告只能经本文件的函数输出；任何 case 都不得把原始 access/refresh
- * token、Cookie、完整认证 Header、用户真实文件内容或真实对话直接塞进
+ * Quy tắc sắt: Báo cáo chỉ có thể xuất qua các hàm của file này; không case nào được phép đưa access/refresh
+ * token gốc, Cookie, Header xác thực đầy đủ, nội dung file thật của người dùng hoặc đối thoại thật trực tiếp vào
  * `CapabilityResult.evidence`。
  *
- * 这里刻意保守：默认把所有字符串值都当作敏感内容处理，只有调用方明确
- * 提供的「我们自己发出去的固定测试文本」字面量才原样保留，其余一律
- * 替换成 `<string:长度>`（保留字段名与类型，不保留内容）。
+ * Ở đây cố ý thận trọng: Mặc định coi tất cả giá trị chuỗi là nội dung nhạy cảm, chỉ có các chuỗi ký tự cố định
+ * do phía gọi cung cấp rõ ràng ("văn bản thử nghiệm cố định do chính chúng ta gửi đi") mới được giữ nguyên, còn lại đều
+ * thay thế thành `<string:độ_dài>` (giữ lại tên trường và kiểu dữ liệu, không giữ nội dung).
  */
 
 export { maskEmail, redactWsUrl };
 
-/** 租户 / 对象 ID 只保留前 8 位（§3.3）。 */
+/** Tenant / Object ID chỉ giữ lại 8 ký tự đầu (§3.3). */
 export function maskId(id: string | null | undefined): string | null {
   if (id === null || id === undefined || id === '') return null;
   return id.length <= 8 ? id : `${id.slice(0, 8)}…`;
 }
 
-/** 明确禁止出现在证据里的键名（大小写不敏感），命中时整体丢弃该字段。 */
+/** Tên các key bị cấm rõ ràng không được xuất hiện trong bằng chứng (không phân biệt hoa thường), khi khớp sẽ loại bỏ toàn bộ trường đó. */
 const FORBIDDEN_KEYS = new Set(
   [
     'access_token',
@@ -51,11 +51,11 @@ const MAX_ARRAY_ITEMS = 20;
 const MAX_DEPTH = 8;
 
 /**
- * 把任意值（通常是上游原始帧）转成「只留结构不留内容」的样本：
- * - 对象：保留键名，命中 `FORBIDDEN_KEYS` 的键整体替换为占位符；
- * - 字符串：命中 allowlist 原样保留，否则替换为 `<string:长度>`；
- * - 数字 / 布尔 / null：原样保留（它们是结构化元数据，不是「内容」）；
- * - 数组：逐项转换，超过上限截断并记录被截断的数量。
+ * Chuyển đổi giá trị bất kỳ (thường là frame gốc từ upstream) thành mẫu "chỉ giữ cấu trúc không giữ nội dung":
+ * - Object: Giữ tên key, key khớp `FORBIDDEN_KEYS` sẽ thay thế toàn bộ bằng placeholder;
+ * - String: Khớp allowlist thì giữ nguyên, ngược lại thay bằng `<string:độ_dài>`;
+ * - Number / Boolean / null: Giữ nguyên (chúng là metadata có cấu trúc, không phải "nội dung");
+ * - Array: Chuyển đổi từng phần tử, vượt quá giới hạn trên sẽ cắt ngắn và ghi nhận số lượng bị cắt.
  */
 export function buildStructureSample(
   value: unknown,
@@ -90,7 +90,7 @@ export function buildStructureSample(
     return out;
   }
 
-  // function / symbol / bigint 等不应出现在上游 JSON 帧里，兜底丢弃
+  // function / symbol / bigint v.v. không nên xuất hiện trong JSON frame upstream, loại bỏ dự phòng
   return `<redacted:unsupported-type:${typeof value}>`;
 }
 
@@ -100,7 +100,7 @@ function sampleString(text: string, allowlist: ReadonlySet<string>): string {
   return `<string:${text.length}>`;
 }
 
-/** JWT 形态、access_token query、Bearer 头等的启发式识别，兜底防线。 */
+/** Nhận diện heuristic dạng JWT, access_token query, Bearer header v.v., phòng tuyến dự phòng. */
 const JWT_PATTERN = /^eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}$/;
 const ACCESS_TOKEN_QUERY_PATTERN = /[?&]access_token=[^&\s"']+/i;
 const BEARER_PATTERN = /^Bearer\s+\S+$/i;
@@ -112,9 +112,9 @@ function looksLikeSecret(text: string): boolean {
 }
 
 /**
- * 最终防线：在报告写盘前对整段渲染文本做一次扫描。
- * 命中任何一种敏感形态都视为「本不该到这一步」的实现 bug，直接抛错而不是
- * 静默再脱敏一次——不能带着「曾经差点泄露」的侥幸心理发布报告。
+ * Phòng tuyến cuối cùng: Quét toàn bộ đoạn văn bản đã render trước khi ghi báo cáo ra đĩa.
+ * Khớp bất kỳ dạng nhạy cảm nào đều coi là bug triển khai "lẽ ra không nên đến bước này", ném lỗi trực tiếp thay vì
+ * âm thầm khử nhạy cảm lần nữa — không thể công bố báo cáo với tâm lý cầu may "từng suýt làm lộ".
  */
 export function assertReportClean(renderedText: string): void {
   const findings: string[] = [];
@@ -131,7 +131,7 @@ export function assertReportClean(renderedText: string): void {
 
 const JWT_PATTERN_GLOBAL = /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b/;
 
-/** 邮箱正则会命中我们自己的掩码形态（如 `fo***@example.com`），排除这种形态后如果还有命中才算真的泄露。 */
+/** Regex email sẽ khớp dạng mask của chính chúng ta (như `fo***@example.com`), loại trừ dạng này nếu vẫn khớp mới tính là rò rỉ thật. */
 function onlyMaskedEmails(text: string): boolean {
   const emails = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? [];
   return emails.every((email) => /^[A-Za-z0-9._%+-]{0,2}\*{3}@/.test(email));

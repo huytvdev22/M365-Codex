@@ -5,11 +5,10 @@ import { App } from '../App';
 import { AuthProvider } from '../auth/AuthContext';
 
 /**
- * 登录守卫：没有会话（sessionStorage 为空，afterEach 也会清空）时，
- * 访问任何受保护路径都必须落回登录页，而不是把受保护页面短暂渲染出来。
+ * Bộ bảo vệ đăng nhập: Khi không có phiên làm việc, truy cập bất kỳ đường dẫn nào đều chuyển về trang đăng nhập.
  */
-describe('登录守卫', () => {
-  it('未登录访问概览页会被重定向到登录页', async () => {
+describe('Bộ bảo vệ đăng nhập', () => {
+  it('Chưa đăng nhập truy cập trang tổng quan sẽ bị chuyển hướng về trang đăng nhập', async () => {
     render(
       <MemoryRouter initialEntries={['/overview']}>
         <AuthProvider>
@@ -18,11 +17,11 @@ describe('登录守卫', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('管理员登录')).toBeTruthy();
-    expect(screen.queryByText('概览')).toBeNull();
+    expect(await screen.findByText('Đăng nhập Quản trị viên')).toBeTruthy();
+    expect(screen.queryByText('Tổng quan')).toBeNull();
   });
 
-  it('未登录访问 API Key 页也会被重定向到登录页', async () => {
+  it('Chưa đăng nhập truy cập trang API Key sẽ bị chuyển hướng về trang đăng nhập', async () => {
     render(
       <MemoryRouter initialEntries={['/api-keys']}>
         <AuthProvider>
@@ -31,6 +30,6 @@ describe('登录守卫', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('管理员登录')).toBeTruthy();
+    expect(await screen.findByText('Đăng nhập Quản trị viên')).toBeTruthy();
   });
 });

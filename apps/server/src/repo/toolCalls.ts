@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { asRow, asRows, type Database } from '../db/index.js';
 
 /**
- * 工具调用持久化（§M5）。
+ * Lưu trữ lệnh gọi công cụ (tool call) (§M5).
  *
- * 关键约束：`UNIQUE (response_id, call_id)` + status，保证同一工具调用不会因
- * SSE 重连或重复提交被重复「发出」或重复「执行」。副作用工具带 side_effect=1。
+ * Ràng buộc then chốt: `UNIQUE (response_id, call_id)` + status, đảm bảo cùng một lệnh gọi công cụ không bị
+ * phát lại hoặc thực thi lặp lại do SSE kết nối lại hoặc gửi trùng. Công cụ có tác dụng phụ mang side_effect=1.
  *
- * 状态流转：
- *   emitted   —— 已把 function_call 发给客户端，等待其回传结果
- *   completed —— 已收到 function_call_output，结果回传上游续推理
+ * Luồng trạng thái:
+ *   emitted   —— Đã gửi function_call tới client, chờ client gửi kết quả về
+ *   completed —— Đã nhận function_call_output, kết quả gửi ngược lên upstream để suy luận tiếp
  */
 
 export type ToolCallStatus = 'emitted' | 'completed';
@@ -43,8 +43,8 @@ export class ToolCallRepository {
   }
 
   /**
-   * 记录一次发出的工具调用。若 (response_id, call_id) 已存在则不重复插入，
-   * 返回 false（幂等：重连不会重复发出）。
+   * Ghi nhận một lệnh gọi công cụ đã phát ra. Nếu (response_id, call_id) đã tồn tại thì không chèn lặp lại,
+   * trả về false (idempotent: kết nối lại không phát trùng lặp).
    */
   recordEmitted(input: RecordToolCallInput, now = Date.now()): boolean {
     const result = this.#db
@@ -74,7 +74,7 @@ export class ToolCallRepository {
     );
   }
 
-  /** 跨所有 response 找某 call_id 的记录（客户端回传结果时可能只带 call_id）。 */
+  /** Tìm bản ghi của một call_id trên toàn bộ response (khi client gửi kết quả về có thể chỉ mang call_id). */
   findAnyByCallId(callId: string): ToolCallRow | undefined {
     return asRow<ToolCallRow>(
       this.#db
@@ -92,8 +92,8 @@ export class ToolCallRepository {
   }
 
   /**
-   * 标记工具调用已完成（收到结果）。
-   * 只有从 emitted → completed 才会写入，重复回传同一结果不再二次执行，返回 false。
+   * Đánh dấu lệnh gọi công cụ đã hoàn thành (đã nhận kết quả).
+   * Chỉ ghi vào DB khi chuyển từ emitted → completed, gửi lặp lại cùng kết quả sẽ không thực thi lần hai, trả về false.
    */
   markCompleted(responseId: string, callId: string, output: string, now = Date.now()): boolean {
     const result = this.#db
@@ -105,7 +105,7 @@ export class ToolCallRepository {
     return Number(result.changes) > 0;
   }
 
-  /** 某时间点之后发出的工具调用数（供 /admin/overview 的 tools.calls_last_hour）。 */
+  /** Số lệnh gọi công cụ phát ra sau một mốc thời gian (cung cấp cho tools.calls_last_hour của /admin/overview). */
   countCreatedSince(sinceMs: number): number {
     const row = asRow<{ count: number }>(
       this.#db.prepare('SELECT COUNT(*) AS count FROM tool_calls WHERE created_at >= ?').get(sinceMs),
@@ -113,7 +113,7 @@ export class ToolCallRepository {
     return row?.count ?? 0;
   }
 
-  /** 是否存在未完成（emitted）的工具调用。 */
+  /** Có tồn tại lệnh gọi công cụ chưa hoàn thành (emitted) hay không. */
   hasPending(responseId: string): boolean {
     const row = asRow<{ count: number }>(
       this.#db

@@ -10,7 +10,7 @@ const MASKED_ADDRESS = 'socks5://***:***@203.0.113.7:1080';
 
 const proxyFixture: ProxyView = {
   id: 'proxy_1',
-  name: '出口节点-测试',
+  name: 'Node egress-Test',
   url_masked: MASKED_ADDRESS,
   protocol: 'socks5',
   enabled: true,
@@ -35,8 +35,8 @@ vi.mock('../api', async () => {
   };
 });
 
-describe('代理池地址掩码', () => {
-  it('列表只渲染打码地址，完整地址（含用户名密码）不会出现在 DOM 里', async () => {
+describe('Che giấu địa chỉ proxy pool', () => {
+  it('Danh sách chỉ render địa chỉ đã che, địa chỉ đầy đủ (gồm user/pass) không xuất hiện trong DOM', async () => {
     render(
       <MemoryRouter initialEntries={['/proxies']}>
         <AuthProvider>

@@ -79,7 +79,7 @@ describe('授权链接生成', () => {
     const state = (response.json() as { state: string }).state;
     const stored = h.context.oauthSessions.find(state);
     expect(stored).toBeDefined();
-    // 数据库里存的是密文，响应体里连密文都不该出现
+    // Trong database lưu bản mã, trong body response ngay cả bản mã cũng không được phép xuất hiện
     const verifier = h.context.oauthSessions.consume(state).ok
       ? 'consumed'
       : 'unreachable';
@@ -250,7 +250,7 @@ describe('完成授权', () => {
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(400);
     expect(second.body).toContain('已被使用过');
-    // 重放没有再打一次上游
+    // Replay không gọi lại upstream lần nữa
     expect(h.oauth.exchangeCalls).toHaveLength(1);
   });
 
@@ -293,7 +293,7 @@ describe('完成授权', () => {
       })
     ).json() as { state: string; expires_at: number };
 
-    // 直接把过期时间改到过去，等价于时间流逝
+    // Sửa trực tiếp thời gian hết hạn về quá khứ, tương đương thời gian trôi qua
     h.db
       .prepare('UPDATE oauth_sessions SET expires_at = ? WHERE state = ?')
       .run(Date.now() - 1000, start.state);
@@ -323,7 +323,7 @@ describe('完成授权', () => {
     ]);
     expect(startA.state).not.toBe(startB.state);
 
-    // 故意交叉完成：先完成后开的那个
+    // Cố ý hoàn thành chéo: Hoàn thành cái mở sau trước
     const resB = await h.app.inject({
       method: 'POST',
       url: '/admin/oauth/callback',
@@ -358,8 +358,8 @@ describe('完成授权', () => {
       })
     ).json() as { state: string };
 
-    // 用 A 的 state 提交 BOB 的 code：会话是 A 的，换出来的是 BOB，
-    // 这在真实上游会因 code_verifier 不匹配而失败；这里验证账号归属以 Token 声明为准
+    // Dùng state của A gửi code của BOB: Phiên là của A, đổi ra được lại là BOB,
+    // điều này ở upstream thật sẽ thất bại do code_verifier không khớp; ở đây xác minh quyền sở hữu tài khoản căn cứ vào claim của Token
     const response = await h.app.inject({
       method: 'POST',
       url: '/admin/oauth/callback',

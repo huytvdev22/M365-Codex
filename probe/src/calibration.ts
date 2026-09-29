@@ -2,16 +2,16 @@ import type { CapabilityResult } from './types.js';
 import { extractToolCallStats } from './verdict.js';
 
 /**
- * 落地校准建议（对应实施计划 §3「给出可直接落地的校准建议」）。
+ * Khuyến nghị hiệu chuẩn khả thi (tương ứng kế hoạch triển khai §3 "Đưa ra khuyến nghị hiệu chuẩn có thể áp dụng trực tiếp").
  *
- * 做法：递归收集本轮所有证据里出现过的字段名（值早已被 `evidence.ts` 脱敏，
- * 字段名本身不敏感），与 `codecV1.ts` 建模时假设的字段名集合做差集，
- * 列出「观察到但未建模」与「建模了但从未观察到」两类，供人工去改
- * `apps/server/src/adapter/codecV1.ts` 时参考。这不是自动改代码，只是把
- * 差异摆出来——协议字段的最终取舍仍需人工判断（真实帧样本、多次运行的稳定性）。
+ * Cách làm: Thu thập đệ quy các tên trường xuất hiện trong tất cả bằng chứng của lượt này (giá trị đã được `evidence.ts` khử nhạy cảm,
+ * bản thân tên trường không nhạy cảm), lấy phần bù với tập hợp tên trường giả định khi mô hình hóa `codecV1.ts`,
+ * liệt kê hai loại "quan sát được nhưng chưa mô hình hóa" và "đã mô hình hóa nhưng chưa từng quan sát thấy", dùng cho việc sửa thủ công
+ * `apps/server/src/adapter/codecV1.ts`. Đây không phải tự động sửa code, chỉ là đưa
+ * sự khác biệt ra — việc lựa chọn cuối cùng các trường giao thức vẫn cần con người phán đoán (mẫu frame thật, độ ổn định qua nhiều lần chạy).
  */
 
-/** `codecV1.ts` 里已经写死会去读的字段名（保持与源码同步，改 codec 时记得回来更新这里）。 */
+/** Tên các trường đã được code cứng sẽ đọc trong `codecV1.ts` (giữ đồng bộ với mã nguồn, khi sửa codec nhớ cập nhật ở đây). */
 const MODELED_FIELDS = new Set([
   'type',
   'invocationId',
@@ -56,7 +56,7 @@ function collectKeys(value: unknown, into: Set<string>, depth = 0): void {
   }
 }
 
-/** 收集本轮所有 case 证据里、原始帧结构样本部分出现过的键名。 */
+/** Thu thập tên các key từng xuất hiện trong phần mẫu cấu trúc frame gốc ở tất cả bằng chứng case của lượt này. */
 export function collectObservedFrameKeys(results: readonly CapabilityResult[]): Set<string> {
   const keys = new Set<string>();
   for (const result of results) {
@@ -74,7 +74,7 @@ export interface CalibrationNotes {
 }
 
 const NON_PROTOCOL_KEYS = new Set([
-  // 探针自己 evidence 结构里用的键名，不是上游协议字段，diff 时要排除
+  // Tên key dùng trong cấu trúc evidence của chính probe, không phải trường giao thức upstream, cần loại trừ khi diff
   'event_kinds',
   'frame_count',
   'raw_frame_structure_sample',

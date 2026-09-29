@@ -8,38 +8,38 @@ export function CapabilitiesPage() {
   const { data, error, loading, reload } = useAsync(() => api.getCapabilities());
 
   return (
-    <Layout title="模型与能力" subtitle="model 与 reasoning.effort 原样透传，这里只做记录与如实上报">
+    <Layout title="Mô hình & Năng lực" subtitle="model và reasoning.effort được chuyển tiếp nguyên trạng, trang này chỉ ghi nhận và báo cáo trung thực">
       <AsyncSection loading={loading} error={error} data={data} onRetry={reload}>
         {(caps) => (
           <>
             <div className="card">
-              <h2 style={{ marginTop: 0 }}>观测到的模型</h2>
+              <h2 style={{ marginTop: 0 }}>Các mô hình đã ghi nhận</h2>
               <p className="text-muted">
-                本项目不造模型别名——这里列出的是曾经被请求过、如实记录下来的 <code>model</code> 取值，
-                不代表本项目对其做了任何校验或改写。
+                Dự án không tự tạo bí danh model mới — danh sách này liệt kê các giá trị <code>model</code> đã từng được client yêu cầu và được ghi nhận lại,
+                không có sự can thiệp sửa đổi nào.
               </p>
               <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
                 {caps.models.map((m) => (
                   <span key={m.id} className="badge badge-info mono">
-                    {m.id}（{m.source}）
+                    {m.id} ({m.source})
                   </span>
                 ))}
-                {caps.models.length === 0 && <span className="text-faint">尚未观测到任何请求</span>}
+                {caps.models.length === 0 && <span className="text-faint">Chưa ghi nhận yêu cầu nào</span>}
               </div>
             </div>
 
             <div className="card table-wrap">
-              <h2 style={{ marginTop: 0 }}>能力矩阵</h2>
+              <h2 style={{ marginTop: 0 }}>Ma trận năng lực</h2>
               <p className="text-muted">
-                未经 M0 探针确认的能力一律标 <code>upstream_decided</code> 或 <code>unsupported</code>，
-                不会标成 <code>native</code>。
+                Các năng lực chưa qua kiểm chứng bởi M0 Probe sẽ được đánh dấu <code>upstream_decided</code> hoặc <code>unsupported</code>,
+                không tự ý đánh dấu là <code>native</code>.
               </p>
               <table>
                 <thead>
                   <tr>
-                    <th>能力</th>
-                    <th>状态</th>
-                    <th>说明</th>
+                    <th>Năng lực / Tính năng</th>
+                    <th>Trạng thái</th>
+                    <th>Mô tả chi tiết</th>
                   </tr>
                 </thead>
                 <tbody>

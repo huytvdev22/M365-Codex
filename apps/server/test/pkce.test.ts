@@ -31,7 +31,7 @@ describe('deriveCodeChallenge', () => {
   });
 
   it('与 RFC 7636 附录 B 的示例一致', () => {
-    // RFC 7636 Appendix B 给出的标准测试向量
+    // Test vector chuẩn do RFC 7636 Appendix B cung cấp
     const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
     expect(deriveCodeChallenge(verifier)).toBe('E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
   });

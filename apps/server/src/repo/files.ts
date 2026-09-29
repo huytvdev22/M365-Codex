@@ -3,10 +3,10 @@ import { asRow, asRows, type Database } from '../db/index.js';
 import type { FileKind, FileStatus, UploadStatus } from '../files/types.js';
 
 /**
- * 文件 / 分片上传的数据访问层（对应实施计划 §11、§M6）。
+ * Tầng truy cập dữ liệu cho File / Upload phân đoạn (tương ứng kế hoạch triển khai §11, §M6).
  *
- * 归属规则：所有查询都要求调用方带上 `apiKeyId` 做过滤——一个 API Key 只能看到、
- * 读到、删到自己创建的文件，列表也不例外（不只是内容读不到，连存在与否都不可见）。
+ * Quy tắc sở hữu: Mọi truy vấn đều yêu cầu bên gọi kèm theo `apiKeyId` để lọc — một API Key chỉ có thể nhìn thấy,
+ * đọc được, xóa được file do chính nó tạo ra, danh sách cũng không ngoại lệ (không chỉ không đọc được nội dung mà ngay cả sự tồn tại cũng không thấy).
  */
 
 export interface FileRow {
@@ -80,7 +80,7 @@ export class FileRepository {
     return asRow<FileRow>(this.#db.prepare('SELECT * FROM files WHERE id = ?').get(id));
   }
 
-  /** 找一份「未被删除」的文件，且必须属于指定 Key；否则视为不存在（不泄露存在性）。 */
+  /** Tìm một file "chưa bị xóa", và bắt buộc thuộc về Key chỉ định; nếu không xem như không tồn tại (không để lộ tính tồn tại). */
   findOwnedActive(id: string, apiKeyId: string): FileRow | undefined {
     return asRow<FileRow>(
       this.#db
@@ -106,7 +106,7 @@ export class FileRepository {
     );
   }
 
-  /** 该 Key 当前占用的存储字节数（未删除、未过期）。 */
+  /** Số byte lưu trữ hiện tại mà Key này chiếm dụng (chưa xóa, chưa hết hạn). */
   sumActiveBytes(apiKeyId: string, now = Date.now()): number {
     const row = asRow<{ total: number | null }>(
       this.#db
@@ -119,7 +119,7 @@ export class FileRepository {
     return row?.total ?? 0;
   }
 
-  /** 软删除：保留行以便审计，但内容与元数据都不再对外可见。 */
+  /** Xóa mềm: giữ lại hàng phục vụ kiểm toán, nhưng cả nội dung và metadata đều không còn hiển thị ra ngoài nữa. */
   softDelete(id: string, apiKeyId: string, now = Date.now()): boolean {
     const result = this.#db
       .prepare('UPDATE files SET deleted_at = ? WHERE id = ? AND api_key_id = ? AND deleted_at IS NULL')
@@ -127,7 +127,7 @@ export class FileRepository {
     return Number(result.changes) > 0;
   }
 
-  /** 找出已过期但尚未清理的文件（供清理任务使用，不区分 API Key）。 */
+  /** Tìm các file đã hết hạn nhưng chưa được dọn dẹp (dành cho tác vụ dọn dẹp sử dụng, không phân biệt API Key). */
   findExpired(now = Date.now()): FileRow[] {
     return asRows<FileRow>(
       this.#db
@@ -136,7 +136,7 @@ export class FileRepository {
     );
   }
 
-  /** 管理视角的文件列表（契约 §2.6），可选按 API Key 过滤，跨 Key 可见。 */
+  /** Danh sách file theo góc nhìn quản trị (hợp đồng §2.6), tùy chọn lọc theo API Key, có thể nhìn thấy xuyên suốt các Key. */
   listForAdmin(filters: { limit: number; apiKeyId?: string }): { items: FileRow[]; totalBytes: number } {
     if (filters.apiKeyId !== undefined) {
       const items = asRows<FileRow>(
@@ -160,7 +160,7 @@ export class FileRepository {
     return { items, totalBytes: totalRow?.total ?? 0 };
   }
 
-  /** 管理端删除：跳过归属校验（契约 §2.6 `DELETE /admin/files/:id`）。 */
+  /** Xóa từ phía quản trị: bỏ qua kiểm tra quyền sở hữu (hợp đồng §2.6 `DELETE /admin/files/:id`). */
   adminSoftDelete(id: string, now = Date.now()): FileRow | undefined {
     const existing = this.findById(id);
     if (existing === undefined || existing.deleted_at !== null) return undefined;
@@ -229,7 +229,7 @@ export class UploadRepository {
     );
   }
 
-  /** 追加一个分片记录；分片号重复会因 UNIQUE 约束抛错，交由调用方决定如何处理。 */
+  /** Thêm một bản ghi phân đoạn; số thứ tự phân đoạn trùng lặp sẽ bị throw lỗi do ràng buộc UNIQUE, để bên gọi quyết định xử lý. */
   addPart(uploadId: string, bytes: number, now = Date.now()): UploadPartRow {
     const id = `part_${randomUUID().replaceAll('-', '')}`;
     const partNumber = this.#nextPartNumber(uploadId);
@@ -285,7 +285,7 @@ export class UploadRepository {
     this.#db.prepare("UPDATE uploads SET status = 'expired' WHERE id = ? AND status = 'pending'").run(id);
   }
 
-  /** 找出已过期但仍是 pending 的 Upload（供清理任务使用）。 */
+  /** Tìm các Upload đã hết hạn nhưng vẫn ở trạng thái pending (dành cho tác vụ dọn dẹp sử dụng). */
   findExpiredPending(now = Date.now()): UploadRow[] {
     return asRows<UploadRow>(
       this.#db.prepare("SELECT * FROM uploads WHERE status = 'pending' AND expires_at < ?").all(now),

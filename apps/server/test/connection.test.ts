@@ -12,7 +12,7 @@ import { buildUpstreamUrl } from '../src/adapter/endpoint.js';
 import type { UpstreamEvent } from '../src/adapter/protocol.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
-/** 用真实的内存 WS 服务器模拟 Sydney 上游，端到端验证连接层。 */
+/** Dùng WS server trong bộ nhớ thật mô phỏng Sydney upstream, xác minh end-to-end tầng kết nối. */
 
 let server: MockSydneyServer | undefined;
 
@@ -149,8 +149,8 @@ describe('心跳', () => {
     server = await startMockSydneyServer({ kind: 'normal', chunks: Array.from({ length: 5 }, (_, i) => String(i)) });
     const conn = newConnection(server.url);
     await collect(conn.run({ url: urlFor(server.url), invocationId: 'i', text: 'q' }));
-    // 心跳间隔 50ms，握手后到 completion 之间应至少触发若干次；这里只要求 ≥1
-    expect(server.pingCount).toBeGreaterThanOrEqual(0); // ping 计数取决于时序，宽松断言
+    // Khoảng thời gian heartbeat 50ms, giữa lúc bắt tay đến completion cần kích hoạt ít nhất vài lần; ở đây chỉ yêu cầu ≥1
+    expect(server.pingCount).toBeGreaterThanOrEqual(0); // Đếm ping phụ thuộc vào thời điểm, assert nới lỏng
   });
 });
 
@@ -163,7 +163,7 @@ describe('取消', () => {
       conn.run({ url: urlFor(server.url), invocationId: 'i', text: 'q', signal: controller.signal }),
     );
     setTimeout(() => controller.abort(), 50);
-    // 取消后 run 正常结束（不抛错），事件为空
+    // Sau khi hủy run kết thúc bình thường (không ném lỗi), mảng sự kiện rỗng
     const events = await promise;
     expect(events).toEqual([]);
   });
@@ -196,8 +196,8 @@ describe('NO_PROXY', () => {
           return new WebSocket(url, options);
         },
       });
-      // proxy.invalid 不是真实可达的代理，连接必然失败——这里只关心
-      // SydneyConnection 有没有按 proxyUrl 把 agent 挂上去，不关心后续网络结果
+      // proxy.invalid không phải proxy thực sự truy cập được, kết nối chắc chắn thất bại — ở đây chỉ quan tâm
+      // SydneyConnection có gắn agent theo proxyUrl hay không, không quan tâm kết quả mạng phía sau
       await collect(connection.run({ url: urlFor(server.url), invocationId: 'i', text: 'q' })).catch(() => undefined);
       expect(seen[0]?.agent).toBeDefined();
     } finally {
@@ -252,10 +252,10 @@ describe('NO_PROXY', () => {
 });
 
 describe('握手请求头', () => {
-  // 2026-07-27 真实账号实测：X-Scenario 是上游放行的**唯一硬条件**。
-  // 不带它一律 403，且响应体为空、没有 WWW-Authenticate，看起来完全像
-  // 「这个账号没有权限」——当初就是被这个假象带偏，误判成了地区封锁。
-  // 这条测试存在的意义就是防止有人把这个头当作无用代码删掉。
+  // Đã kiểm thử thực tế với tài khoản thật ngày 27-07-2026: X-Scenario là **điều kiện cứng duy nhất** để upstream chấp thuận.
+  // Không mang nó đều bị 403, body rỗng, không có WWW-Authenticate, trông hoàn toàn giống như
+  // "tài khoản này không có quyền" — ban đầu chính là bị hiểu lầm bởi hiện tượng này, phán đoán sai thành chặn vùng miền.
+  // Ý nghĩa của bài test này là ngăn ngừa ai đó coi header này là code vô dụng rồi xóa đi.
   it('必须带上 X-Scenario 头，取值来自配置', async () => {
     const server = await startMockSydneyServer({ kind: 'normal', chunks: ['ok'] });
     try {

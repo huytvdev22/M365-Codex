@@ -7,7 +7,7 @@ import { createContext, type AppContext } from '../../src/context.js';
 import { openDatabase, runMigrations, type Database } from '../../src/db/index.js';
 import { FakeOAuthClient } from './fakeOAuth.js';
 
-/** 测试脚手架：内存数据库 + 静默日志，不落任何文件。 */
+/** Scaffold test: DB trong bộ nhớ + log im lặng, không ghi ra bất kỳ file nào. */
 
 export const TEST_ADMIN_PASSWORD = 'test-admin-password-123';
 
@@ -30,7 +30,7 @@ export interface TestHarness {
   context: AppContext;
   config: AppConfig;
   db: Database;
-  /** 模拟上游 OAuth 客户端，测试中可编程注入错误与延迟 */
+  /** Mock OAuth client upstream, trong test có thể lập trình inject lỗi và độ trễ */
   oauth: FakeOAuthClient;
   close: () => Promise<void>;
 }
@@ -58,7 +58,7 @@ export async function createTestHarness(envOverrides: RawEnv = {}): Promise<Test
   };
 }
 
-/** 登录并返回管理端会话令牌。 */
+/** Đăng nhập và trả về token phiên admin. */
 export async function loginAdmin(app: FastifyInstance, password = TEST_ADMIN_PASSWORD): Promise<string> {
   const response = await app.inject({
     method: 'POST',

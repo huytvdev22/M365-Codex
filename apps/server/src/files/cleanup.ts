@@ -2,11 +2,11 @@ import type { FileRepository, UploadRepository } from '../repo/files.js';
 import type { FileStorage } from './storage.js';
 
 /**
- * 过期文件与未完成 Upload 的清理（对应实施计划 §11：「未完成的 Upload、过期文件
- * 自动清理」）。
+ * Dọn dẹp tệp hết hạn và các Upload chưa hoàn thành (tương ứng với Kế hoạch thực hiện §11:
+ * "Tự động dọn dẹp Upload chưa hoàn tất, tệp hết hạn").
  *
- * M6 只把清理逻辑做成可独立调用、可单测的纯函数；定时器注册留给 M7——避免
- * 在没有 WebUI/运维面板可看执行历史之前，先悄悄跑一个谁都不知道存在的后台任务。
+ * M6 triển khai logic dọn dẹp thành hàm thuần có thể gọi độc lập và unit test; việc đăng ký timer để lại cho M7 —
+ * tránh việc khi chưa có WebUI/bảng quản trị xem lịch sử thực thi đã ngầm chạy một background task không ai biết đến.
  */
 
 export interface CleanupDeps {
@@ -20,19 +20,19 @@ export interface CleanupResult {
   expiredUploads: number;
 }
 
-/** 清理已过保留期但尚未删除的文件：软删除数据库行 + 删除磁盘内容。 */
+/** Dọn dẹp tệp đã quá hạn lưu trữ nhưng chưa xóa: Xóa mềm dòng trong CSDL + xóa nội dung trên đĩa. */
 export function cleanupExpiredFiles(deps: CleanupDeps, now = Date.now()): number {
   const expired = deps.files.findExpired(now);
   for (const file of expired) {
     const deleted = deps.files.softDelete(file.id, file.api_key_id, now);
-    // softDelete 具备幂等性：只有真正生效（未被并发清理过）才去动磁盘，
-    // 避免并发清理任务重复删除同一份内容。
+    // softDelete có tính idempotency: chỉ khi thực sự có hiệu lực (chưa bị dọn dẹp đồng thời) mới xóa đĩa,
+    // tránh các tác vụ cleanup đồng thời xóa lặp cùng một file.
     if (deleted) deps.storage.deleteFile(file.id);
   }
   return expired.length;
 }
 
-/** 清理已过期仍处于 pending 的 Upload：标记 expired + 删除已收到的分片。 */
+/** Dọn dẹp Upload đã hết hạn nhưng vẫn ở trạng thái pending: Đánh dấu expired + xóa các mảnh đã nhận. */
 export function cleanupExpiredUploads(deps: CleanupDeps, now = Date.now()): number {
   const expired = deps.uploads.findExpiredPending(now);
   for (const upload of expired) {
@@ -42,7 +42,7 @@ export function cleanupExpiredUploads(deps: CleanupDeps, now = Date.now()): numb
   return expired.length;
 }
 
-/** 一次性跑完两类清理，供 M7 的定时器或运维手动触发调用。 */
+/** Chạy một lần cả 2 loại dọn dẹp, dùng cho timer ở M7 hoặc quản trị viên kích hoạt thủ công. */
 export function runFilesCleanup(deps: CleanupDeps, now = Date.now()): CleanupResult {
   return {
     expiredFiles: cleanupExpiredFiles(deps, now),
@@ -51,13 +51,13 @@ export function runFilesCleanup(deps: CleanupDeps, now = Date.now()): CleanupRes
 }
 
 export interface CleanupWithBytesResult extends CleanupResult {
-  /** 本次清理释放的文件字节数（供 `POST /admin/files/cleanup` 展示，契约 §2.6） */
+  /** Số byte tệp được giải phóng trong lần dọn dẹp này (dùng cho `POST /admin/files/cleanup`, Hợp đồng §2.6) */
   freedBytes: number;
 }
 
 /**
- * 供管理端「立即清理」按钮使用：与 `runFilesCleanup` 逻辑一致，
- * 额外统计释放的字节数（清理前先读一遍即将被删除文件的大小）。
+ * Dành cho nút "Dọn dẹp ngay" ở phía quản trị: Cùng logic với `runFilesCleanup`,
+ * thống kê thêm số byte được giải phóng (đọc kích thước các file sắp xóa trước khi dọn).
  */
 export function runFilesCleanupWithBytes(deps: CleanupDeps, now = Date.now()): CleanupWithBytesResult {
   const expiredFiles = deps.files.findExpired(now);

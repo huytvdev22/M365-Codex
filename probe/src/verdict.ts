@@ -2,12 +2,12 @@ import type { CapabilityResult, CapabilityStatus } from './types.js';
 import type { ToolCallStats } from './toolCall.js';
 
 /**
- * §3.5 通过标准判定。
+ * Phán đoán tiêu chuẩn vượt qua theo §3.5.
  *
- * 逐条读取固定 case id 的探测结果，凡「native」「adaptable」都算通过（两者都是
- * 「上游直接支持」或「M365-Codex 状态机可靠转换」，符合 §3.4 的定义）；
- * 「partial」视具体条目决定是否勉强算通过；「unsupported」「unstable」「unknown」
- * 一律不算通过。
+ * Đọc từng kết quả thăm dò của case id cố định, mọi trạng thái "native", "adaptable" đều tính là vượt qua (cả hai đều là
+ * "upstream hỗ trợ trực tiếp" hoặc "state machine M365-Codex chuyển đổi đáng tin cậy", phù hợp định nghĩa §3.4);
+ * "partial" tùy theo mục cụ thể để quyết định có tính là tạm vượt qua hay không; "unsupported", "unstable", "unknown"
+ * đều không tính là vượt qua.
  */
 
 export interface ChecklistItem {
@@ -42,7 +42,7 @@ function passed(result: CapabilityResult | undefined, okStatuses: readonly Capab
   return result !== undefined && okStatuses.includes(result.status);
 }
 
-/** 从 case 13/14/15 的证据里把 `ToolCallStats` 捞出来汇总（§3.5 门槛）。 */
+/** Lấy `ToolCallStats` từ bằng chứng của case 13/14/15 ra để tổng hợp (ngưỡng §3.5). */
 export function extractToolCallStats(results: readonly CapabilityResult[]): ToolCallStats | null {
   const single = byId(results, 'single_tool_call');
   const stats = single?.evidence.tool_call_stats as ToolCallStats | undefined;
@@ -69,7 +69,7 @@ export function evaluateVerdict(results: readonly CapabilityResult[]): Verdict {
     },
     {
       label: '连续会话可以恢复，或可通过本地上下文重建',
-      // M3 已经实现「本地重建上下文」兜底（见里程碑进度），所以这里任一方式成立即算通过
+      // M3 đã triển khai cơ chế dự phòng "tái tạo ngữ cảnh cục bộ" (xem tiến độ milestone), vì vậy ở đây bất kỳ cách nào thành công đều tính là vượt qua
       passed:
         passed(byId(results, 'multi_turn_conversation'), ['native', 'adaptable', 'partial']) ||
         passed(byId(results, 'session_resume_after_disconnect'), ['native', 'adaptable', 'partial']),

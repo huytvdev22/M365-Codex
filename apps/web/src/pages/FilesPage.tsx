@@ -15,7 +15,7 @@ export function FilesPage() {
   const [cleanupError, setCleanupError] = useState<unknown>(null);
 
   const handleDelete = (id: string, filename: string) => {
-    if (!window.confirm(`确认删除文件「${filename}」？`)) return;
+    if (!window.confirm(`Xác nhận xóa tệp "${filename}"?`)) return;
     setBusyId(id);
     setRowError(null);
     api
@@ -39,20 +39,20 @@ export function FilesPage() {
   };
 
   return (
-    <Layout title="文件" subtitle="已上传文件的管理视角（Files / Uploads / 图片 / PDF / Office 提取产物）">
+    <Layout title="Quản lý tệp" subtitle="Quản lý tệp đã tải lên (Files / Uploads / Ảnh / PDF / Văn bản trích xuất Office)">
       <div className="card flex-between">
         <div>
-          <div className="stat-label">立即执行一次过期清理</div>
+          <div className="stat-label">Dọn dẹp các tệp hết hạn ngay lập tức</div>
           {cleanupResult !== null && (
             <div className="text-muted">
-              上次清理删除文件 {cleanupResult.deleted_files} 个、未完成上传 {cleanupResult.deleted_uploads} 个，
-              释放 {formatBytes(cleanupResult.freed_bytes)}
+              Đợt trước đã xóa {cleanupResult.deleted_files} tệp, {cleanupResult.deleted_uploads} lượt tải dang dở,
+              giải phóng {formatBytes(cleanupResult.freed_bytes)}
             </div>
           )}
           {cleanupError !== null && <ErrorBanner error={cleanupError} />}
         </div>
         <button type="button" className="btn" onClick={handleCleanup} disabled={cleaning}>
-          {cleaning ? '清理中…' : '立即清理'}
+          {cleaning ? 'Đang dọn dẹp…' : 'Dọn dẹp ngay'}
         </button>
       </div>
 
@@ -62,24 +62,24 @@ export function FilesPage() {
         data={data}
         onRetry={reload}
         isEmpty={(res) => res.items.length === 0}
-        emptyTitle="还没有任何文件"
+        emptyTitle="Chưa có tệp tin nào"
       >
         {(res) => (
           <div className="card table-wrap">
             <div className="text-muted" style={{ marginBottom: 10 }}>
-              共 {res.items.length} 个文件，合计占用 {formatBytes(res.total_bytes)}
+              Tổng cộng {res.items.length} tệp, tổng dung lượng {formatBytes(res.total_bytes)}
             </div>
             <table>
               <thead>
                 <tr>
-                  <th>文件名</th>
-                  <th>类型</th>
-                  <th>大小</th>
-                  <th>状态</th>
-                  <th>归属 Key</th>
-                  <th>创建时间</th>
-                  <th>过期时间</th>
-                  <th>操作</th>
+                  <th>Tên tệp</th>
+                  <th>Loại tệp</th>
+                  <th>Kích thước</th>
+                  <th>Trạng thái</th>
+                  <th>API Key sở hữu</th>
+                  <th>Thời gian tạo</th>
+                  <th>Thời gian hết hạn</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,7 +101,7 @@ export function FilesPage() {
                         disabled={busyId === file.id}
                         onClick={() => handleDelete(file.id, file.filename)}
                       >
-                        删除
+                        Xóa
                       </button>
                       {rowError?.id === file.id && (
                         <div style={{ marginTop: 8, maxWidth: 280 }}>

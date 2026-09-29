@@ -3,9 +3,9 @@ import { openDatabase, runMigrations, type Database } from '../src/db/index.js';
 import { ApiKeyRepository } from '../src/repo/apiKeys.js';
 
 /**
- * API Key 仓储的补充字段（计划 §10.1）：备注、累计请求次数、按 Key 收紧的
- * 工具调用/上传大小上限。这四项此前一直没做——这里只测数据访问层本身；
- * 「不得突破全局天花板」的裁剪逻辑属于 gateway/auth.ts，见 gatewayAuth.test.ts。
+ * Các trường bổ sung của repository API Key (kế hoạch §10.1): Ghi chú, số lần yêu cầu tích lũy, mức siết chặt
+ * trần gọi công cụ / dung lượng upload theo Key. Bốn mục này trước đó chưa làm — ở đây chỉ test tầng truy cập dữ liệu;
+ * logic cắt giảm "không được vượt qua trần toàn cục" thuộc về gateway/auth.ts, xem gatewayAuth.test.ts.
  */
 
 let db: Database | undefined;
@@ -61,7 +61,7 @@ describe('update', () => {
 
     const updated = repo.update(created.id, { note: '新备注' });
     expect(updated?.note).toBe('新备注');
-    expect(updated?.max_tool_calls).toBe(1); // 未传，保持原值
+    expect(updated?.max_tool_calls).toBe(1); // Không truyền, giữ nguyên giá trị ban đầu
     expect(updated?.max_file_bytes).toBe(2);
 
     const cleared = repo.update(created.id, { maxToolCalls: null, maxFileBytes: null });

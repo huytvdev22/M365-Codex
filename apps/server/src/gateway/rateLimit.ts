@@ -3,15 +3,15 @@ import type { RateLimitConfig } from '../config/index.js';
 import type { ApiKeyRow } from '../repo/apiKeys.js';
 
 /**
- * API Key 级限额（对应实施计划 §10、契约 §2.3）。
+ * Giới hạn hạn ngạch cấp API Key (tương ứng kế hoạch triển khai §10, hợp đồng §2.3).
  *
- * 铁律（§10 末句）：**API Key 级限制不得突破全局上限**。落地方式很直接——
- * 有效限额永远是 `min(Key 自身设置, 全局天花板)`；Key 没设（null＝不限）时
- * 直接用全局天花板兜底，而不是真的不限。
+ * Quy tắc thép (§10 câu cuối): **Giới hạn cấp API Key không được vượt trần toàn cục**. Cách thức áp dụng rất trực tiếp —
+ * Hạn ngạch hiệu lực luôn là `min(thiết lập riêng của Key, trần toàn cục)`; khi Key không thiết lập (null = không giới hạn)
+ * thì dùng thẳng trần toàn cục làm chặn dưới, chứ không thực sự thả nổi không giới hạn.
  *
- * 并发计数只在进程内维护（`#concurrent` 计数器），注释先说清楚这个前提：
- * 单容器部署下这就是全局真实并发；一旦跑多副本，各副本各算各的，
- * 会出现"总并发看似超限"的情况——多副本水平扩展不在当前架构范围内。
+ * Bộ đếm đồng thời chỉ được duy trì trong tiến trình (bộ đếm `#concurrent`), comment nói rõ tiền đề này trước:
+ * Trong triển khai một container thì đây chính là concurrency thực tế toàn cục; một khi chạy đa bản sao (multi-replica),
+ * mỗi bản sao tự tính riêng, sẽ xuất hiện tình huống "tổng concurrency có vẻ vượt giới hạn" — mở rộng ngang đa bản sao không nằm trong phạm vi kiến trúc hiện tại.
  */
 
 export interface EffectiveLimits {
@@ -43,7 +43,7 @@ export class RateLimiter {
     this.#global = global;
   }
 
-  /** 把 Key 自身设置与全局天花板结合，永远不超过全局上限。 */
+  /** Kết hợp thiết lập của bản thân Key với trần toàn cục, vĩnh viễn không vượt quá giới hạn trần toàn cục. */
   effectiveLimits(key: ApiKeyRow): EffectiveLimits {
     return {
       rpmLimit: clampToCeiling(key.rpm_limit, this.#global.globalRpmLimit),
@@ -53,9 +53,9 @@ export class RateLimiter {
   }
 
   /**
-   * 校验接口与模型范围（§10）。不匹配时返回清晰原因，调用方转成 403。
-   * `allowed_endpoints` / `allowed_models` 为 `null` 表示不限制；一旦设置（哪怕是空数组）
-   * 就变成白名单，不在名单内一律拒绝。
+   * Xác thực phạm vi endpoint và model (§10). Khi không khớp trả về nguyên nhân rõ ràng, bên gọi chuyển thành 403.
+   * `allowed_endpoints` / `allowed_models` là `null` biểu thị không giới hạn; một khi đã thiết lập (dù là mảng rỗng)
+   * sẽ trở thành whitelist, không nằm trong danh sách đều bị từ chối.
    */
   checkEndpointAndModel(
     parsed: { endpoints: string[] | null; models: string[] | null },
@@ -63,14 +63,14 @@ export class RateLimiter {
     model: string | null,
   ): void {
     if (parsed.endpoints !== null && !parsed.endpoints.includes(endpoint)) {
-      throw ApiError.forbidden(`该 API Key 未被授权访问接口 ${endpoint}`);
+      throw ApiError.forbidden(`API Key này chưa được cấp quyền truy cập endpoint ${endpoint}`);
     }
     if (model !== null && parsed.models !== null && !parsed.models.includes(model)) {
-      throw ApiError.forbidden(`该 API Key 未被授权使用模型 ${model}`);
+      throw ApiError.forbidden(`API Key này chưa được cấp quyền sử dụng mô hình ${model}`);
     }
   }
 
-  /** 尝试消费一次配额；超限返回带 `retryAfterSeconds` 的失败结果，调用方转成 429。 */
+  /** Thử tiêu thụ 1 lượt quota; vượt hạn mức trả về kết quả thất bại kèm `retryAfterSeconds`, bên gọi chuyển thành 429. */
   consume(keyId: string, limits: EffectiveLimits, now = Date.now()): ConsumeResult {
     const state = this.#stateFor(keyId, now);
 
@@ -99,14 +99,14 @@ export class RateLimiter {
     return {
       ok: true,
       release: () => {
-        if (released) return; // 防止调用方重复 release 把计数减穿
+        if (released) return; // Ngăn ngừa bên gọi release lặp lại làm giảm âm bộ đếm
         released = true;
         state.concurrent = Math.max(0, state.concurrent - 1);
       },
     };
   }
 
-  /** 供测试与可观测性查看当前进程内状态。 */
+  /** Dành cho test và khả năng quan sát (observability) xem trạng thái trong tiến trình hiện tại. */
   snapshot(keyId: string): Readonly<KeyState> | undefined {
     return this.#states.get(keyId);
   }
@@ -131,9 +131,9 @@ export class RateLimiter {
 }
 
 /**
- * 有效限额永远是 `min(Key 自身设置, 全局天花板)`；Key 没设（null）时直接用
- * 全局天花板兜底。除了 rpm/daily/concurrency，`max_tool_calls`/`max_file_bytes`
- * （§10.1）也复用这同一条裁剪规则，导出给 `gateway/auth.ts` 用。
+ * Hạn ngạch hiệu lực luôn là `min(thiết lập riêng của Key, trần toàn cục)`; khi Key không đặt (null) thì dùng thẳng
+ * trần toàn cục làm chặn dưới. Ngoài rpm/daily/concurrency, `max_tool_calls`/`max_file_bytes`
+ * (§10.1) cũng tái sử dụng cùng quy tắc cắt tỉa này, export cho `gateway/auth.ts` sử dụng.
  */
 export function clampToCeiling(keyLimit: number | null, globalCeiling: number): number {
   if (keyLimit === null) return globalCeiling;

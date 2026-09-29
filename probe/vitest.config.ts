@@ -1,10 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * 探针自测配置。
+ * Cấu hình tự kiểm thử của probe.
  *
- * 自测只打 `apps/server/test/helpers/mockSydneyServer.ts` 起的模拟上游，
- * 绝不连真实 Microsoft；因此这里不需要任何真实网络相关的设置。
+ * Tự kiểm thử chỉ gọi mock upstream khởi tạo từ `apps/server/test/helpers/mockSydneyServer.ts`,
+ * tuyệt đối không kết nối Microsoft thật; do đó ở đây không cần bất kỳ thiết lập mạng thật nào.
  */
 export default defineConfig({
   test: {

@@ -24,19 +24,19 @@ import {
 import type { ResponseObject, SseEvent } from './types.js';
 
 /**
- * Responses 服务：串起 dispatch → 状态机 → 持久化，并实现工具调用的完整代理循环
- * （对应实施计划 §7）。
+ * Responses Service: Kết nối dispatch → máy trạng thái → lưu trữ dữ liệu, và thực hiện vòng lặp proxy gọi công cụ hoàn chỉnh
+ * (tương ứng kế hoạch triển khai §7).
  *
- * 可靠性规则（§7.3）在这里的落点：
- * - **只调声明过的工具**：未声明的调用先请求修复，修复无果就丢弃并判失败，绝不发给客户端；
- * - **参数必须是合法 JSON**：修复无果同样判失败（发出去客户端也解析不了）；
- * - **参数不符合 schema**：修复无果时如实发出并记录告警——schema 可能只是客户端的期望，
- *   由客户端自己决定怎么处理，比整轮失败更可用；
- * - **每个调用唯一 call_id**、**不因重连重复发出**：靠 tool_calls 表的
- *   `UNIQUE (response_id, call_id)`；
- * - **结果回传必须匹配未完成的 call_id**：在 create() 里同步校验，早于任何上游动作；
- * - **副作用阶段不跨账号重放**：带工具结果的请求打上 sideEffect，由调度器保证失败即止；
- * - **工具 JSON 不重复出现在正文**：提示词模拟模式下由 PromptToolScanner 从文本流里剥离。
+ * Các quy tắc về độ tin cậy (§7.3) được áp dụng tại đây:
+ * - **Chỉ gọi các công cụ đã khai báo**: Lần gọi chưa khai báo sẽ yêu cầu sửa trước, nếu sửa không thành công sẽ bỏ qua và đánh giá thất bại, tuyệt đối không gửi cho client;
+ * - **Tham số phải là JSON hợp lệ**: Sửa không thành công cũng đánh giá thất bại (gửi đi client cũng không parse được);
+ * - **Tham số không khớp với schema**: Khi sửa không thành công vẫn gửi nguyên bản và ghi log cảnh báo — schema có thể chỉ là kỳ vọng của client,
+ *   do client tự quyết định cách xử lý, khả dụng hơn là làm thất bại cả vòng;
+ * - **Mỗi lần gọi có call_id duy nhất**, **không phát trùng lặp do kết nối lại**: Dựa vào ràng buộc của bảng tool_calls
+ *   `UNIQUE (response_id, call_id)`;
+ * - **Kết quả trả về phải khớp với call_id chưa hoàn thành**: Xác thực đồng bộ trong create(), trước bất kỳ hành động upstream nào;
+ * - **Giai đoạn tác dụng phụ không phát lại qua tài khoản khác**: Request mang kết quả công cụ được đánh dấu sideEffect, bộ điều phối đảm bảo dừng ngay khi thất bại;
+ * - **JSON công cụ không xuất hiện lặp lại trong nội dung chính**: Chế độ mô phỏng prompt được PromptToolScanner tách ra khỏi luồng văn bản.
  */
 
 export interface CreateResponseInput {
@@ -45,10 +45,10 @@ export interface CreateResponseInput {
   signal?: AbortSignal | undefined;
   idempotencyKey?: string | null;
   /**
-   * 按 API Key 收紧后的、本对话链累计工具调用数上限（§10.1）；调用方
-   * （`routes/v1.ts`/`routes/chat.ts`）已经用 `gateway/auth.ts` 算好的
-   * `min(Key 自身设置, 全局天花板)` 传进来。不传时退回全局配置
-   * `tools.maxTotalCalls`，行为与此前完全一致。
+   * Giới hạn trên số lượt gọi công cụ tích lũy của chuỗi hội thoại này sau khi siết chặt theo API Key (§10.1); phía gọi
+   * (`routes/v1.ts`/`routes/chat.ts`) đã truyền vào giá trị `min(cài đặt của Key, trần cấu hình toàn cục)` được tính toán
+   * bởi `gateway/auth.ts`. Khi không truyền sẽ quay về cấu hình toàn cục
+   * `tools.maxTotalCalls`, hành vi hoàn toàn nhất quán như trước.
    */
   toolCallsCeiling?: number;
 }
@@ -58,7 +58,7 @@ export interface ResponseExecution {
   stream: AsyncGenerator<SseEvent>;
   getFinal: () => ResponseObject;
   getError: () => ApiError | null;
-  /** 客户端声明了但本网关执行不了、已被跳过的工具名（供路由回写响应头告知调用方） */
+  /** Tên công cụ client đã khai báo nhưng gateway này không thể thực thi và đã bị bỏ qua (để route ghi header phản hồi thông báo phía gọi) */
   skippedTools: readonly string[];
 }
 
@@ -68,30 +68,30 @@ export interface ResponsesServiceDeps {
   toolCalls: ToolCallRepository;
   tools: ToolsConfig;
   logger: Logger;
-  /** M6 新增：解析 input_file / input_image 的 file_id 引用（按发起请求的 API Key 限定归属） */
+  /** Bổ sung M6: Phân giải tham chiếu file_id của input_file / input_image (giới hạn quyền sở hữu theo API Key gửi request) */
   files?: FilesService;
-  /** M6 新增：上游是否真支持图片输入（UPSTREAM_IMAGE_INPUT，默认 false） */
+  /** Bổ sung M6: Upstream có thực sự hỗ trợ đầu vào hình ảnh không (UPSTREAM_IMAGE_INPUT, mặc định false) */
   upstreamImageInput?: boolean;
-  /** M6 新增：重建出的上下文文本超过多少字符就从最旧历史开始截断 */
+  /** Bổ sung M6: Văn bản ngữ cảnh tái dựng vượt quá bao nhiêu ký tự thì bắt đầu cắt tỉa từ lịch sử cũ nhất */
   contextMaxChars?: number;
-  /** M7 新增：在关键路径打点，供 /admin/overview 与未来 M8 的 /metrics 使用 */
+  /** Bổ sung M7: Thu thập số liệu trên đường dẫn quan trọng, phục vụ /admin/overview và /metrics M8 tương lai */
   metrics?: Metrics;
 }
 
-/** 缓冲中的工具调用（按 call_id 累积参数）。 */
+/** Lần gọi công cụ trong bộ đệm (tích lũy tham số theo call_id). */
 interface PendingToolCall {
   callId: string;
   name: string;
   args: string;
 }
 
-/** 一轮工具调用的校验结论。 */
+/** Kết luận kiểm tra một vòng gọi công cụ. */
 interface RoundVerdict {
-  /** 必须请求修复、且修复无果就不能发出的问题 */
+  /** Vấn đề nghiêm trọng bắt buộc phải yêu cầu sửa, và nếu sửa không được thì không thể phát đi */
   fatal: string[];
-  /** 只是不符合 schema，修复无果时仍可发出 */
+  /** Chỉ là không khớp schema, sửa không được thì vẫn có thể phát đi */
   soft: string[];
-  /** 未声明或参数非法、不允许发给客户端的调用 */
+  /** Lần gọi chưa khai báo hoặc tham số không hợp lệ, không cho phép gửi cho client */
   rejected: Set<string>;
 }
 
@@ -104,11 +104,11 @@ export class ResponsesService {
 
   create(input: CreateResponseInput): ResponseExecution {
     const { request } = input;
-    // input_file / input_image 的 file_id 引用按发起请求的 API Key 限定归属，
-    // 不允许跨 Key 读取他人上传的文件内容（见 files/service.ts 的 resolveOwned*）。
-    const extracted = extractInputText(request, this.#buildExtractDeps(input.apiKeyId)); // 不支持内容会在此抛清晰错误
+    // Tham chiếu file_id của input_file / input_image được giới hạn quyền sở hữu theo API Key gửi request,
+    // không cho phép đọc nội dung tệp do người khác tải lên qua Key khác (xem resolveOwned* trong files/service.ts).
+    const extracted = extractInputText(request, this.#buildExtractDeps(input.apiKeyId)); // Nội dung không hỗ trợ sẽ ném lỗi rõ ràng tại đây
     if (extracted.truncatedChars > 0) {
-      // 不静默：上下文因为超过 CONTEXT_MAX_CHARS 被截断，留痕方便排查"模型突然失忆"
+      // Không im lặng: Ngữ cảnh bị cắt bớt do vượt quá CONTEXT_MAX_CHARS, để lại dấu vết để dễ chẩn đoán hiện tượng "mô hình đột nhiên mất trí nhớ"
       this.#deps.logger.info(
         { truncated_chars: extracted.truncatedChars },
         '重建的对话上下文超过字符上限，已从最旧历史开始截断',
@@ -123,8 +123,8 @@ export class ResponsesService {
     const registry = ToolRegistry.fromRequest(request.tools);
     const previousResponseId = request.previous_response_id ?? null;
 
-    // 工具结果回传：必须匹配已发出的调用、且不超过结果大小上限。
-    // 放在这里（而不是生成器里）是为了在动上游之前就把 4xx 明确返回给客户端。
+    // Trả về kết quả công cụ: Bắt buộc phải khớp với lượt gọi đã phát ra và không vượt quá giới hạn kích thước kết quả.
+    // Đặt ở đây (thay vì trong generator) nhằm trả về 4xx rõ ràng cho client trước khi tương tác với upstream.
     this.#validateToolResults(extracted.toolResults, previousResponseId);
 
     const inherited = this.#inheritToolCounters(previousResponseId);
@@ -142,9 +142,9 @@ export class ResponsesService {
     const reasoningEffort = extractReasoningEffort(request);
     const passthrough = buildPassthrough(request);
     if (extracted.images.length > 0) {
-      // 「适配层约定」：invocation 的透传字段本就是给上游的通用扩展通道
-      // （model/reasoning/temperature 都走这条路），图片沿用同一通道，
-      // 具体线上字段名/结构待 M0 探针校准（见 adapter/protocol.ts 的注释）。
+      // "Quy ước tầng adapter": Trường chuyển tiếp (passthrough) của invocation vốn là kênh mở rộng chung cho upstream
+      // (model/reasoning/temperature đều đi qua đường này), hình ảnh dùng chung kênh này,
+      // tên trường/cấu trúc online cụ thể chờ probe M0 hiệu chuẩn (xem chú thích trong adapter/protocol.ts).
       passthrough.images = extracted.images;
     }
 
@@ -176,7 +176,7 @@ export class ResponsesService {
     );
 
     if (registry.skipped.length > 0) {
-      // 不静默：跳过的托管工具要留痕，路由还会通过响应头告诉调用方
+      // Không im lặng: Công cụ được quản lý bị bỏ qua cần để lại dấu vết, router cũng sẽ thông báo cho phía gọi qua header phản hồi
       this.#deps.logger.warn(
         { response_id: responseId, skipped: registry.skipped.map((t) => `${t.type}:${t.name}`) },
         '声明了本网关执行不了的工具，已跳过',
@@ -206,21 +206,21 @@ export class ResponsesService {
   }): AsyncGenerator<SseEvent> {
     const { builder, registry } = ctx;
     const limits = this.#deps.tools;
-    // §10.1：API Key 级的工具调用次数上限只能比全局天花板更严；
-    // ctx.input.toolCallsCeiling 已经是调用方用 clampToCeiling 算好的有效值
+    // §10.1: Trần số lượt gọi công cụ ở cấp API Key chỉ có thể nghiêm ngặt hơn trần toàn cục;
+    // ctx.input.toolCallsCeiling đã là giá trị hợp lệ được phía gọi tính bằng clampToCeiling
     const maxTotalCalls = ctx.input.toolCallsCeiling ?? limits.maxTotalCalls;
     const responseId = builder.responseId;
 
     yield* iter(builder.begin());
     this.#deps.responses.updateStatus(responseId, 'in_progress');
 
-    // 续接：把上一轮发出的、这次带结果回传的工具调用标记为完成（幂等）
+    // Tiếp nối: Đánh dấu các lệnh gọi công cụ phát ra ở vòng trước và mang kết quả trả về lần này là hoàn thành (idempotent)
     this.#markPriorToolCallsCompleted(ctx.input.request.previous_response_id ?? null, ctx.extracted.toolResults);
 
     const toolResults = ctx.extracted.toolResults.map((r) => ({ callId: r.callId, output: r.output }));
     const hasToolResults = toolResults.length > 0;
     const hasTools = registry.size > 0;
-    // native / auto 走结构化声明；prompt / auto 额外把工具目录写进提示词（§3.5）
+    // native / auto đi theo khai báo có cấu trúc; prompt / auto ghi thêm danh mục công cụ vào prompt (§3.5)
     const tools = hasTools && limits.mode !== 'prompt' ? registry.toDeclarations() : undefined;
     const instruction = hasTools && limits.mode !== 'native' ? buildToolInstruction(registry.list()) : '';
     const scanText = instruction !== '';
@@ -256,7 +256,7 @@ export class ResponsesService {
         for await (const raw of dispatch.events) {
           for (const event of expand(raw, scanner)) {
             if (this.#accumulateToolEvent(event, pending, order)) continue;
-            // 修复轮（attempt>0）不再向客户端重复输出文本，只取工具调用
+            // Vòng sửa lỗi (attempt > 0) không lặp lại xuất văn bản cho client, chỉ lấy lệnh gọi công cụ
             if (attempt === 0) {
               yield* iter(builder.consume(event));
             }
@@ -273,7 +273,7 @@ export class ResponsesService {
 
         const toolCalls = order.map((id) => pending.get(id)).filter((c): c is PendingToolCall => c !== undefined);
         if (toolCalls.length === 0) {
-          break; // 没有工具调用，本轮结束
+          break; // Không có lệnh gọi công cụ, kết thúc vòng này
         }
 
         const verdict = this.#judgeRound(toolCalls, registry, maxPerRound, allowParallel);
@@ -282,7 +282,7 @@ export class ResponsesService {
           attempt += 1;
           text = withInstruction(instruction, buildRepairPrompt([...verdict.fatal, ...verdict.soft]));
           sticky = { accountId: dispatch.accountId, conversationRef: dispatch.conversationRef };
-          // 修复轮只是重新要一次工具调用，本身不产生副作用
+          // Vòng sửa lỗi chỉ yêu cầu lại lệnh gọi công cụ, bản thân không tạo tác dụng phụ
           sideEffect = false;
           carryToolResults = undefined;
           this.#deps.logger.info(
@@ -293,7 +293,7 @@ export class ResponsesService {
         }
 
         if (verdict.fatal.length > 0) {
-          // 修复额度用尽仍不合规：未声明的工具、非法 JSON 一律不发给客户端
+          // Hết hạn mức sửa vẫn không hợp lệ: Công cụ chưa khai báo, JSON không hợp lệ tuyệt đối không gửi cho client
           throw new ApiError({
             type: 'upstream_error',
             status: 502,
@@ -314,8 +314,8 @@ export class ResponsesService {
           );
         }
 
-        // 打点供 /admin/overview 的 tools.calls_last_hour / arg_pass_rate 使用：
-        // rejected 是本轮被判定不合规、绝不下发给客户端的调用数；emitted 是实际下发数。
+        // Thu thập số liệu phục vụ tools.calls_last_hour / arg_pass_rate của /admin/overview:
+        // rejected là số lượng gọi bị phán định không hợp lệ trong vòng này và tuyệt đối không gửi cho client; emitted là số lượng thực tế gửi đi.
         if (verdict.rejected.size > 0) {
           this.#deps.metrics?.toolArgValidations.inc({ result: 'rejected' }, verdict.rejected.size);
         }
@@ -344,7 +344,7 @@ export class ResponsesService {
       }
 
       if (ctx.input.signal?.aborted === true) {
-        if (this.#isShutdownAbort(ctx.input.signal)) return; // 落库交给 server.ts 统一处理，见该 signal 的注释
+        if (this.#isShutdownAbort(ctx.input.signal)) return; // Việc lưu DB do server.ts xử lý tập trung, xem chú thích của signal đó
         yield* iter(builder.cancel());
         this.#persistFinal(responseId, lastAccountId, lastConversationRef, builder);
         return;
@@ -359,15 +359,15 @@ export class ResponsesService {
           message: finalStatus.error?.message ?? '上游返回错误',
         });
       }
-      // 只在链路自然走完时记一次：轮次统计的是「一条对话链最终用了几轮」，
-      // 中途取消/异常不构成一次完整的样本点
+      // Chỉ ghi nhận một lần khi luồng kết thúc tự nhiên: Thống kê vòng lặp là "một chuỗi hội thoại cuối cùng dùng mấy vòng",
+      // việc hủy/ngoại lệ giữa chừng không cấu thành một mẫu hoàn chỉnh
       if (finalStatus.status === 'completed' || finalStatus.status === 'failed') {
         this.#deps.metrics?.toolRounds.observe(finalToolRound);
       }
       this.#persistFinal(responseId, lastAccountId, lastConversationRef, builder);
     } catch (error) {
       if (ctx.input.signal?.aborted === true) {
-        if (this.#isShutdownAbort(ctx.input.signal)) return; // 同上：不重复落库
+        if (this.#isShutdownAbort(ctx.input.signal)) return; // Tương tự trên: không ghi DB trùng lặp
         yield* iter(builder.cancel());
         this.#persistFinal(responseId, lastAccountId, lastConversationRef, builder);
         return;
@@ -381,8 +381,8 @@ export class ResponsesService {
   }
 
   /**
-   * 审一轮工具调用：数量是否超限、工具是否声明过、参数是否合法。
-   * 未声明与非法 JSON 进 rejected（绝不发给客户端），schema 不符只记软问题。
+   * Thẩm định một vòng gọi công cụ: Số lượng có vượt quá không, công cụ đã khai báo chưa, tham số có hợp lệ không.
+   * Chưa khai báo và JSON không hợp lệ sẽ vào rejected (tuyệt đối không gửi cho client), không khớp schema chỉ ghi nhận lỗi nhẹ.
    */
   #judgeRound(
     toolCalls: readonly PendingToolCall[],
@@ -415,7 +415,7 @@ export class ResponsesService {
     return verdict;
   }
 
-  /** 把工具事件累积到缓冲区；返回 true 表示该事件是工具事件（已消费）。 */
+  /** Tích lũy sự kiện công cụ vào bộ đệm; trả về true nếu sự kiện đó là sự kiện công cụ (đã tiêu thụ). */
   #accumulateToolEvent(
     event: UpstreamEvent,
     pending: Map<string, PendingToolCall>,
@@ -440,7 +440,7 @@ export class ResponsesService {
     }
   }
 
-  /** 校验工具结果回传：必须对应已发出的调用，且不超过大小上限（§7.3、§7.4）。 */
+  /** Xác thực kết quả công cụ trả về: Phải tương ứng với lần gọi đã phát ra và không vượt giới hạn kích thước (§7.3, §7.4). */
   #validateToolResults(toolResults: readonly ToolResult[], previousResponseId: string | null): void {
     const maxBytes = this.#deps.tools.maxResultBytes;
     for (const result of toolResults) {
@@ -467,14 +467,14 @@ export class ResponsesService {
     }
   }
 
-  /** 从上一轮继承工具轮次与累计调用数。 */
+  /** Kế thừa số vòng công cụ và tổng số lần gọi tích lũy từ vòng trước. */
   #inheritToolCounters(previousResponseId: string | null): { round: number; total: number } {
     if (previousResponseId === null) return { round: 0, total: 0 };
     const parent = this.#deps.responses.findById(previousResponseId);
     return { round: parent?.tool_round ?? 0, total: parent?.tool_calls_total ?? 0 };
   }
 
-  /** 续接时把上一轮发出、这次回传结果的工具调用标记完成（幂等）。 */
+  /** Khi tiếp nối, đánh dấu các lần gọi công cụ đã phát ở vòng trước và có kết quả lần này là hoàn thành (idempotent). */
   #markPriorToolCallsCompleted(
     previousResponseId: string | null,
     toolResults: readonly { callId: string; output: string }[],
@@ -487,7 +487,7 @@ export class ResponsesService {
           : this.#deps.toolCalls.findByCallId(previousResponseId, result.callId)) ??
         this.#deps.toolCalls.findAnyByCallId(result.callId);
       if (existing === undefined) continue;
-      // markCompleted 只在 emitted→completed 时生效，重复回传不会二次处理
+      // markCompleted chỉ có hiệu lực khi emitted→completed, gửi lại trùng lặp sẽ không xử lý lần 2
       this.#deps.toolCalls.markCompleted(existing.response_id, result.callId, result.output);
     }
   }
@@ -514,10 +514,10 @@ export class ResponsesService {
   }
 
   /**
-   * 区分「优雅关闭触发的中止」与「用户/客户端主动取消」（§19）。前者由
-   * `server.ts` 的 `gracefulShutdown` 统一按 `maintenance/recovery.ts` 的
-   * 处置把该 Response 落库为 `incomplete`；这里如果也走 `builder.cancel()`
-   * 写一次 `cancelled`，就会出现两个写手竞争同一行、两套不一致的终态语义。
+   * Phân biệt giữa "hủy do dừng hệ thống nhẹ nhàng (graceful shutdown)" và "người dùng/client chủ động hủy" (§19). Cái trước do
+   * `gracefulShutdown` trong `server.ts` xử lý tập trung theo `maintenance/recovery.ts`,
+   * lưu Response này xuống DB thành `incomplete`; nếu ở đây cũng gọi `builder.cancel()`
+   * để ghi `cancelled`, sẽ có 2 tác nhân cạnh tranh ghi cùng một dòng, gây xung đột ngữ nghĩa trạng thái cuối cùng.
    */
   #isShutdownAbort(signal: AbortSignal): boolean {
     return signal.reason === SHUTDOWN_ABORT_REASON;
@@ -530,7 +530,7 @@ export class ResponsesService {
     return { accountId: binding.account_id, conversationRef: binding.upstream_conversation_ref };
   }
 
-  /** 把 FilesService 适配成 extractInputText 需要的、按 apiKeyId 限定归属的查找接口。 */
+  /** Điều hợp FilesService thành interface tra cứu theo apiKeyId mà extractInputText yêu cầu. */
   #buildExtractDeps(apiKeyId: string | null): ExtractInputDeps {
     const files = this.#deps.files;
     if (files === undefined || apiKeyId === null) {
@@ -550,17 +550,17 @@ export class ResponsesService {
   }
 }
 
-/** 提示词模拟模式下，工具目录跟在用户文本前面一起发给上游。 */
+/** Ở chế độ mô phỏng prompt, danh mục công cụ được gửi kèm phía trước văn bản người dùng tới upstream. */
 function withInstruction(instruction: string, text: string): string {
   return instruction === '' ? text : `${instruction}\n\n${text}`;
 }
 
-/** 构造请求上游修复的提示。 */
+/** Khởi tạo prompt yêu cầu upstream sửa lỗi. */
 function buildRepairPrompt(issues: readonly string[]): string {
   return `上一次的工具调用不符合要求，请仅重新发起工具调用并给出合法参数。\n${issues.join('\n')}`;
 }
 
-/** 提示词模拟模式下把正文里的工具调用剥离出来；其余事件原样通过。 */
+/** Ở chế độ mô phỏng prompt, tách các lệnh gọi công cụ trong nội dung văn bản ra; các sự kiện còn lại giữ nguyên. */
 function expand(event: UpstreamEvent, scanner: PromptToolScanner | null): UpstreamEvent[] {
   if (scanner === null || event.kind !== 'text_delta') return [event];
   const { text, events } = scanner.push(event.text);

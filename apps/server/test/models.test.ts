@@ -50,8 +50,8 @@ describe('loadModels', () => {
 });
 
 describe('降级必须留痕', () => {
-  // 静默降级踩过一次：镜像漏拷 config/ 目录，线上只返回 1 个模型而配置里有 3 个，
-  // 因为 catch 里什么都不说，排查时完全看不出来。
+  // Đã từng bị lỗi giáng cấp im lặng: Image quên copy thư mục config/, trên production chỉ trả về 1 model trong khi config có 3,
+  // vì trong catch không thông báo gì, khi điều tra hoàn toàn không thấy được.
   it('读不到文件时回调说明原因', () => {
     const reasons: string[] = [];
     const list = loadModels('/definitely/not/a/real/path/models.json', (r) => reasons.push(r));

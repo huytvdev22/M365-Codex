@@ -21,8 +21,8 @@ import {
 } from './types';
 
 /**
- * 开发期模拟数据（`VITE_USE_MOCK=1` 时启用），服务端 M7 接口尚未实现前用它独立跑通 UI。
- * 所有数据都是虚构的：域名统一用 *.example.invalid，不含任何真实凭据。
+ * Dữ liệu giả lập trong giai đoạn phát triển (kích hoạt khi `VITE_USE_MOCK=1`), dùng để chạy UI độc lập trước khi server hoàn thiện.
+ * Mọi dữ liệu đều là hư cấu: tên miền dùng *.example.invalid, không chứa thông tin nhạy cảm thật.
  */
 
 const LATENCY_MS = 260;
@@ -37,7 +37,7 @@ function notFound(message: string): never {
   });
 }
 
-// ---- 内存数据 ----
+// ---- Dữ liệu trong bộ nhớ ----
 
 let accounts: AccountView[] = [
   {
@@ -45,7 +45,7 @@ let accounts: AccountView[] = [
     tid: 'tid-aaaa',
     oid: 'oid-1111',
     email: 'demo.user1@tenant.example.invalid',
-    display_name: '演示账号 1',
+    display_name: 'Tài khoản demo 1',
     status: 'online',
     source: 'oauth_pkce',
     created_at: Date.now() - 86_400_000 * 10,
@@ -64,7 +64,7 @@ let accounts: AccountView[] = [
     tid: 'tid-bbbb',
     oid: 'oid-2222',
     email: 'demo.user2@tenant.example.invalid',
-    display_name: '演示账号 2',
+    display_name: 'Tài khoản demo 2',
     status: 'cooldown',
     source: 'oauth_pkce',
     created_at: Date.now() - 86_400_000 * 5,
@@ -83,7 +83,7 @@ let accounts: AccountView[] = [
     tid: 'tid-cccc',
     oid: 'oid-3333',
     email: 'demo.user3@tenant.example.invalid',
-    display_name: '演示账号 3',
+    display_name: 'Tài khoản demo 3',
     status: 'reauth_required',
     source: 'oauth_pkce',
     created_at: Date.now() - 86_400_000 * 20,
@@ -102,7 +102,7 @@ let accounts: AccountView[] = [
 let apiKeys: ApiKeyView[] = [
   {
     id: 'key_1',
-    name: '日常开发',
+    name: 'Phát triển hàng ngày',
     masked_key: 'sk-Ab12************************wxYZ',
     enabled: true,
     created_at: Date.now() - 86_400_000 * 30,
@@ -121,7 +121,7 @@ let apiKeys: ApiKeyView[] = [
 const proxies: ProxyView[] = [
   {
     id: 'proxy_1',
-    name: '出口节点-A',
+    name: 'Node egress-A',
     url_masked: 'socks5://***:***@198.51.100.10:1080',
     protocol: 'socks5',
     enabled: true,
@@ -163,7 +163,7 @@ const requests: RequestListItem[] = Array.from({ length: 8 }, (_, i) => ({
   tool_calls_total: i % 3,
   created_at: Date.now() - i * 600_000,
   updated_at: Date.now() - i * 500_000,
-  error_message: i % 4 === 2 ? '上游返回 502' : null,
+  error_message: i % 4 === 2 ? 'Upstream trả về 502' : null,
 }));
 
 let settings: SettingsResponse = {
@@ -234,7 +234,7 @@ export const mockAdminApi: AdminApi = {
   login: (password) => {
     if (password.trim().length === 0) {
       throw new ApiRequestError(401, {
-        error: { type: 'authentication_error', message: '管理端密码错误', param: null, request_id: `mock_${requestIdSeq++}` },
+        error: { type: 'authentication_error', message: 'Mật khẩu quản trị không đúng', param: null, request_id: `mock_${requestIdSeq++}` },
       });
     }
     return delay({ token: 'mock-session-token', expires_at: Date.now() + 3_600_000 });
@@ -265,19 +265,19 @@ export const mockAdminApi: AdminApi = {
   listAccounts: () => delay([...accounts]),
   getAccount: (id) => {
     const found = accounts.find((a) => a.id === id);
-    if (found === undefined) notFound('账号不存在');
+    if (found === undefined) notFound('Tài khoản không tồn tại');
     return delay(found);
   },
   setAccountStatus: (id, status: AccountStatus) => {
     const found = accounts.find((a) => a.id === id);
-    if (found === undefined) notFound('账号不存在');
+    if (found === undefined) notFound('Tài khoản không tồn tại');
     found.status = status;
     found.updated_at = Date.now();
     return delay(found);
   },
   refreshAccount: (id) => {
     const found = accounts.find((a) => a.id === id);
-    if (found === undefined) notFound('账号不存在');
+    if (found === undefined) notFound('Tài khoản không tồn tại');
     found.token_rotated_at = Date.now();
     found.token_expires_at = Date.now() + 3_600_000;
     return delay(found);
@@ -288,7 +288,7 @@ export const mockAdminApi: AdminApi = {
   },
   bindAccountProxy: (id, proxyId) => {
     const found = accounts.find((a) => a.id === id);
-    if (found === undefined) notFound('账号不存在');
+    if (found === undefined) notFound('Tài khoản không tồn tại');
     found.proxy_id = proxyId;
     return delay(found);
   },
@@ -305,7 +305,7 @@ export const mockAdminApi: AdminApi = {
       tid: 'tid-new',
       oid: 'oid-new',
       email: 'new.user@tenant.example.invalid',
-      display_name: '新授权账号',
+      display_name: 'Tài khoản mới ủy quyền',
       status: 'probing',
       source: 'oauth_pkce',
       created_at: Date.now(),
@@ -327,7 +327,7 @@ export const mockAdminApi: AdminApi = {
   listRequests: ({ limit }) => delay({ items: requests.slice(0, limit ?? requests.length), total: requests.length }),
   getRequest: (id) => {
     const found = requests.find((r) => r.id === id);
-    if (found === undefined) notFound('请求不存在');
+    if (found === undefined) notFound('Yêu cầu không tồn tại');
     const detail: RequestDetail = { ...found, tool_calls: [] };
     return delay(detail);
   },
@@ -358,13 +358,13 @@ export const mockAdminApi: AdminApi = {
   },
   updateApiKey: (id, payload: UpdateApiKeyRequest) => {
     const found = apiKeys.find((k) => k.id === id);
-    if (found === undefined) notFound('API Key 不存在');
+    if (found === undefined) notFound('API Key không tồn tại');
     Object.assign(found, payload);
     return delay(found);
   },
   revokeApiKey: (id) => {
     const found = apiKeys.find((k) => k.id === id);
-    if (found === undefined) notFound('API Key 不存在');
+    if (found === undefined) notFound('API Key không tồn tại');
     found.enabled = false;
     found.revoked_at = Date.now();
     return delay(found);
@@ -377,10 +377,10 @@ export const mockAdminApi: AdminApi = {
         { id: 'gpt-5', source: 'upstream' },
       ],
       matrix: [
-        { feature: 'tool_calls', status: 'native', detail: '原生工具声明与提示词兜底双通道' },
-        { feature: 'image_input', status: 'upstream_decided', detail: '取决于 M0 探针结果' },
-        { feature: 'parallel_tool_calls', status: 'experimental', detail: '尚未在真实上游验证' },
-        { feature: 'embeddings', status: 'unsupported', detail: '依赖 OpenAI 后端，本项目不实现' },
+        { feature: 'tool_calls', status: 'native', detail: 'Kênh đôi khai báo công cụ gốc và prompt dự phòng' },
+        { feature: 'image_input', status: 'upstream_decided', detail: 'Phụ thuộc vào kết quả probe M0' },
+        { feature: 'parallel_tool_calls', status: 'experimental', detail: 'Chưa được kiểm chứng trên upstream thực tế' },
+        { feature: 'embeddings', status: 'unsupported', detail: 'Phụ thuộc backend OpenAI, dự án này không hỗ trợ' },
       ],
     }),
 
@@ -415,7 +415,7 @@ export const mockAdminApi: AdminApi = {
   },
   updateProxy: (id, payload) => {
     const found = proxies.find((p) => p.id === id);
-    if (found === undefined) notFound('代理不存在');
+    if (found === undefined) notFound('Proxy không tồn tại');
     if (payload.name !== undefined) found.name = payload.name;
     if (payload.weight !== undefined) found.weight = payload.weight;
     if (payload.priority !== undefined) found.priority = payload.priority;
@@ -427,7 +427,7 @@ export const mockAdminApi: AdminApi = {
     if (idx >= 0) proxies.splice(idx, 1);
     return delay(undefined);
   },
-  checkProxy: () => delay({ ok: true, latency_ms: 76, detail: '连通性正常' }),
+  checkProxy: () => delay({ ok: true, latency_ms: 76, detail: 'Kết nối bình thường' }),
 
   getSettings: () => delay(settings),
   updateSettings: (group, values) => {
@@ -440,7 +440,7 @@ export const mockAdminApi: AdminApi = {
       if (item === undefined) continue;
       if (!item.editable) {
         throw new ApiRequestError(400, {
-          error: { type: 'invalid_request_error', message: `${key} 当前由环境变量固定，不可在界面修改`, param: key, request_id: `mock_${requestIdSeq++}` },
+          error: { type: 'invalid_request_error', message: `${key} hiện được cố định bởi biến môi trường, không thể sửa trên giao diện`, param: key, request_id: `mock_${requestIdSeq++}` },
         });
       }
       item.value = value;
@@ -464,8 +464,8 @@ export const mockAdminApi: AdminApi = {
         'wire_api = "responses"',
       ].join('\n'),
       notes: [
-        'wire_api 固定为 "responses"：Codex 自 2026 年 2 月起只支持 responses，chat 已移除。',
-        `请把创建好的 sk- 密钥设置到环境变量 ${apiKeyEnv} 中，再启动 Codex。`,
+        'wire_api cố định là "responses": Codex từ tháng 2/2026 chỉ hỗ trợ responses, chat đã bị loại bỏ.',
+        `Vui lòng thiết lập khóa sk- vừa tạo vào biến môi trường ${apiKeyEnv} trước khi khởi động Codex.`,
       ],
     }),
 
@@ -484,14 +484,14 @@ export const mockAdminApi: AdminApi = {
   listBackups: () => delay([...backups]),
   downloadBackup: (id) => {
     const found = backups.find((b) => b.id === id);
-    if (found === undefined) notFound('备份包不存在');
+    if (found === undefined) notFound('Gói sao lưu không tồn tại');
     return delay(new Blob([`mock-backup:${id}`], { type: 'application/gzip' }));
   },
   restoreBackup: () =>
     delay<RestoreResult>({
       restored: true,
       requires_restart: true,
-      message: '备份已校验并写入数据目录，需重启服务后才会生效',
+      message: 'Bản sao lưu đã được kiểm tra và ghi vào thư mục dữ liệu, cần khởi động lại dịch vụ để có hiệu lực',
       manifest: {
         format_version: 1,
         app_version: '0.8.0-mock',
@@ -549,7 +549,7 @@ function maskProxyUrl(url: string): string {
     const auth = parsed.username.length > 0 ? '***:***@' : '';
     return `${parsed.protocol}//${auth}${parsed.hostname}:${parsed.port || '—'}`;
   } catch {
-    return '（地址格式无法解析，已拒绝保存明文展示）';
+    return '（Định dạng địa chỉ không hợp lệ, từ chối hiển thị dạng văn bản rõ）';
   }
 }
 

@@ -2,7 +2,7 @@ import { buildEvidence, countEventKind, extractText, makeResult, runText } from 
 import { TEXT_INSTRUCTIONS, TEXT_LONG, TEXT_SHORT, ownLiterals } from '../testInputs.js';
 import type { CapabilityResult, ProbeContext } from '../types.js';
 
-/** #2 普通文本对话：单轮问答能否稳定成功。 */
+/** #2 Hội thoại văn bản thông thường: Hỏi đáp đơn vòng có thành công ổn định không. */
 export async function caseBasicTextChat(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, TEXT_SHORT);
@@ -22,7 +22,7 @@ export async function caseBasicTextChat(ctx: ProbeContext): Promise<CapabilityRe
   });
 }
 
-/** #3 流式文本响应：是否分多个增量帧到达，而不是一次性吐出整段文本。 */
+/** #3 Phản hồi văn bản dạng stream: Có chia thành nhiều frame tăng dần hay không, thay vì trả về toàn bộ văn bản một lần. */
 export async function caseStreamingText(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, TEXT_SHORT);
@@ -51,7 +51,7 @@ const REMEMBER_NAME = '探针小助手七号';
 const REMEMBER_PROMPT = `从现在开始，请记住一个名字：「${REMEMBER_NAME}」。仅回复「好的，已记住」。`;
 const RECALL_PROMPT = '我刚才让你记住的名字是什么？请只回复那个名字，不要说别的。';
 
-/** #7 连续会话：同一 conversation 内的第二轮是否还带着第一轮的上下文。 */
+/** #7 Phiên liên tục: Vòng thứ hai trong cùng conversation có còn mang ngữ cảnh của vòng thứ nhất không. */
 export async function caseMultiTurnConversation(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const first = await runText(ctx, REMEMBER_PROMPT);
@@ -95,7 +95,7 @@ export async function caseMultiTurnConversation(ctx: ProbeContext): Promise<Capa
   });
 }
 
-/** #8 上游会话恢复：第一轮连接完全断开（本探针每轮本就是独立连接）后，新连接能否续接同一 conversationRef。 */
+/** #8 Khôi phục phiên upstream: Sau khi kết nối vòng một ngắt hoàn toàn (probe này vốn dùng kết nối độc lập cho mỗi vòng), kết nối mới có thể nối tiếp cùng conversationRef không. */
 export async function caseSessionResumeAfterDisconnect(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const first = await runText(ctx, REMEMBER_PROMPT);
@@ -113,7 +113,7 @@ export async function caseSessionResumeAfterDisconnect(ctx: ProbeContext): Promi
     });
   }
 
-  // 显式等待，模拟「断线一段时间后再续接」，而不是背靠背立刻重连
+  // Chờ đợi rõ ràng, mô phỏng "ngắt kết nối một lúc rồi mới nối tiếp", thay vì kết nối lại ngay lập tức
   await sleep(Math.min(ctx.delayMs * 2, 5000));
 
   const resumed = await runText(ctx, RECALL_PROMPT, { conversationRef: first.conversationRef });
@@ -139,7 +139,7 @@ export async function caseSessionResumeAfterDisconnect(ctx: ProbeContext): Promi
   });
 }
 
-/** #9 长上下文承载能力：约 2 万字符的单轮输入是否被正常接受。 */
+/** #9 Khả năng chịu tải ngữ cảnh dài: Đầu vào đơn vòng khoảng 20.000 ký tự có được chấp nhận bình thường không. */
 export async function caseLongContext(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, TEXT_LONG, { totalTimeoutMs: ctx.invocationTimeoutMs * 2 });
@@ -163,7 +163,7 @@ export async function caseLongContext(ctx: ProbeContext): Promise<CapabilityResu
 
 const INSTRUCTIONS_QUESTION = '请介绍一下你自己能做什么。';
 
-/** #10 Instructions / 系统级指令注入方式：passthrough 字段与文本前缀两种方式是否有效。 */
+/** #10 Instructions / Phương thức chèn chỉ thị cấp hệ thống: Hai cách dùng trường passthrough và tiền tố văn bản có hiệu quả không. */
 export async function caseInstructionsInjection(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
 
@@ -174,13 +174,13 @@ export async function caseInstructionsInjection(ctx: ProbeContext): Promise<Capa
 
   const passthroughText = extractText(viaPassthrough);
   const prefixText = extractText(viaPrefix);
-  // 启发式：指令要求「不超过两句话」，用长度做粗略代理指标，不追求语义精确判定
+  // Heuristic: Chỉ thị yêu cầu "không quá hai câu", dùng độ dài làm chỉ số đại diện ước chừng, không cố gắng phán đoán chính xác ngữ nghĩa
   const passthroughShort = passthroughText.length > 0 && passthroughText.length <= 150;
   const prefixShort = prefixText.length > 0 && prefixText.length <= 150;
 
   let status: CapabilityResult['status'] = 'unknown';
-  if (prefixShort) status = 'adaptable'; // 文本前缀本就是「M365-Codex 状态机可靠转换」的既有做法
-  if (passthroughShort) status = 'native'; // 若上游真的认识 passthrough.instructions 字段，判为原生支持
+  if (prefixShort) status = 'adaptable'; // Tiền tố văn bản vốn là cách làm hiện tại "state machine M365-Codex chuyển đổi đáng tin cậy"
+  if (passthroughShort) status = 'native'; // Nếu upstream thực sự hiểu trường passthrough.instructions, đánh giá là hỗ trợ gốc
 
   return makeResult({
     id: 'instructions_injection',

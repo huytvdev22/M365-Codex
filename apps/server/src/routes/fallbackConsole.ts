@@ -1,9 +1,9 @@
 /**
- * 前端构建产物缺失时的兜底页面。
+ * Trang dự phòng khi thiếu bản build frontend.
  *
- * 正式镜像里 `apps/web/dist` 一定存在，这个页面只会在「只构建了服务端」的场景出现
- * （例如本地只跑 `npm run build --workspace @m365-codex/server`）。它不是第二套控制台，
- * 只负责把话说清楚：管理界面没构建，怎么构建。
+ * Trong image chính thức `apps/web/dist` chắc chắn tồn tại, trang này chỉ xuất hiện trong trường hợp "chỉ build server"
+ * (ví dụ máy cục bộ chỉ chạy `npm run build --workspace @m365-codex/server`). Nó không phải bộ điều khiển thứ hai,
+ * chỉ chịu trách nhiệm giải thích rõ: Giao diện quản trị chưa được build, và hướng dẫn cách build.
  */
 export const FALLBACK_CONSOLE_HTML = `<!doctype html>
 <html lang="zh-CN">

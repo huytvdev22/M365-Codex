@@ -5,14 +5,14 @@ import type { OAuthClient } from '../../apps/server/dist/oauth/client.js';
 import type { TokenManager } from '../../apps/server/dist/oauth/tokenManager.js';
 
 /**
- * 探针的公共类型（对应实施计划 §3.4、§3.3）。
+ * Các kiểu dữ liệu công khai của probe (tương ứng kế hoạch triển khai §3.4, §3.3).
  *
- * 探针工作在「适配器层」而不是完整 Responses 网关层：直接对着上游 WebSocket
- * 跑 §3.1 的 29 项用例，产出脱敏证据。业务层（Responses/工具循环/调度）已在
- * M3-M8 用建模值实现，探针的产出是拿去校准那些建模值，而不是重新实现一遍网关。
+ * Probe hoạt động ở "tầng adapter" chứ không phải tầng gateway Responses đầy đủ: kết nối trực tiếp với WebSocket upstream
+ * để chạy 29 case của §3.1, tạo ra bằng chứng đã khử nhạy cảm. Tầng nghiệp vụ (Responses/vòng lặp công cụ/bộ điều phối) đã được
+ * triển khai ở M3-M8 bằng giá trị mô hình hóa, sản phẩm của probe là dùng để hiệu chuẩn các giá trị mô hình hóa đó, không phải triển khai lại gateway.
  */
 
-/** 能力状态枚举（§3.4）。 */
+/** Enum trạng thái năng lực (§3.4). */
 export const CAPABILITY_STATUSES = [
   'native',
   'adaptable',
@@ -23,50 +23,50 @@ export const CAPABILITY_STATUSES = [
 ] as const;
 export type CapabilityStatus = (typeof CAPABILITY_STATUSES)[number];
 
-/** 单项能力探测的产出（§3.3 要求的字段全部覆盖）。 */
+/** Sản phẩm của việc thăm dò năng lực đơn lẻ (bao phủ toàn bộ các trường theo yêu cầu §3.3). */
 export interface CapabilityResult {
-  /** 稳定 id，如 `basic_text_chat`，报告与代码里一致，便于回溯 */
+  /** id ổn định, như `basic_text_chat`, nhất quán giữa báo cáo và mã nguồn để dễ truy vết */
   id: string;
-  /** §3.1 的序号（1-29） */
+  /** Số thứ tự theo §3.1 (1-29) */
   index: number;
-  /** 中文名称 */
+  /** Tên định danh */
   name: string;
   status: CapabilityStatus;
-  /** 脱敏后的证据摘要（中文，供人读） */
+  /** Tóm tắt bằng chứng sau khi khử nhạy cảm (cho con người đọc) */
   summary: string;
-  /** 请求发起时间（epoch ms） */
+  /** Thời gian bắt đầu gửi yêu cầu (epoch ms) */
   requestedAt: number;
-  /** 耗时（毫秒) */
+  /** Thời gian thực thi (mili-giây) */
   durationMs: number;
-  /** 上游错误分类（无错误为 null），对应 `UpstreamDisposition` 或本探针自定义分类 */
+  /** Phân loại lỗi upstream (null nếu không có lỗi), tương ứng `UpstreamDisposition` hoặc phân loại tùy chỉnh của probe */
   errorCategory: string | null;
-  /** 结构化的脱敏证据；只经 `evidence.ts` 输出，绝不含 Token/真实对话原文 */
+  /** Bằng chứng đã khử nhạy cảm có cấu trúc; chỉ xuất qua `evidence.ts`, tuyệt đối không chứa Token/nội dung hội thoại thật */
   evidence: Record<string, unknown>;
 }
 
-/** 单次 invocation 的原始采集结果，供各 case 与 evidence 采样使用。 */
+/** Kết quả thu thập thô của một invocation đơn lẻ, dùng cho các case và lấy mẫu evidence. */
 export interface InvocationOutcome {
-  /** 归一化事件（供能力判定使用） */
+  /** Sự kiện chuẩn hóa (dùng cho phán đoán năng lực) */
   events: UpstreamEvent[];
-  /** 原始帧（供结构采样/校准差异使用，务必只经脱敏输出） */
+  /** Frame gốc (dùng cho lấy mẫu cấu trúc / sai khác hiệu chuẩn, bắt buộc chỉ xuất qua khử nhạy cảm) */
   rawMessages: RawMessage[];
-  /** WebSocket 关闭码（正常关闭为 1000，未关闭为 null） */
+  /** Mã đóng WebSocket (đóng bình thường là 1000, chưa đóng là null) */
   closeCode: number | null;
   closeReason: string | null;
-  /** 分类失败原因；成功为 null */
+  /** Lý do thất bại phân loại; null nếu thành công */
   errorCategory: string | null;
   errorMessage: string | null;
-  /** 429 场景下解析出的冷却毫秒数（§3.1 第 25 项），无相关信息为 null */
+  /** Số mili-giây làm nguội phân tích được trong kịch bản 429 (§3.1 mục 25), null nếu không có thông tin */
   retryAfterMs: number | null;
   durationMs: number;
-  /** 服务端下发的会话标识（若上游返回），用于「连续会话」「会话恢复」用例 */
+  /** Định danh phiên do server gửi xuống (nếu upstream trả về), dùng cho các case "phiên liên tục", "khôi phục phiên" */
   conversationRef: string | null;
 }
 
-/** 上游连接相关配置（对应 `apps/server/src/config/index.ts` 的 `UpstreamConfig`）。 */
+/** Cấu hình liên quan đến kết nối upstream (tương ứng `UpstreamConfig` trong `apps/server/src/config/index.ts`). */
 export interface ProbeUpstreamConfig {
   readonly wsBase: string;
-  /** 握手必须带的 X-Scenario 头，见服务端 UpstreamConfig.scenario */
+  /** Header X-Scenario bắt buộc phải có khi bắt tay, xem UpstreamConfig.scenario của server */
   readonly scenario: string;
   readonly pathTemplate: string;
   readonly protocolVersion: string;
@@ -75,21 +75,21 @@ export interface ProbeUpstreamConfig {
   readonly idleTimeoutMs: number;
 }
 
-/** 单个 case 运行所需的上下文。每个 case 自行开连接，互不共享可变状态。 */
+/** Ngữ cảnh cần thiết để chạy một case đơn lẻ. Mỗi case tự mở kết nối, không chia sẻ trạng thái khả biến với nhau. */
 export interface ProbeContext {
   account: { id: string; oid: string; tid: string; email: string | null };
-  /** 取一个当前可用的 access token；调用方用完即弃，绝不缓存到 ctx 以外 */
+  /** Lấy một access token khả dụng hiện tại; phía gọi dùng xong hủy bỏ, tuyệt đối không cache ra ngoài ctx */
   getAccessToken: () => Promise<string>;
   upstream: ProbeUpstreamConfig;
   codec: ProtocolCodec;
   logger: Logger;
-  /** 每个 case 之间的间隔（§6 安全与礼貌） */
+  /** Khoảng nghỉ giữa mỗi case (§6 an toàn và lịch sự) */
   delayMs: number;
-  /** 统计类用例的采样次数（§3.5 门槛的四项指标) */
+  /** Số lần lấy mẫu của các case thống kê (bốn chỉ số ngưỡng §3.5) */
   repeat: number;
-  /** 单次 invocation 的整体超时（毫秒） */
+  /** Timeout tổng thể của một invocation đơn lẻ (mili-giây) */
   invocationTimeoutMs: number;
-  /** 账号仓库：仅用于 Token 刷新类用例读取“是否变化”，绝不读出内容后落盘 */
+  /** Kho lưu trữ tài khoản: Chỉ dùng cho các case refresh Token đọc xem "có thay đổi hay không", tuyệt đối không đọc nội dung rồi ghi đĩa */
   accounts: AccountRepository;
   oauthClient: OAuthClient;
   tokenManager: TokenManager;

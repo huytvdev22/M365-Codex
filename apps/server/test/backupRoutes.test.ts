@@ -7,8 +7,8 @@ import { unpackArchive } from '../src/backup/archive.js';
 import { createTestHarness, loginAdmin, type TestHarness } from './helpers/testApp.js';
 
 /**
- * 备份 / 恢复 / 诊断接口（对应实施计划 §15.4、§17，契约 §三）。
- * 备份包要真实落盘，用真实临时目录（DATA_DIR 不能是 :memory:）。
+ * Endpoint Sao lưu / Phục hồi / Chẩn đoán (tương ứng kế hoạch triển khai §15.4, §17, hợp đồng §3).
+ * Gói sao lưu phải thực sự ghi ra đĩa, dùng thư mục tạm thật (DATA_DIR không thể là :memory:).
  */
 
 let harness: TestHarness | undefined;
@@ -54,7 +54,7 @@ describe('POST /admin/backup', () => {
 
   it('includeFiles: false 时不打包已上传文件，manifest.includes_files 为 false', async () => {
     const { h, token } = await setup();
-    // 在数据目录下伪造一份已上传文件内容，验证它没有被打进备份包
+    // Giả mạo nội dung file đã upload trong thư mục dữ liệu, xác minh nó không bị đóng gói vào bản sao lưu
     mkdirSync(join(dataDir as string, 'files', 'file-a'), { recursive: true });
     writeFileSync(join(dataDir as string, 'files', 'file-a', 'content'), '附件内容', 'utf8');
 
@@ -84,8 +84,8 @@ describe('POST /admin/backup', () => {
     expect(createEntry?.detail).toContain('"includes_files":false');
   });
 
-  // 带了 body 就必须合法：把 includeFiles 写成字符串如果被静默忽略，
-  // 调用方会以为拿到的是「只含数据库」的包，实际拿到的是完整包（护栏 §1.7）
+  // Có mang body thì bắt buộc phải hợp lệ: Nếu viết includeFiles thành string mà bị âm thầm bỏ qua,
+  // phía gọi sẽ tưởng rằng nhận được gói "chỉ chứa database", trong khi thực tế nhận gói đầy đủ (hàng rào bảo vệ §1.7)
   it('includeFiles 类型不对时明确报错，而不是静默按缺省处理', async () => {
     const { h, token } = await setup();
     const res = await h.app.inject({
@@ -244,9 +244,9 @@ describe('GET /admin/diagnostics', () => {
     expect(body.schema).toBeDefined();
     expect(body.config).toBeDefined();
     const dump = JSON.stringify(body);
-    expect(dump).not.toContain('@'); // 不含邮箱
+    expect(dump).not.toContain('@'); // Không chứa email
     expect(dump).not.toContain('sk-');
-    expect(dump).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}/); // 不含 JWT 形态
+    expect(dump).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}/); // Không chứa dạng JWT
   });
 
   it('无管理会话返回 401', async () => {

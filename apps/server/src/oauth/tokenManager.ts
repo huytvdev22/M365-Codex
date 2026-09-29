@@ -5,18 +5,18 @@ import { OAuthRequestError, type OAuthClient } from './client.js';
 import { computeExpiry } from './service.js';
 
 /**
- * Access Token 的按需刷新。
+ * Làm mới Access Token theo nhu cầu.
  *
- * 关键约束：
- * - **同账号只允许一个刷新任务**。并发请求共享同一个 Promise，否则多个刷新
- *   会互相覆盖 refresh_token，把账号刷坏；
- * - 写回是事务化的原子替换；
- * - `invalid_grant` 说明 refresh_token 作废，账号转入 `reauth_required`，
- *   不再反复重试；
- * - 全程不打印 Token，日志里只有账号 ID 与错误码。
+ * Ràng buộc then chốt:
+ * - **Mỗi tài khoản chỉ cho phép 1 tác vụ làm mới duy nhất**. Các request đồng thời chia sẻ cùng một Promise, nếu không nhiều tác vụ làm mới
+ *   sẽ ghi đè refresh_token lẫn nhau, làm hỏng tài khoản;
+ * - Ghi lại bằng transaction nguyên tử;
+ * - `invalid_grant` chứng tỏ refresh_token đã bị vô hiệu, tài khoản chuyển sang `reauth_required`,
+ *   không thử lại liên tục nữa;
+ * - Toàn bộ quá trình không in Token ra log, log chỉ có ID tài khoản và mã lỗi.
  */
 
-/** 提前多久刷新：Token 剩余寿命少于该值时主动换新。 */
+/** Làm mới trước bao lâu: khi tuổi thọ còn lại của Token nhỏ hơn giá trị này sẽ chủ động đổi mới. */
 export const REFRESH_SKEW_MS = 5 * 60 * 1000;
 
 export class TokenUnavailableError extends Error {
@@ -36,9 +36,9 @@ export interface TokenManagerDeps {
   client: OAuthClient;
   logger: Logger;
   skewMs?: number;
-  /** 按账号解析出口代理，绑定后 Token 刷新走同一个出口（对应实施计划 §13.1）。 */
+  /** Phân giải proxy đầu ra theo tài khoản, sau khi gắn thì làm mới Token đi qua cùng một cổng ra (tương ứng kế hoạch triển khai §13.1). */
   resolveProxyForAccount?: (accountId: string) => string | null;
-  /** M8：Token 刷新结果打点（§17） */
+  /** M8: Đo đạc số liệu kết quả làm mới Token (§17) */
   metrics?: Metrics;
 }
 
@@ -49,7 +49,7 @@ export class TokenManager {
   readonly #skewMs: number;
   readonly #resolveProxyForAccount: ((accountId: string) => string | null) | undefined;
   readonly #metrics: Metrics | undefined;
-  /** accountId → 进行中的刷新任务，保证同账号单飞 */
+  /** accountId → Tác vụ làm mới đang diễn ra, đảm bảo cùng một tài khoản chỉ chạy đơn lẻ */
   readonly #inFlight = new Map<string, Promise<string>>();
 
   constructor(deps: TokenManagerDeps) {
@@ -61,7 +61,7 @@ export class TokenManager {
     this.#metrics = deps.metrics;
   }
 
-  /** 取一个当前可用的 access token，必要时先刷新。 */
+  /** Lấy một access token khả dụng hiện tại, khi cần thiết sẽ làm mới trước. */
   async getAccessToken(accountId: string, now = Date.now()): Promise<string> {
     const current = this.#accounts.readAccessToken(accountId);
     if (current === null) {
@@ -74,7 +74,7 @@ export class TokenManager {
     return this.refresh(accountId, now);
   }
 
-  /** 强制刷新。同账号并发调用会复用同一个进行中的任务。 */
+  /** Bắt buộc làm mới. Các cuộc gọi đồng thời trên cùng tài khoản sẽ tái sử dụng cùng một tác vụ đang chạy. */
   async refresh(accountId: string, now = Date.now()): Promise<string> {
     const existing = this.#inFlight.get(accountId);
     if (existing !== undefined) return existing;
@@ -86,7 +86,7 @@ export class TokenManager {
     return task;
   }
 
-  /** 当前是否有进行中的刷新任务，供测试与可观测性使用。 */
+  /** Hiện tại có tác vụ làm mới nào đang chạy không, dành cho test và observability. */
   isRefreshing(accountId: string): boolean {
     return this.#inFlight.has(accountId);
   }
@@ -106,7 +106,7 @@ export class TokenManager {
 
     const refreshToken = this.#accounts.readRefreshToken(accountId);
     if (refreshToken === null) {
-      // 没有 refresh_token 就无从自动续期，直接要求重新授权
+      // Không có refresh_token thì không thể tự động gia hạn, trực tiếp yêu cầu cấp quyền lại
       this.#accounts.forceStatus(accountId, 'reauth_required', now);
       this.#metrics?.tokenRefresh.inc({ result: 'no_refresh_token' });
       throw new TokenUnavailableError(

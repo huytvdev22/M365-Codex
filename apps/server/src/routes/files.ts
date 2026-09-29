@@ -8,10 +8,10 @@ import type { FileRow, UploadRow } from '../repo/files.js';
 import type { FileObject, UploadObject } from '../files/types.js';
 
 /**
- * 文件 / 分片上传接口（对应实施计划 §11、§M6）。
+ * API tệp tin / tải lên theo phần (tương ứng kế hoạch triển khai §11, §M6).
  *
- * 字段命名对齐 OpenAI 的 Files / Uploads API；全部走现有 API Key 鉴权，
- * 归属与限额由 `files/service.ts` 统一把关，这里只负责协议转换。
+ * Tên trường được căn chỉnh theo Files / Uploads API của OpenAI; toàn bộ đi qua xác thực API Key hiện có,
+ * quyền sở hữu và hạn mức do `files/service.ts` kiểm soát tập trung, ở đây chỉ chịu trách nhiệm chuyển đổi giao thức.
  */
 
 const toSeconds = (ms: number): number => Math.floor(ms / 1000);
@@ -44,7 +44,7 @@ function toUploadObject(row: UploadRow, file: FileRow | null): UploadObject {
   };
 }
 
-/** 从已启用 `attachFieldsToBody` 的 multipart 请求体里取指定字段。 */
+/** Lấy trường chỉ định từ multipart request body đã bật `attachFieldsToBody`. */
 interface MultipartFileField {
   type: 'file';
   filename: string;

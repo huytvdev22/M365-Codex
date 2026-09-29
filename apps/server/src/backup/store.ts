@@ -4,12 +4,12 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { join } from 'node:path';
 
 /**
- * 备份包在磁盘上的管理（对应实施计划 §15.4、契约 §三）。
+ * Quản lý gói sao lưu trên đĩa (tương ứng với Kế hoạch thực hiện §15.4, Hợp đồng §3).
  *
- * `BackupService`（`backup/service.ts`）只管「怎么生成/校验/恢复一个包」，
- * 不关心「这些包放在哪、叫什么、什么时候该删」——那是这里的事：
- * `<DATA_DIR>/backups/<id>.tar.gz`，`id` 由本类生成，不接受外部输入拼路径，
- * 从根本上避免 `GET /admin/backup/:id/download` 的路径穿越。
+ * `BackupService` (`backup/service.ts`) chỉ quan tâm đến việc "tạo / xác thực / khôi phục một gói như thế nào",
+ * không quan tâm "các gói này đặt ở đâu, tên là gì, khi nào nên xóa" — đó là trách nhiệm ở đây:
+ * `<DATA_DIR>/backups/<id>.tar.gz`, `id` do class này sinh ra, không nhận input bên ngoài ghép vào đường dẫn,
+ * loại trừ tận gốc lỗ hổng Path Traversal của `GET /admin/backup/:id/download`.
  */
 
 export interface BackupFileInfo {
@@ -18,7 +18,7 @@ export interface BackupFileInfo {
   created_at: number;
 }
 
-/** id 只能是本类生成的形状：`bkp_<毫秒时间戳>_<8位十六进制>`。 */
+/** id chỉ có thể có dạng do class này sinh ra: `bkp_<timestamp_ms>_<8_ký_tự_hex>`. */
 const ID_PATTERN = /^bkp_[0-9]+_[a-f0-9]{8}$/;
 
 export function isValidBackupId(id: string): boolean {
@@ -36,7 +36,7 @@ export class BackupStore {
     return this.#dir;
   }
 
-  /** 生成新 id 并落盘，返回该包的元信息。 */
+  /** Sinh id mới và ghi xuống đĩa, trả về metadata của gói sao lưu đó. */
   save(content: Buffer, now = Date.now()): BackupFileInfo {
     mkdirSync(this.#dir, { recursive: true });
     const id = `bkp_${now}_${randomBytes(4).toString('hex')}`;
@@ -44,21 +44,21 @@ export class BackupStore {
     return { id, bytes: content.byteLength, created_at: now };
   }
 
-  /** 按创建时间倒序列出全部备份包。 */
+  /** Liệt kê toàn bộ các gói sao lưu theo thứ tự giảm dần thời gian tạo. */
   list(): BackupFileInfo[] {
     if (!existsSync(this.#dir)) return [];
     const items: BackupFileInfo[] = [];
     for (const entry of readdirSync(this.#dir, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith('.tar.gz')) continue;
       const id = entry.name.slice(0, -'.tar.gz'.length);
-      if (!isValidBackupId(id)) continue; // 目录里混进了别的文件，忽略而不是报错
+      if (!isValidBackupId(id)) continue; // Thư mục bị lẫn file khác, bỏ qua thay vì báo lỗi
       const stat = statSync(join(this.#dir, entry.name));
       items.push({ id, bytes: stat.size, created_at: stat.mtimeMs });
     }
     return items.sort((a, b) => b.created_at - a.created_at);
   }
 
-  /** 读取指定 id 的内容；id 形状不合法或文件不存在都返回 undefined。 */
+  /** Đọc nội dung id chỉ định; id không hợp lệ hoặc file không tồn tại đều trả về undefined. */
   read(id: string): Buffer | undefined {
     if (!isValidBackupId(id)) return undefined;
     const path = this.#path(id);
@@ -74,9 +74,9 @@ export class BackupStore {
     return true;
   }
 
-  /** 只保留最近 retentionCount 份，删掉更旧的；返回删除数量（供清理任务上报）。 */
+  /** Chỉ giữ lại retentionCount bản gần nhất, xóa các bản cũ hơn; trả về số lượng đã xóa (cho tác vụ cleanup). */
   prune(retentionCount: number): number {
-    const items = this.list(); // 已按时间倒序
+    const items = this.list(); // Đã sắp xếp giảm dần theo thời gian
     const toDelete = items.slice(retentionCount);
     for (const item of toDelete) this.delete(item.id);
     return toDelete.length;

@@ -1,14 +1,14 @@
 /**
- * 与服务端约定的类型定义，字段名与语义严格照抄
- * `docs/管理端API契约.md`（本仓库内部文档，不进 GitHub 展示，但是这份 WebUI 唯一的接口依据）。
+ * Định nghĩa các kiểu dữ liệu đã thỏa thuận với máy chủ, tên trường và ngữ nghĩa tuân thủ nghiêm ngặt
+ * quy ước API quản trị (tài liệu nội bộ của kho lưu trữ này, là căn cứ giao diện duy nhất cho WebUI).
  *
- * 不在这里发明契约之外的字段；服务端尚未实现的部分先按契约文档的形状声明，
- * 真正联调时如有出入以 src/api/client.ts 里的注释为准去对齐。
+ * Không tự tạo các trường ngoài tài liệu quy ước; những phần máy chủ chưa triển khai tạm thời khai báo theo mẫu quy ước,
+ * khi tích hợp thực tế nếu có khác biệt sẽ căn cứ theo chú thích trong src/api/client.ts để đồng bộ.
  */
 
-// ---- 通用 ----
+// ---- Chung ----
 
-/** 统一错误体。服务端实现里额外带了 `code`（HTTP 状态码字符串），契约文档未强制要求但会出现，按可选处理。 */
+/** Cấu trúc lỗi thống nhất. Phía server có thể trả về thêm trường `code` (chuỗi mã trạng thái HTTP), xử lý dưới dạng tùy chọn. */
 export interface ApiErrorBody {
   error: {
     type: string;
@@ -19,7 +19,7 @@ export interface ApiErrorBody {
   };
 }
 
-/** 请求失败时抛出的异常，携带完整错误体方便 UI 展示 request_id。 */
+/** Ngoại lệ phát sinh khi yêu cầu thất bại, mang theo toàn bộ body lỗi để giao diện hiển thị request_id. */
 export class ApiRequestError extends Error {
   readonly body: ApiErrorBody;
   readonly status: number;
@@ -41,7 +41,7 @@ export interface SettingItem<T = unknown> {
   requires_restart: boolean;
 }
 
-// ---- 登录 / 会话 ----
+// ---- Đăng nhập / Phiên làm việc ----
 
 export interface LoginResponse {
   token: string;
@@ -55,7 +55,7 @@ export interface SessionResponse {
   public_admin_url: string | null;
 }
 
-// ---- 账号 ----
+// ---- Tài khoản ----
 
 export const ACCOUNT_STATUSES = [
   'probing',
@@ -86,7 +86,7 @@ export interface AccountView {
   cooldown_until: number | null;
   last_ok_at: number | null;
   last_error_type: string | null;
-  /** 出口代理绑定（M7 新增，随代理池一起落地）。未绑定为 null。 */
+  /** Ràng buộc Proxy Egress (M7 thêm mới, triển khai cùng proxy pool). Chưa gán là null. */
   proxy_id: string | null;
 }
 
@@ -105,7 +105,7 @@ export interface OAuthSessionsResponse {
   pending: number;
 }
 
-// ---- API Key ----
+// ---- Khóa API (API Key) ----
 
 export interface ApiKeyView {
   id: string;
@@ -124,7 +124,7 @@ export interface ApiKeyView {
   allowed_models: string[] | null;
 }
 
-/** 创建返回：明文 key 只在这一次出现，之后任何接口都不会再吐出来。 */
+/** Kết quả tạo mới: Khóa bí mật dạng văn bản rõ chỉ xuất hiện lần này duy nhất, sau đó không API nào trả về nữa. */
 export interface ApiKeyCreated extends ApiKeyView {
   key: string;
 }
@@ -144,7 +144,7 @@ export type UpdateApiKeyRequest = Partial<
   Omit<CreateApiKeyRequest, 'name'> & { name: string; enabled: boolean }
 >;
 
-// ---- 审计日志 ----
+// ---- Nhật ký kiểm toán ----
 
 export interface AuditLogEntry {
   id: string;
@@ -156,7 +156,7 @@ export interface AuditLogEntry {
   created_at: number;
 }
 
-// ---- 概览 ----
+// ---- Tổng quan ----
 
 export type SystemStatus = 'normal' | 'degraded' | 'maintenance' | 'upstream_unavailable' | 'migration_failed';
 
@@ -194,7 +194,7 @@ export interface OverviewResponse {
   pending_restart: string[];
 }
 
-// ---- 请求记录 ----
+// ---- Bản ghi yêu cầu ----
 
 export type ResponseStatus = 'queued' | 'in_progress' | 'completed' | 'incomplete' | 'failed' | 'cancelled';
 
@@ -229,7 +229,7 @@ export interface RequestDetail extends RequestListItem {
   tool_calls: RequestToolCall[];
 }
 
-// ---- 设置 ----
+// ---- Cài đặt ----
 
 export interface NetworkSettings {
   public_api_base_url: SettingItem<string>;
@@ -240,7 +240,7 @@ export interface NetworkSettings {
   no_proxy: SettingItem<string>;
 }
 
-/** 全部是清理任务的间隔/保留时长，单位毫秒（对应服务端 cleanup 调度器）。 */
+/** Toàn bộ là khoảng thời gian chạy/thời gian lưu giữ tác vụ dọn dẹp, đơn vị mili-giây (tương ứng với bộ lập lịch cleanup phía máy chủ). */
 export interface SchedulerSettings {
   cleanup_interval_ms: SettingItem<number>;
   response_retention_ms: SettingItem<number>;
@@ -251,7 +251,7 @@ export interface SchedulerSettings {
 }
 
 export interface LoggingSettings {
-  /** 唯一 requires_restart=false 的设置项：保存后立即热生效。 */
+  /** Mục cài đặt duy nhất có requires_restart=false: Có hiệu lực ngay lập tức sau khi lưu. */
   log_level: SettingItem<string>;
   log_privacy_mode: SettingItem<'strict' | 'metadata' | 'debug'>;
 }
@@ -261,7 +261,7 @@ export interface OAuthSettings {
   redirect_uri: SettingItem<string>;
   authorize_url: SettingItem<string>;
   token_url: SettingItem<string>;
-  /** 服务端类型是 string_list：多个 scope 用空格分隔展示/编辑。 */
+  /** Phía máy chủ có kiểu string_list: Nhiều scope được phân tách bằng dấu cách khi hiển thị/chỉnh sửa. */
   scopes: SettingItem<string[]>;
 }
 
@@ -271,7 +271,7 @@ export interface ToolsSettings {
   max_rounds: SettingItem<number>;
   max_total_calls: SettingItem<number>;
   max_result_bytes: SettingItem<number>;
-  /** 协议规则封顶 2，服务端会拒绝更大的值。 */
+  /** Quy tắc giao thức giới hạn tối đa là 2, máy chủ sẽ từ chối giá trị lớn hơn. */
   max_arg_repairs: SettingItem<number>;
   allow_parallel: SettingItem<boolean>;
 }
@@ -293,7 +293,7 @@ export interface SettingsResponse {
 
 export type SettingsGroupName = keyof SettingsResponse;
 
-// ---- 出口代理池 ----
+// ---- Pool Proxy Egress ----
 
 export type ProxyProtocol = 'http' | 'https' | 'socks5';
 export type ProxyStatus = 'unknown' | 'healthy' | 'unhealthy' | 'cooldown';
@@ -301,7 +301,7 @@ export type ProxyStatus = 'unknown' | 'healthy' | 'unhealthy' | 'cooldown';
 export interface ProxyView {
   id: string;
   name: string;
-  /** 打码后的地址，用户名密码永不明文出现，例如 `socks5://***:***@1.2.3.4:1080`。 */
+  /** Địa chỉ đã che thông tin nhạy cảm, tên người dùng và mật khẩu không bao giờ xuất hiện dạng thô, ví dụ `socks5://***:***@1.2.3.4:1080`. */
   url_masked: string;
   protocol: ProxyProtocol;
   enabled: boolean;
@@ -328,9 +328,9 @@ export interface BulkImportProxyRequest {
 }
 
 /**
- * 字段名与服务端 `apps/server/src/routes/adminOps.ts` 的
- * `POST /admin/proxies/bulk` 实际返回严格对齐：`created`/`failed` 计数，
- * `results` 里逐行给出 `ok`/`id`（成功时）/`error`（失败时），没有 `succeeded`/`errors` 这两个字段。
+ * Tên trường đồng bộ nghiêm ngặt với phản hồi thực tế của `POST /admin/proxies/bulk` trong
+ * `apps/server/src/routes/adminOps.ts`: số đếm `created`/`failed`,
+ * danh sách `results` theo từng dòng gồm `ok`/`id` (thành công)/`error` (thất bại), không dùng trường `succeeded`/`errors`.
  */
 export interface BulkImportProxyResult {
   created: number;
@@ -344,7 +344,7 @@ export interface ProxyCheckResult {
   detail: string;
 }
 
-// ---- Codex 配置生成 ----
+// ---- Sinh cấu hình Codex ----
 
 export interface CodexConfigResponse {
   toml: string;
@@ -352,7 +352,7 @@ export interface CodexConfigResponse {
   notes: string[];
 }
 
-// ---- 文件 ----
+// ---- Quản lý Tệp ----
 
 export interface FileListItem {
   id: string;
@@ -372,9 +372,9 @@ export interface FileListResponse {
 }
 
 /**
- * 字段名与服务端 `apps/server/src/routes/adminOps.ts` 的
- * `POST /admin/files/cleanup` 实际返回严格对齐：过期文件与未完成上传分开计数，
- * 没有笼统的单一 `deleted` 字段。
+ * Tên trường đồng bộ nghiêm ngặt với phản hồi thực tế của `POST /admin/files/cleanup` trong
+ * `apps/server/src/routes/adminOps.ts`: tệp hết hạn và tệp tải lên chưa hoàn tất được đếm riêng biệt,
+ * không gộp chung vào một trường `deleted` duy nhất.
  */
 export interface FilesCleanupResult {
   deleted_files: number;
@@ -382,7 +382,7 @@ export interface FilesCleanupResult {
   freed_bytes: number;
 }
 
-// ---- 模型与能力矩阵 ----
+// ---- Mô hình & Ma trận năng lực ----
 
 export type CapabilityStatus = 'native' | 'local' | 'upstream_decided' | 'experimental' | 'unsupported';
 
@@ -391,9 +391,9 @@ export interface CapabilitiesResponse {
   matrix: Array<{ feature: string; status: CapabilityStatus; detail: string }>;
 }
 
-// ---- 备份 / 恢复 / 诊断（对应服务端 apps/server/src/routes/backup.ts） ----
+// ---- Sao lưu / Phục hồi / Chẩn đoán (tương ứng apps/server/src/routes/backup.ts) ----
 
-/** 与服务端 `BackupStore#save`/`#list`（apps/server/src/backup/store.ts）返回形状一致。 */
+/** Cùng cấu trúc dữ liệu với `BackupStore#save`/`#list` (apps/server/src/backup/store.ts). */
 export interface BackupInfo {
   id: string;
   bytes: number;
@@ -404,7 +404,7 @@ export interface BackupListResponse {
   items: BackupInfo[];
 }
 
-/** 与服务端 `BackupManifest`（apps/server/src/backup/service.ts）字段一致。 */
+/** Cùng các trường với `BackupManifest` (apps/server/src/backup/service.ts). */
 export interface BackupManifest {
   format_version: number;
   app_version: string;
@@ -416,8 +416,8 @@ export interface BackupManifest {
 }
 
 /**
- * `POST /admin/restore` 的返回体。`requires_restart` 恒为 true——
- * 服务端只负责校验并落盘，正在运行的进程仍持有旧库连接，必须重启才会生效。
+ * Phản hồi của `POST /admin/restore`. `requires_restart` luôn là true —
+ * máy chủ chỉ chịu trách nhiệm kiểm tra và ghi tệp xuống đĩa, tiến trình đang chạy vẫn giữ kết nối CSDL cũ nên bắt buộc phải khởi động lại.
  */
 export interface RestoreResult {
   restored: boolean;
@@ -426,7 +426,7 @@ export interface RestoreResult {
   manifest: BackupManifest;
 }
 
-/** 与服务端 `DiagnosticsReport`（apps/server/src/observability/diagnostics.ts）字段一致。 */
+/** Cùng các trường với `DiagnosticsReport` (apps/server/src/observability/diagnostics.ts). */
 export interface DiagnosticsReport {
   generated_at: number;
   app_version: string;

@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** 设为 "1" 时使用 src/api/mock.ts 提供的模拟数据，脱离服务端独立开发。 */
+  /** Đặt thành "1" khi muốn dùng dữ liệu giả lập từ src/api/mock.ts để phát triển độc lập không cần server. */
   readonly VITE_USE_MOCK?: string;
-  /** 开发代理目标，覆盖 vite.config.ts 默认的 http://127.0.0.1:8080。 */
+  /** Mục tiêu proxy khi phát triển, ghi đè giá trị mặc định http://127.0.0.1:8080 trong vite.config.ts. */
   readonly VITE_API_TARGET?: string;
 }
 

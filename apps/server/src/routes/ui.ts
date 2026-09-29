@@ -6,16 +6,16 @@ import type { FastifyInstance } from 'fastify';
 import { FALLBACK_CONSOLE_HTML } from './fallbackConsole.js';
 
 /**
- * 管理界面的静态托管（对应实施计划 §14）。
+ * Hosting tĩnh cho giao diện quản trị (tương ứng kế hoạch triển khai §14).
  *
- * 页面挂在 `/ui/` 下，和 `/admin/*` 的 JSON 管理 API 分开——同一前缀下一半是页面
- * 一半是 JSON，后续加接口很容易撞路径。
+ * Các trang được gắn dưới `/ui/`, tách biệt với JSON API quản lý `/admin/*` — nếu chung một tiền tố mà nửa là trang
+ * nửa là JSON thì việc bổ sung endpoint sau này rất dễ bị xung đột đường dẫn.
  *
- * 没有引入 @fastify/static：这里只要「读文件 + 按扩展名给 Content-Type + 目录逃逸
- * 防护 + SPA 回落」这几件事，自己写四十行比多一个依赖划算。
+ * Không đưa thêm @fastify/static vào: Ở đây chỉ cần "đọc tệp + gán Content-Type theo đuôi mở rộng + phòng chống
+ * path traversal + fallback SPA", tự viết 40 dòng kinh tế hơn là thêm một dependency.
  *
- * 构建产物不存在时（例如只构建了服务端），回落到内置的**临时控制台**页面，
- * 保证管理员任何时候都进得去、能加账号、能建 Key。构建产物一旦存在就自动接管。
+ * Khi sản phẩm build không tồn tại (ví dụ chỉ build server), fallback về trang **bảng điều khiển tạm thời** tích hợp sẵn,
+ * đảm bảo quản trị viên lúc nào cũng vào được, thêm được tài khoản, tạo được Key. Một khi sản phẩm build xuất hiện sẽ tự động tiếp quản.
  */
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -35,7 +35,7 @@ const MIME_BY_EXT: Record<string, string> = {
   '.map': 'application/json; charset=utf-8',
 };
 
-/** 定位 apps/web/dist：dist/routes/ui.js 与源码 src/routes/ui.ts 的相对深度一致。 */
+/** Xác định vị trí apps/web/dist: Độ sâu tương đối của dist/routes/ui.js và mã nguồn src/routes/ui.ts là như nhau. */
 function resolveWebDist(): string {
   const here = fileURLToPath(new URL('.', import.meta.url));
   return resolve(here, '..', '..', '..', 'web', 'dist');
@@ -56,18 +56,18 @@ export function registerUiRoutes(app: FastifyInstance, options: { webDist?: stri
     const requested = request.params['*'] ?? '';
 
     if (!existsSync(join(webDist, 'index.html'))) {
-      // 还没有前端构建产物：给内置的临时控制台
+      // Chưa có sản phẩm build frontend: Trả về trang bảng điều khiển tạm tích hợp sẵn
       return reply.type('text/html; charset=utf-8').send(FALLBACK_CONSOLE_HTML);
     }
 
-    // 目录逃逸防护：拼完路径必须仍在 webDist 内
+    // Phòng chống path traversal: Đường dẫn sau khi ghép phải luôn nằm trong webDist
     const candidate = resolve(webDist, normalize(requested));
     const inside = candidate === webDist || candidate.startsWith(webDist + sep);
     const target = inside && requested !== '' && existsSync(candidate) ? candidate : join(webDist, 'index.html');
 
     const body = await readFile(target);
     const mime = MIME_BY_EXT[extname(target).toLowerCase()] ?? 'application/octet-stream';
-    // 带哈希的资源可以长缓存，index.html 不行——否则改版后浏览器一直拿旧壳
+    // Tài nguyên có hash có thể cache lâu, index.html thì không — nếu không sau khi cập nhật trình duyệt sẽ giữ mãi vỏ cũ
     const cache = target.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable';
     return reply.type(mime).header('cache-control', cache).send(body);
   });

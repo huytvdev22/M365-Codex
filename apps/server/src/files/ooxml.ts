@@ -1,13 +1,13 @@
 import { inflateRawSync } from 'node:zlib';
 
 /**
- * OOXML（docx/xlsx/pptx）文本提取，手写实现，不引第三方依赖（对应实施计划 §M6）。
+ * Trích xuất văn bản OOXML (docx/xlsx/pptx), triển khai trực tiếp không dùng thư viện ngoài (tương ứng với Kế hoạch thực hiện §M6).
  *
- * OOXML 文件本质是一个 ZIP 包，内部若干 XML 部件。这里只实现读取所需的最小子集：
- * 定位中央目录（End of Central Directory → Central Directory File Header），
- * 按需读取指定条目的本地文件头并用 `node:zlib.inflateRawSync` 解压（compression
- * method 8 = deflate；0 = 存储，不需要解压）。不支持 ZIP64（OOXML 文档实际大小
- * 远达不到 ZIP64 门槛，遇到会明确抛错而不是错误地解析）。
+ * Tệp OOXML bản chất là một gói ZIP chứa nhiều thành phần XML bên trong. Ở đây chỉ triển khai tập con tối thiểu cần thiết để đọc:
+ * Định vị Central Directory (End of Central Directory → Central Directory File Header),
+ * đọc theo nhu cầu local file header của entry chỉ định và giải nén bằng `node:zlib.inflateRawSync` (compression
+ * method 8 = deflate; 0 = store, không cần giải nén). Không hỗ trợ ZIP64 (kích thước tài liệu OOXML thực tế
+ * nhỏ hơn nhiều so với ngưỡng ZIP64, nếu gặp sẽ ném lỗi rõ ràng thay vì parse sai).
  */
 
 const EOCD_SIGNATURE = 0x06054b50;
@@ -31,7 +31,7 @@ export class ZipFormatError extends Error {
   }
 }
 
-/** 从缓冲区尾部向前搜索 EOCD 记录，返回其起始偏移。 */
+/** Tìm kiếm ngược từ cuối buffer để tìm bản ghi EOCD, trả về offset bắt đầu. */
 function findEndOfCentralDirectory(buffer: Buffer): number {
   const searchStart = Math.max(0, buffer.length - EOCD_MIN_SIZE - MAX_COMMENT_SIZE);
   for (let offset = buffer.length - EOCD_MIN_SIZE; offset >= searchStart; offset -= 1) {
@@ -42,7 +42,7 @@ function findEndOfCentralDirectory(buffer: Buffer): number {
   throw new ZipFormatError('未找到 ZIP 中央目录结束记录（EOCD），文件可能已损坏或不是合法的 ZIP/OOXML');
 }
 
-/** 解析 ZIP 中央目录，列出全部条目（不读取内容）。 */
+/** Phân tích Central Directory của ZIP, liệt kê toàn bộ các entry (không đọc nội dung). */
 export function listZipEntries(buffer: Buffer): ZipEntry[] {
   const eocdOffset = findEndOfCentralDirectory(buffer);
   const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
@@ -73,7 +73,7 @@ export function listZipEntries(buffer: Buffer): ZipEntry[] {
   return entries;
 }
 
-/** 读取指定条目的解压后内容；文件不存在则返回 null。 */
+/** Đọc nội dung sau khi giải nén của entry chỉ định; trả về null nếu tệp không tồn tại. */
 export function readZipEntry(buffer: Buffer, entries: readonly ZipEntry[], name: string): Buffer | null {
   const entry = entries.find((e) => e.name === name);
   if (entry === undefined) return null;
@@ -91,7 +91,7 @@ export function readZipEntry(buffer: Buffer, entries: readonly ZipEntry[], name:
   throw new ZipFormatError(`条目 ${name} 使用了不支持的压缩方式 (${entry.method})`);
 }
 
-/** XML 数值/命名实体反转义，覆盖 OOXML 文本部件里会出现的常见形式。 */
+/** Unescape các thực thể XML dạng số / đặt tên, bao phủ các dạng phổ biến xuất hiện trong phần văn bản OOXML. */
 export function unescapeXmlEntities(text: string): string {
   return text
     .replaceAll(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
@@ -109,8 +109,8 @@ function readEntryText(buffer: Buffer, entries: readonly ZipEntry[], name: strin
 }
 
 /**
- * docx：word/document.xml 里 `<w:p>` 是段落，`<w:t>` 是文本片段，`<w:tab/>`
- * 是制表符，`<w:br/>` 是换行。段落内片段直接拼接，段落之间用换行分隔。
+ * docx: trong word/document.xml `<w:p>` là đoạn văn, `<w:t>` là mẩu văn bản, `<w:tab/>`
+ * là tab, `<w:br/>` là xuống dòng. Các mẩu trong đoạn ghép trực tiếp, giữa các đoạn cách nhau bằng xuống dòng.
  */
 export function extractDocxText(buffer: Buffer): string {
   const entries = listZipEntries(buffer);
@@ -138,7 +138,7 @@ export function extractDocxText(buffer: Buffer): string {
   return lines.join('\n').trim();
 }
 
-/** 解析 xl/sharedStrings.xml：每个 `<si>` 是一条共享字符串，内部可能有多个 `<t>` 片段。 */
+/** Phân tích xl/sharedStrings.xml: mỗi `<si>` là một chuỗi dùng chung, bên trong có thể chứa nhiều mẩu `<t>`. */
 function parseSharedStrings(xml: string | null): string[] {
   if (xml === null) return [];
   const items = xml.split(/<si>/).slice(1);
@@ -148,7 +148,7 @@ function parseSharedStrings(xml: string | null): string[] {
   });
 }
 
-/** 解析单个 worksheet XML，按行/列拼出制表符分隔的文本。 */
+/** Phân tích một worksheet XML, ghép thành văn bản phân tách bằng tab theo hàng/cột. */
 function parseSheetText(xml: string, sharedStrings: readonly string[]): string {
   const rows = [...xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)];
   const lines: string[] = [];
@@ -178,7 +178,7 @@ function parseSheetText(xml: string, sharedStrings: readonly string[]): string {
   return lines.join('\n');
 }
 
-/** xlsx：按工作表文件名的数字顺序遍历 xl/worksheets/sheetN.xml，逐表拼接。 */
+/** xlsx: Duyệt xl/worksheets/sheetN.xml theo thứ tự số của tên worksheet, ghép từng sheet. */
 export function extractXlsxText(buffer: Buffer): string {
   const entries = listZipEntries(buffer);
   const sharedStrings = parseSharedStrings(readEntryText(buffer, entries, 'xl/sharedStrings.xml'));
@@ -203,7 +203,7 @@ function sheetNumber(name: string): number {
   return match?.[1] !== undefined ? Number(match[1]) : 0;
 }
 
-/** pptx：按幻灯片文件名的数字顺序遍历 ppt/slides/slideN.xml，取 `<a:t>` 文本。 */
+/** pptx: Duyệt ppt/slides/slideN.xml theo thứ tự số của slide, trích xuất văn bản `<a:t>`. */
 export function extractPptxText(buffer: Buffer): string {
   const entries = listZipEntries(buffer);
   const slideEntries = entries

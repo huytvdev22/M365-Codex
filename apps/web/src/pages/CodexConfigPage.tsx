@@ -23,10 +23,10 @@ export function CodexConfigPage() {
   };
 
   return (
-    <Layout title="Codex 配置" subtitle="生成可直接粘贴到 ~/.codex/config.toml 的片段">
+    <Layout title="Cấu hình Codex" subtitle="Tạo đoạn mã cấu hình để dán vào ~/.codex/config.toml">
       <div className="card">
         <div className="field">
-          <label htmlFor="codex-env-key">存放 API Key 的环境变量名</label>
+          <label htmlFor="codex-env-key">Tên biến môi trường lưu trữ API Key</label>
           <input
             id="codex-env-key"
             type="text"
@@ -34,8 +34,8 @@ export function CodexConfigPage() {
             onChange={(e) => setApiKeyEnv(e.target.value)}
           />
           <span className="field-hint">
-            生成的配置只引用这个环境变量名，不会把 API Key 明文写进 TOML 里；
-            请把创建好的 <code>sk-</code> 密钥设置到这个环境变量。
+            Cấu hình tạo ra chỉ tham chiếu đến tên biến môi trường này, không ghi trực tiếp API Key thô vào TOML;
+            vui lòng gán khóa bí mật <code>sk-</code> đã tạo vào biến môi trường này.
           </span>
         </div>
         {error !== null && (
@@ -44,27 +44,27 @@ export function CodexConfigPage() {
           </div>
         )}
         <button type="button" className="btn btn-primary" onClick={generate} disabled={loading}>
-          {loading ? '生成中…' : '生成配置'}
+          {loading ? 'Đang tạo…' : 'Tạo cấu hình'}
         </button>
       </div>
 
       {config !== null && (
         <div className="card">
           <div className="flex-between" style={{ marginBottom: 10 }}>
-            <h2 style={{ margin: 0 }}>config.toml 片段</h2>
-            <CopyButton value={config.toml} label="复制片段" />
+            <h2 style={{ margin: 0 }}>Đoạn mã cấu hình config.toml</h2>
+            <CopyButton value={config.toml} label="Sao chép cấu hình" />
           </div>
           <pre className="mono" style={{ background: 'var(--bg-inset)', padding: 14, borderRadius: 'var(--radius-md)', overflowX: 'auto' }}>
             {config.toml}
           </pre>
 
           <div className="error-banner" style={{ marginTop: 4 }}>
-            <div className="error-title">关于 wire_api</div>
+            <div className="error-title">Về thuộc tính wire_api</div>
             <div>
-              Codex 自 2026 年 2 月起 <code>wire_api</code> 只支持 <code>&quot;responses&quot;</code>
-              （<code>&quot;chat&quot;</code> 已移除，省略时也默认 responses）。这里固定生成
-              <code>wire_api = &quot;responses&quot;</code>，同时意味着 <code>/v1/chat/completions</code>{' '}
-              端点不再供 Codex 自身使用，它保留给其他仍走 Chat Completions 的 OpenAI 兼容客户端。
+              Kể từ tháng 2/2026, Codex chỉ hỗ trợ <code>wire_api = &quot;responses&quot;</code>
+              (chế độ <code>&quot;chat&quot;</code> đã bị loại bỏ, khi lược bỏ cũng mặc định là responses). Đoạn mã này cố định sinh ra
+              <code>wire_api = &quot;responses&quot;</code>; đồng thời endpoint <code>/v1/chat/completions</code>{' '}
+              sẽ dành cho các client OpenAI tương thích khác thay vì bản thân Codex.
             </div>
           </div>
 
@@ -79,7 +79,7 @@ export function CodexConfigPage() {
           )}
 
           <div className="text-muted" style={{ marginTop: 10 }}>
-            对外 API Base URL：<span className="mono">{config.base_url}</span>
+            Base URL API đối ngoại: <span className="mono">{config.base_url}</span>
           </div>
         </div>
       )}

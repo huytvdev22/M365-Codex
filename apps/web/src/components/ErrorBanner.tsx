@@ -1,14 +1,14 @@
 import { ApiRequestError } from '../api';
 
 /**
- * 统一错误体的展示组件：把 request_id 显眼地露出来，方便用户报障时提供给排查方。
- * 兼容非 ApiRequestError 的普通异常（例如网络层完全没连上）。
+ * Component hiển thị cấu trúc lỗi thống nhất: hiển thị rõ ràng request_id giúp người dùng dễ dàng cung cấp khi báo sự cố.
+ * Tương thích với các ngoại lệ thông thường ngoài ApiRequestError (ví dụ mất kết nối mạng hoàn toàn).
  */
 export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   if (error === null || error === undefined) return null;
 
   const isApiError = error instanceof ApiRequestError;
-  const title = isApiError ? apiErrorTypeLabel(error.body.error.type) : '发生错误';
+  const title = isApiError ? apiErrorTypeLabel(error.body.error.type) : 'Đã xảy ra lỗi';
   const message = describeUnknownError(error);
   const requestId = isApiError ? error.body.error.request_id : null;
   const param = isApiError ? error.body.error.param : null;
@@ -19,14 +19,14 @@ export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () =
       <div>{message}</div>
       {(requestId !== null || param !== null) && (
         <div className="error-meta">
-          {param !== null && <span>相关字段：{param}{'　'}</span>}
+          {param !== null && <span>Trường liên quan: {param}{'　'}</span>}
           {requestId !== null && <span className="mono">request_id: {requestId}</span>}
         </div>
       )}
       {onRetry !== undefined && (
         <div style={{ marginTop: 10 }}>
           <button type="button" className="btn btn-sm" onClick={onRetry}>
-            重试
+            Thử lại
           </button>
         </div>
       )}
@@ -35,8 +35,8 @@ export function ErrorBanner({ error, onRetry }: { error: unknown; onRetry?: () =
 }
 
 /**
- * 把任意 catch 到的值转成给人看的一行文本。`error` 类型是 `unknown`，不能无脑 String()——
- * 那样一个普通对象会渲染成没有信息量的 `[object Object]`，按真实类型分别处理。
+ * Chuyển đổi giá trị bất kỳ được catch thành một dòng văn bản dễ đọc.
+ * Xử lý riêng biệt theo kiểu dữ liệu thực tế, tránh trường hợp object bị hiển thị thành `[object Object]`.
  */
 function describeUnknownError(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -45,25 +45,25 @@ function describeUnknownError(error: unknown): string {
   try {
     return JSON.stringify(error);
   } catch {
-    return '未知错误';
+    return 'Lỗi không xác định';
   }
 }
 
 function apiErrorTypeLabel(type: string): string {
   const map: Record<string, string> = {
-    invalid_request_error: '请求不合法',
-    authentication_error: '认证失败',
-    permission_error: '无权限',
-    not_found_error: '资源不存在',
-    rate_limit_error: '触发限流',
-    idempotency_error: '幂等键冲突',
-    unsupported_parameter: '参数暂不支持',
-    unsupported_feature: '功能不在支持范围',
-    account_pool_exhausted: '账号池已耗尽',
-    upstream_error: '上游错误',
-    upstream_timeout: '上游超时',
-    service_not_ready: '服务尚未就绪',
-    internal_error: '内部错误',
+    invalid_request_error: 'Yêu cầu không hợp lệ',
+    authentication_error: 'Xác thực thất bại',
+    permission_error: 'Không có quyền truy cập',
+    not_found_error: 'Không tìm thấy tài nguyên',
+    rate_limit_error: 'Bị giới hạn tần suất (Rate limit)',
+    idempotency_error: 'Xung đột khóa Idempotency',
+    unsupported_parameter: 'Tham số chưa được hỗ trợ',
+    unsupported_feature: 'Tính năng chưa hỗ trợ',
+    account_pool_exhausted: 'Nhóm tài khoản đã cạn kiệt',
+    upstream_error: 'Lỗi dịch vụ thượng nguồn (Upstream)',
+    upstream_timeout: 'Hết thời gian chờ dịch vụ thượng nguồn',
+    service_not_ready: 'Dịch vụ chưa sẵn sàng',
+    internal_error: 'Lỗi nội bộ hệ thống',
   };
   return map[type] ?? type;
 }

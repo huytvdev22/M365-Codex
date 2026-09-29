@@ -1,4 +1,4 @@
-/** 各种状态 → 中文标签 + 颜色，集中一处维护，避免每个页面各写一套映射。 */
+/** Ánh xạ các trạng thái → Nhãn tiếng Việt + Màu sắc, quản lý tập trung một nơi. */
 
 type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -7,14 +7,14 @@ function Badge({ tone, label }: { tone: Tone; label: string }) {
 }
 
 const ACCOUNT_STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
-  probing: { label: '探测中', tone: 'info' },
-  online: { label: '在线', tone: 'ok' },
-  busy: { label: '忙碌', tone: 'info' },
-  cooldown: { label: '冷却中', tone: 'warn' },
-  reauth_required: { label: '需重新授权', tone: 'danger' },
-  disabled: { label: '已停用', tone: 'neutral' },
-  unsupported: { label: '能力不满足', tone: 'neutral' },
-  error: { label: '错误', tone: 'danger' },
+  probing: { label: 'Đang kiểm tra', tone: 'info' },
+  online: { label: 'Trực tuyến', tone: 'ok' },
+  busy: { label: 'Đang bận', tone: 'info' },
+  cooldown: { label: 'Đang làm nguội', tone: 'warn' },
+  reauth_required: { label: 'Cần ủy quyền lại', tone: 'danger' },
+  disabled: { label: 'Đã tắt', tone: 'neutral' },
+  unsupported: { label: 'Không đủ năng lực', tone: 'neutral' },
+  error: { label: 'Lỗi', tone: 'danger' },
 };
 
 export function AccountStatusBadge({ status }: { status: string }) {
@@ -23,11 +23,11 @@ export function AccountStatusBadge({ status }: { status: string }) {
 }
 
 const SYSTEM_STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
-  normal: { label: '正常', tone: 'ok' },
-  degraded: { label: '降级', tone: 'warn' },
-  maintenance: { label: '维护中', tone: 'info' },
-  upstream_unavailable: { label: '上游不可用', tone: 'danger' },
-  migration_failed: { label: '迁移失败', tone: 'danger' },
+  normal: { label: 'Bình thường', tone: 'ok' },
+  degraded: { label: 'Giảm cấp', tone: 'warn' },
+  maintenance: { label: 'Đang bảo trì', tone: 'info' },
+  upstream_unavailable: { label: 'Upstream không khả dụng', tone: 'danger' },
+  migration_failed: { label: 'Migration thất bại', tone: 'danger' },
 };
 
 export function SystemStatusBadge({ status }: { status: string }) {
@@ -36,12 +36,12 @@ export function SystemStatusBadge({ status }: { status: string }) {
 }
 
 const RESPONSE_STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
-  queued: { label: '排队中', tone: 'neutral' },
-  in_progress: { label: '进行中', tone: 'info' },
-  completed: { label: '已完成', tone: 'ok' },
-  incomplete: { label: '未完成', tone: 'warn' },
-  failed: { label: '失败', tone: 'danger' },
-  cancelled: { label: '已取消', tone: 'neutral' },
+  queued: { label: 'Đang xếp hàng', tone: 'neutral' },
+  in_progress: { label: 'Đang xử lý', tone: 'info' },
+  completed: { label: 'Đã hoàn tất', tone: 'ok' },
+  incomplete: { label: 'Chưa hoàn tất', tone: 'warn' },
+  failed: { label: 'Thất bại', tone: 'danger' },
+  cancelled: { label: 'Đã hủy', tone: 'neutral' },
 };
 
 export function ResponseStatusBadge({ status }: { status: string }) {
@@ -50,10 +50,10 @@ export function ResponseStatusBadge({ status }: { status: string }) {
 }
 
 const PROXY_STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
-  unknown: { label: '未检测', tone: 'neutral' },
-  healthy: { label: '健康', tone: 'ok' },
-  unhealthy: { label: '异常', tone: 'danger' },
-  cooldown: { label: '冷却中', tone: 'warn' },
+  unknown: { label: 'Chưa kiểm tra', tone: 'neutral' },
+  healthy: { label: 'Khỏe mạnh', tone: 'ok' },
+  unhealthy: { label: 'Bất thường', tone: 'danger' },
+  cooldown: { label: 'Đang làm nguội', tone: 'warn' },
 };
 
 export function ProxyStatusBadge({ status }: { status: string }) {
@@ -62,11 +62,11 @@ export function ProxyStatusBadge({ status }: { status: string }) {
 }
 
 const CAPABILITY_STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
-  native: { label: '原生支持', tone: 'ok' },
-  local: { label: '本地实现', tone: 'ok' },
-  upstream_decided: { label: '取决于上游', tone: 'warn' },
-  experimental: { label: '实验性', tone: 'info' },
-  unsupported: { label: '不支持', tone: 'neutral' },
+  native: { label: 'Hỗ trợ gốc', tone: 'ok' },
+  local: { label: 'Hiện thực cục bộ', tone: 'ok' },
+  upstream_decided: { label: 'Tùy thuộc upstream', tone: 'warn' },
+  experimental: { label: 'Thử nghiệm', tone: 'info' },
+  unsupported: { label: 'Không hỗ trợ', tone: 'neutral' },
 };
 
 export function CapabilityStatusBadge({ status }: { status: string }) {

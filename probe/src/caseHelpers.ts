@@ -10,7 +10,7 @@ import { runRawSession } from './rawSession.js';
 import { buildStructureSample } from './evidence.js';
 import type { CapabilityResult, CapabilityStatus, InvocationOutcome, ProbeContext } from './types.js';
 
-/** 单次文本 invocation 的可选参数。 */
+/** Các tham số tùy chọn cho invocation dạng text đơn lẻ. */
 export interface RunTextOptions {
   conversationRef?: string | undefined;
   passthrough?: Record<string, unknown> | undefined;
@@ -18,13 +18,13 @@ export interface RunTextOptions {
   toolResults?: readonly ToolResultInput[] | undefined;
   signal?: AbortSignal | undefined;
   onEvent?: ((event: UpstreamEvent, raw: RawMessage) => void) | undefined;
-  /** 覆盖默认的整体超时（毫秒），用于长上下文一类需要更久的用例 */
+  /** Ghi đè timeout tổng thể mặc định (mili-giây), dùng cho các case cần nhiều thời gian hơn như ngữ cảnh dài */
   totalTimeoutMs?: number | undefined;
-  /** 取消时是否发送 stop 帧，见 `rawSession.ts` 的同名选项 */
+  /** Có gửi stop frame khi hủy hay không, xem tùy chọn cùng tên trong `rawSession.ts` */
   sendCancelOnAbort?: boolean | undefined;
 }
 
-/** 发起一次 invocation 并等待完成/失败/超时，返回聚合结果。每次调用独立开连接。 */
+/** Khởi tạo một invocation và chờ hoàn thành/thất bại/timeout, trả về kết quả tổng hợp. Mỗi lần gọi mở kết nối độc lập. */
 export async function runText(
   ctx: ProbeContext,
   text: string,
@@ -43,7 +43,7 @@ export async function runText(
     toolResults: options.toolResults,
     handshakeTimeoutMs: ctx.upstream.handshakeTimeoutMs,
     scenario: ctx.upstream.scenario,
-    // 真实客户端会带 participant.id，探针也带上，否则探出来的形态不作数
+    // Client thật sẽ gửi kèm participant.id, probe cũng gửi kèm, nếu không hình thái thăm dò được sẽ không chuẩn xác
     oid: ctx.account.oid,
     idleTimeoutMs: ctx.upstream.idleTimeoutMs,
     totalTimeoutMs: options.totalTimeoutMs ?? ctx.invocationTimeoutMs,
@@ -53,7 +53,7 @@ export async function runText(
   });
 }
 
-/** 拼出某次 invocation 里全部 `text_delta` 的正文。 */
+/** Ghép nối nội dung của toàn bộ `text_delta` trong một invocation. */
 export function extractText(outcome: InvocationOutcome): string {
   return outcome.events
     .filter((event): event is Extract<UpstreamEvent, { kind: 'text_delta' }> => event.kind === 'text_delta')
@@ -69,7 +69,7 @@ export function countEventKind(outcome: InvocationOutcome, kind: UpstreamEvent['
   return outcome.events.filter((event) => event.kind === kind).length;
 }
 
-/** 把一次 invocation 的原始帧转成脱敏结构样本，最多保留前几条帧（够看结构即可）。 */
+/** Chuyển frame gốc của một invocation thành mẫu cấu trúc đã khử nhạy cảm, giữ tối đa vài frame đầu (đủ để xem cấu trúc). */
 export function sampleRawFrames(
   outcome: InvocationOutcome,
   literals: ReadonlySet<string>,
@@ -78,7 +78,7 @@ export function sampleRawFrames(
   return outcome.rawMessages.slice(0, maxFrames).map((message) => buildStructureSample(message, literals));
 }
 
-/** 组装标准化的证据对象：所有 case 共用同一套基础字段，便于报告横向比较。 */
+/** Lắp ráp đối tượng bằng chứng chuẩn hóa: mọi case dùng chung một bộ trường cơ sở, thuận tiện cho việc so sánh ngang trong báo cáo. */
 export function buildEvidence(
   outcome: InvocationOutcome,
   literals: ReadonlySet<string>,
@@ -99,7 +99,7 @@ export function buildEvidence(
   };
 }
 
-/** 组装 `CapabilityResult`，统一各 case 的收尾逻辑。 */
+/** Lắp ráp `CapabilityResult`, thống nhất logic kết thúc của các case. */
 export function makeResult(input: {
   id: string;
   index: number;
@@ -124,7 +124,7 @@ export function makeResult(input: {
   };
 }
 
-/** case 内部抛出异常时的兜底结果：不能让一个 case 的异常中断整轮探测（§6）。 */
+/** Kết quả dự phòng khi nội bộ case ném ra ngoại lệ: không thể để ngoại lệ của một case làm gián đoạn toàn bộ lượt thăm dò (§6). */
 export function makeErrorResult(
   id: string,
   index: number,
@@ -146,7 +146,7 @@ export function makeErrorResult(
   });
 }
 
-/** 统一包一层 try/catch，任何 case 内部异常都转成 `unknown` 状态而不是让整轮探测中断。 */
+/** Bọc thống nhất một tầng try/catch, mọi ngoại lệ nội bộ case đều chuyển thành trạng thái `unknown` thay vì làm gián đoạn toàn bộ lượt thăm dò. */
 export async function runCaseSafely(
   id: string,
   index: number,

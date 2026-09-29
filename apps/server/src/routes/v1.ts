@@ -8,13 +8,13 @@ import { parseResponsesRequest } from '../responses/schema.js';
 import { serializeSse, type SseEvent } from '../responses/types.js';
 
 /**
- * 对外 `/v1/*` 兼容接口（对应实施计划 §4.1）。
- * 全部走 API Key 鉴权。Responses 支持非流式与 SSE 流式。
+ * Giao diện tương thích bên ngoài `/v1/*` (tương ứng kế hoạch triển khai §4.1).
+ * Toàn bộ đi qua xác thực API Key. Responses hỗ trợ cả non-stream và SSE stream.
  */
 
 export function registerV1Routes(app: FastifyInstance, context: AppContext): void {
   const apiKeyGuard = createApiKeyGuard(context);
-  // 读不到目录文件时会退到内置的单条目录——这属于部署问题，必须留痕
+  // Khi không đọc được tệp danh mục thì fallback về danh mục đơn lẻ tích hợp sẵn — đây là vấn đề triển khai, bắt buộc phải lưu vết
   const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, '模型目录降级'));
 
   app.get('/v1/models', { preHandler: apiKeyGuard }, async () => models);
@@ -38,7 +38,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
     }
 
     try {
-      // 客户端断开 → 取消上游
+      // Client ngắt kết nối → Hủy upstream
       const controller = new AbortController();
       const execution = context.responses.create({
         request: body,
@@ -49,16 +49,16 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
       });
       context.inFlight.register(execution.responseId, controller);
 
-      // 声明了但执行不了的工具（如 OpenAI 托管的 web_search）不静默丢弃：
-      // 在这里回一个响应头，调用方能立刻看见自己有哪些工具不会生效
+      // Công cụ đã khai báo nhưng không thể thực thi (như web_search do OpenAI quản lý) không bị âm thầm loại bỏ:
+      // Trả về header phản hồi tại đây để caller thấy ngay những công cụ nào của họ sẽ không có hiệu lực
       if (execution.skippedTools.length > 0) {
         void reply.header('x-m365-codex-skipped-tools', execution.skippedTools.join(','));
       }
 
-      // handlerDone 标记「本次请求已经跑到了收尾（finally）」——SSE hijack 后
-      // Fastify 的 onResponse 不再触发，只能靠这个标记区分「流还没结束时客户端
-      // 就断开了」（真正的中断，计入 sseInterrupted）与「流已经正常收尾后连接
-      // 才关闭」（不算中断）
+      // handlerDone đánh dấu "request này đã chạy tới phần kết thúc (finally)" — sau khi SSE hijack,
+      // onResponse của Fastify không còn được kích hoạt nữa, chỉ có thể dựa vào cờ này để phân biệt "client ngắt kết nối
+      // khi stream chưa kết thúc" (thực sự bị gián đoạn, tính vào sseInterrupted) và "kết nối chỉ đóng sau khi stream
+      // đã kết thúc bình thường" (không tính là gián đoạn)
       let handlerDone = false;
       const onClose = (): void => {
         if (!handlerDone && body.stream === true) {
@@ -72,7 +72,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
         if (body.stream) {
           const startedAt = process.hrtime.bigint();
           const streamed = await streamResponse(reply, execution.stream);
-          // hijack 后 onResponse 不会触发，这里手动记一次请求量与耗时（§17）
+          // Sau khi hijack thì onResponse không kích hoạt, tại đây ghi nhận thủ công số lượng request và thời gian xử lý (§17)
           context.metrics.requests.inc({ endpoint: 'POST /v1/responses', status: '200' });
           context.metrics.requestDuration.observe(elapsedSeconds(startedAt), {
             endpoint: 'POST /v1/responses',
@@ -80,7 +80,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
           idem.handle?.complete(0, null, null);
           return streamed;
         }
-        // 非流式：把事件流跑干（驱动上游），再返回最终对象
+        // Không stream: Chạy cạn luồng sự kiện (thúc đẩy upstream), sau đó trả về đối tượng cuối cùng
         for await (const _event of execution.stream) {
           void _event;
         }
@@ -96,7 +96,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
         context.inFlight.unregister(execution.responseId);
       }
     } catch (error) {
-      // 首次失败要把幂等键释放掉，否则同键重试会一直撞见 in_progress
+      // Lần đầu thất bại cần giải phóng idempotency key, nếu không việc thử lại với cùng key sẽ liên tục gặp in_progress
       idem.handle?.release();
       throw error;
     }
@@ -111,7 +111,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
       assertOwnership(row.api_key_id, request.apiKeyRow?.id ?? null);
       const body = context.responseRepo.readBody(request.params.id);
       if (body === null) {
-        // 尚未完成或无快照：返回精简状态
+        // Chưa hoàn thành hoặc không có snapshot: Trả về trạng thái tinh gọn
         return { id: row.id, object: 'response', status: row.status };
       }
       return body;
@@ -146,7 +146,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
   );
 }
 
-/** 以 SSE 流式回传。第一条事件前设置 SSE 头并 hijack。 */
+/** Truyền phát trực tuyến bằng SSE. Thiết lập header SSE và hijack trước sự kiện đầu tiên. */
 async function streamResponse(reply: FastifyReply, stream: AsyncGenerator<SseEvent>): Promise<void> {
   reply.raw.setHeader('content-type', 'text/event-stream; charset=utf-8');
   reply.raw.setHeader('cache-control', 'no-cache, no-transform');
@@ -158,14 +158,14 @@ async function streamResponse(reply: FastifyReply, stream: AsyncGenerator<SseEve
 
   try {
     for await (const event of stream) {
-      // 连接已经断开就不用再写了——继续 write() 只是把字节丢进一个没人收的缓冲区，
-      // 白白拖慢事件流跑干的速度
+      // Kết nối đã ngắt thì không cần ghi tiếp nữa — tiếp tục write() chỉ ném byte vào một bộ đệm không có người nhận,
+      // làm chậm vô ích tốc độ chạy cạn của luồng sự kiện
       if (reply.raw.destroyed) continue;
       const ok = reply.raw.write(serializeSse(event));
       if (!ok) await waitForDrainOrClose(reply);
     }
   } catch (error) {
-    // 事件流内部理应已把错误转为 response.failed；走到这里是意外
+    // Bên trong luồng sự kiện về lý thuyết đã chuyển lỗi thành response.failed; chạy tới đây là ngoài ý muốn
     reply.request.log.error({ err: error }, 'SSE 流意外中断');
   } finally {
     if (!reply.raw.writableEnded && !reply.raw.destroyed) reply.raw.end();
@@ -173,9 +173,9 @@ async function streamResponse(reply: FastifyReply, stream: AsyncGenerator<SseEve
 }
 
 /**
- * 等到可写缓冲区排空（'drain'）再继续写入；但如果连接在等待期间已经关闭/销毁
- * （客户端断开），'drain' 就永远不会来——必须同时监听 'close'，否则流式循环
- * 会在一个没人接收的连接上永久挂起，`inFlight` 永远不会释放。
+ * Đợi cho đến khi bộ đệm có thể ghi xả hết ('drain') rồi mới tiếp tục ghi; nhưng nếu kết nối đã bị đóng/hủy trong lúc đợi
+ * (client ngắt kết nối), 'drain' sẽ không bao giờ tới — bắt buộc phải đồng thời lắng nghe 'close', nếu không vòng lặp stream
+ * sẽ bị treo vĩnh viễn trên một kết nối không có người nhận, `inFlight` sẽ không bao giờ được giải phóng.
  */
 function waitForDrainOrClose(reply: FastifyReply): Promise<void> {
   if (reply.raw.destroyed) return Promise.resolve();
@@ -193,7 +193,7 @@ function waitForDrainOrClose(reply: FastifyReply): Promise<void> {
   });
 }
 
-/** `process.hrtime.bigint()` 起点转换成耗时秒数，供直方图打点用。 */
+/** Chuyển đổi điểm bắt đầu `process.hrtime.bigint()` thành số giây đã trôi qua, phục vụ ghi nhận histogram. */
 function elapsedSeconds(startedAt: bigint): number {
   return Number(process.hrtime.bigint() - startedAt) / 1e9;
 }
@@ -205,7 +205,7 @@ function headerValue(request: FastifyRequest, name: string): string | null {
 }
 
 function assertOwnership(rowApiKeyId: string | null, requesterApiKeyId: string | null): void {
-  // 一个 API Key 只能看自己的 response
+  // Mỗi API Key chỉ được xem response của chính mình
   if (rowApiKeyId !== null && requesterApiKeyId !== null && rowApiKeyId !== requesterApiKeyId) {
     throw ApiError.notFound('response 不存在');
   }

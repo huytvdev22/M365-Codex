@@ -2,7 +2,7 @@ import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 import { MaintenanceScheduler } from '../src/maintenance/scheduler.js';
 
-/** 定时维护调度：单任务失败不拖累其它任务，状态可查。 */
+/** Điều phối bảo trì định kỳ: Một tác vụ thất bại không ảnh hưởng tác vụ khác, trạng thái có thể tra cứu. */
 
 function makeScheduler(): MaintenanceScheduler {
   return new MaintenanceScheduler(pino({ level: 'silent' }));

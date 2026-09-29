@@ -6,11 +6,7 @@ import { LoggingSettingsPage } from '../pages/LoggingSettingsPage';
 import type { SettingsResponse } from '../api';
 
 /**
- * 服务端 `log_privacy_mode` 只是个普通字符串设置项：没有过期时间字段、没有定时任务把它切回
- * strict、也没有对应审计动作（全仓库 debugUntil/debug_expires 零匹配）。之前页面文案却向管理员
- * 承诺「会自动过期恢复 strict」「到期自动恢复 strict 并写入审计日志」，这是服务端不存在的机制，
- * 管理员会因此误以为切到 debug 是安全的、会自己收敛，实际上会无限期停留在 debug。
- * 这里断言页面不再出现这类虚假的自动恢复承诺，并且确实提示了需要手动改回。
+ * Kiểm tra văn bản mô tả chế độ riêng tư log không hứa hẹn tính năng tự động hết hạn không có thực.
  */
 
 const settingsFixture: SettingsResponse = {
@@ -68,8 +64,8 @@ vi.mock('../api', async () => {
   };
 });
 
-describe('日志隐私模式文案如实描述（不承诺服务端不存在的自动过期）', () => {
-  it('不再出现"自动过期"/"到期自动恢复"这类虚假承诺，且明确提示需手动改回', async () => {
+describe('Mô tả chế độ riêng tư log trung thực', () => {
+  it('Không còn cam kết sai về tự động hết hạn, thông báo rõ cần chuyển lại thủ công', async () => {
     render(
       <MemoryRouter initialEntries={['/settings/logging']}>
         <AuthProvider>
@@ -78,13 +74,11 @@ describe('日志隐私模式文案如实描述（不承诺服务端不存在的�
       </MemoryRouter>,
     );
 
-    await screen.findByLabelText(/隐私模式/);
+    await screen.findByLabelText(/Chế độ riêng tư/);
 
-    // 之前的虚假承诺：「会自动过期恢复 strict」「到期自动恢复 strict 并写入审计日志」——
-    // 服务端根本没有这个机制，这两句具体措辞不能再出现（允许如实说明「没有自动过期机制」）。
-    expect(document.body.textContent?.includes('会自动过期恢复')).toBe(false);
-    expect(document.body.textContent?.includes('到期自动恢复')).toBe(false);
-    expect(screen.getByText(/没有自动过期机制/)).toBeTruthy();
-    expect(screen.getByText(/必须手动改回来/)).toBeTruthy();
+    expect(document.body.textContent?.includes('tự động hết hạn')).toBe(false);
+    expect(document.body.textContent?.includes('tự động phục hồi')).toBe(false);
+    expect(screen.getByText(/không tự động chuyển về/)).toBeTruthy();
+    expect(screen.getByText(/bắt buộc phải chuyển lại thủ công/)).toBeTruthy();
   });
 });

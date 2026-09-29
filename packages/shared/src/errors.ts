@@ -1,38 +1,38 @@
 /**
- * 统一错误体（对应实施计划 §4.4）。
+ * Cấu trúc lỗi thống nhất.
  *
- * 约定：
- * - `type` 表达语义分类，客户端据此做分支处理；
- * - `code` 为 HTTP 状态码的字符串形式，便于与 OpenAI 兼容客户端对齐；
- * - `request_id` 贯穿日志与响应头 `x-request-id`，用于问题定位。
+ * Quy ước:
+ * - `type` thể hiện phân loại ngữ nghĩa, client dựa vào đó để rẽ nhánh xử lý;
+ * - `code` là chuỗi mã trạng thái HTTP, tương thích với client OpenAI;
+ * - `request_id` xuyên suốt log và header `x-request-id`, phục vụ điều tra lỗi.
  */
 
 export const API_ERROR_TYPES = [
-  /** 请求本身不合法（字段缺失、类型错误、JSON 解析失败等） */
+  /** Yêu cầu không hợp lệ (thiếu trường, sai kiểu, lỗi parse JSON, v.v.) */
   'invalid_request_error',
-  /** 缺少或无效的 API Key / 管理会话 */
+  /** Thiếu hoặc không hợp lệ API Key / phiên quản trị */
   'authentication_error',
-  /** 已认证但无权访问该端点、模型或资源 */
+  /** Đã xác thực nhưng không có quyền truy cập endpoint, model hoặc tài nguyên này */
   'permission_error',
-  /** 资源不存在 */
+  /** Tài nguyên không tồn tại */
   'not_found_error',
-  /** 触发本网关侧的限流（RPM / 日配额 / 并发） */
+  /** Kích hoạt giới hạn tần suất phía gateway (RPM / hạn ngạch ngày / đồng thời) */
   'rate_limit_error',
-  /** 幂等键冲突：同一 Key 复用幂等键但请求体不一致 */
+  /** Xung đột khóa Idempotency: Cùng Key dùng lại Idempotency-Key nhưng body khác nhau */
   'idempotency_error',
-  /** 参数被识别但当前上游无法支持，且影响语义，不做静默降级 */
+  /** Tham số được nhận diện nhưng upstream hiện tại không hỗ trợ, không tự ý hạ cấp */
   'unsupported_parameter',
-  /** 功能明确不在本项目能力范围内（见实施计划 §7） */
+  /** Tính năng không nằm trong phạm vi năng lực của dự án */
   'unsupported_feature',
-  /** 账号池中没有可用的 Microsoft 账号 */
+  /** Không có tài khoản Microsoft khả dụng trong pool */
   'account_pool_exhausted',
-  /** 上游（Sydney / BizChat）返回错误或协议异常 */
+  /** Upstream (Sydney / BizChat) trả về lỗi hoặc bất thường giao thức */
   'upstream_error',
-  /** 上游超时或连接中断 */
+  /** Upstream quá thời gian chờ (timeout) hoặc kết nối bị ngắt */
   'upstream_timeout',
-  /** 服务尚未就绪（主密钥无效、迁移未完成等） */
+  /** Dịch vụ chưa sẵn sàng (master key không hợp lệ, migration chưa xong, v.v.) */
   'service_not_ready',
-  /** 未归类的内部错误 */
+  /** Lỗi nội bộ chưa phân loại */
   'internal_error',
 ] as const;
 
@@ -53,12 +53,12 @@ export interface ApiErrorInit {
   status: number;
   message: string;
   param?: string | null;
-  /** 附加信息，只写日志，不返回给客户端 */
+  /** Thông tin bổ sung, chỉ ghi log, không trả về cho client */
   details?: Record<string, unknown>;
   cause?: unknown;
 }
 
-/** 业务异常基类：抛出后由全局错误处理器转换为统一错误体。 */
+/** Lớp cơ sở ngoại lệ nghiệp vụ: được Global Error Handler chuyển thành cấu trúc lỗi thống nhất. */
 export class ApiError extends Error {
   readonly type: ApiErrorType;
   readonly status: number;
@@ -115,7 +115,7 @@ export class ApiError extends Error {
   }
 }
 
-/** 构造统一错误体，供不便抛异常的场景（如 SSE 中途失败）直接序列化。 */
+/** Xây dựng cấu trúc lỗi thống nhất, dùng cho các ngữ cảnh không tiện throw ngoại lệ (như thất bại giữa chừng trong SSE). */
 export function buildErrorBody(
   type: ApiErrorType,
   status: number,

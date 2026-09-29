@@ -8,10 +8,10 @@ import type { FileStorage } from './storage.js';
 import { sha256Hex } from './storage.js';
 
 /**
- * 文件服务：把「校验 → 分类 → 提取 → 落盘 → 入库」串起来（对应实施计划 §11、§M6）。
+ * Dịch vụ tệp: Kết nối chuỗi "Kiểm tra → Phân loại → Trích xuất → Ghi đĩa → Lưu CSDL" (tương ứng Kế hoạch §11, §M6).
  *
- * 归属与限额在这一层统一把关，路由与 Uploads 完成流程都复用同一入口，
- * 避免规则在两处各写一份、慢慢漂移。
+ * Quyền sở hữu và hạn ngạch được kiểm soát tập trung tại tầng này, các route và quy trình hoàn thành Uploads
+ * đều tái sử dụng cùng một cổng vào, tránh việc viết 2 bộ quy tắc ở 2 nơi rồi dần dần trôi dạt khác nhau.
  */
 
 export interface FilesServiceDeps {
@@ -27,9 +27,9 @@ export interface IngestFileParams {
   declaredMimeType: string | null;
   content: Buffer;
   /**
-   * 按 API Key 收紧后的单文件大小上限（§10.1），由调用方用
-   * `gateway/auth.ts` 算好的 `min(Key 自身设置, 全局天花板)` 传入；
-   * 不传则只按全局配置 `files.maxFileBytes` 校验，行为与此前一致。
+   * Giới hạn kích thước tệp đơn lẻ siết chặt theo API Key (§10.1), do bên gọi truyền vào bằng
+   * `min(cài đặt của Key, trần toàn cục)` tính từ `gateway/auth.ts`;
+   * nếu không truyền thì chỉ kiểm tra theo cấu hình toàn cục `files.maxFileBytes`, hành vi đồng nhất với trước.
    */
   maxFileBytesOverride?: number;
 }
@@ -42,10 +42,9 @@ export class FilesService {
   }
 
   /**
-   * 单文件大小检查，供路由在读取 multipart 内容后立即调用，尽早拒绝超大请求。
-   * `ceilingOverride` 是按 API Key 收紧后的上限（§10.1，由
-   * `gateway/auth.ts` 用 `clampToCeiling` 算好、不可能比全局配置更松），
-   * 不传时只按全局配置 `files.maxFileBytes` 校验，行为与此前一致。
+   * Kiểm tra kích thước tệp đơn lẻ, dùng cho route gọi ngay sau khi đọc nội dung multipart để từ chối sớm yêu cầu quá lớn.
+   * `ceilingOverride` là giới hạn siết chặt theo API Key (§10.1, tính bằng `clampToCeiling` từ `gateway/auth.ts`,
+   * không thể lỏng hơn cấu hình toàn cục), nếu không truyền chỉ kiểm tra theo `files.maxFileBytes`.
    */
   assertFileSize(bytes: number, ceilingOverride?: number): void {
     const limit =
@@ -61,7 +60,7 @@ export class FilesService {
     }
   }
 
-  /** 累计存储配额检查：当前占用 + 本次新增是否超过单 Key 上限。 */
+  /** Kiểm tra hạn ngạch lưu trữ tích lũy: dung lượng đang chiếm + phần thêm mới lần này có vượt trần của Key không. */
   assertQuota(apiKeyId: string, additionalBytes: number): void {
     const used = this.#deps.files.sumActiveBytes(apiKeyId);
     const limit = this.#deps.config.maxTotalBytesPerKey;
@@ -74,7 +73,7 @@ export class FilesService {
     }
   }
 
-  /** 校验、分类、提取、落盘、入库的完整流程。 */
+  /** Quy trình hoàn chỉnh: Kiểm tra, phân loại, trích xuất, ghi đĩa, lưu CSDL. */
   async ingest(params: IngestFileParams): Promise<FileRow> {
     this.assertFileSize(params.content.length, params.maxFileBytesOverride);
     this.assertQuota(params.apiKeyId, params.content.length);
@@ -111,7 +110,7 @@ export class FilesService {
     return this.#deps.files.listByApiKey(apiKeyId, purpose);
   }
 
-  /** 找出属于该 Key 的文件；不存在或不属于该 Key 一律 404，不泄露存在性。 */
+  /** Tìm tệp thuộc về Key này; không tồn tại hoặc không thuộc Key đều trả về 404, không làm lộ sự tồn tại. */
   getOwned(fileId: string, apiKeyId: string): FileRow {
     const row = this.#deps.files.findOwnedActive(fileId, apiKeyId);
     if (row === undefined) throw ApiError.notFound('文件不存在');
@@ -130,9 +129,9 @@ export class FilesService {
   }
 
   /**
-   * 供 Responses 的 `input_file` 使用：按 file-id 取已提取文本，且必须属于
-   * 发起本次请求的 API Key——不允许跨 Key 引用别人的文件内容。
-   * 返回 null 表示不存在、不属于该 Key，或未产出可用文本，由调用方决定报错文案。
+   * Dành cho `input_file` của Responses: Lấy văn bản đã trích xuất theo file-id, bắt buộc phải thuộc
+   * API Key khởi tạo request lần này — không cho phép tham chiếu tệp của người khác giữa các Key.
+   * Trả về null biểu thị không tồn tại, không thuộc Key, hoặc không tạo ra văn bản khả dụng.
    */
   resolveOwnedText(fileId: string, apiKeyId: string): { filename: string; text: string } | null {
     const row = this.#deps.files.findOwnedActive(fileId, apiKeyId);
@@ -141,8 +140,8 @@ export class FilesService {
   }
 
   /**
-   * 供 Responses 的 `input_image`（`UPSTREAM_IMAGE_INPUT=true` 时）使用：
-   * 按 file-id 取原始内容并转成 data URL。只认已归类为图片的文件。
+   * Dành cho `input_image` của Responses (khi `UPSTREAM_IMAGE_INPUT=true`):
+   * Lấy nội dung gốc theo file-id và chuyển thành data URL. Chỉ chấp nhận tệp đã phân loại là image.
    */
   resolveOwnedImageDataUrl(fileId: string, apiKeyId: string): { dataUrl: string; filename: string } | null {
     const row = this.#deps.files.findOwnedActive(fileId, apiKeyId);

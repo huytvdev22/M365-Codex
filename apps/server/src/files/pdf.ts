@@ -1,14 +1,14 @@
 /**
- * PDF 文本提取，使用 `pdfjs-dist` 的 legacy Node 构建（对应实施计划 §M6）。
+ * Trích xuất văn bản PDF, sử dụng legacy Node build của `pdfjs-dist` (tương ứng với Kế hoạch thực hiện §M6).
  *
- * 安装该依赖后 `npm audit --audit-level=high` 仍为 0 高危漏洞，符合护栏要求，
- * 因此这里做真实提取，而不是返回 `unsupported_feature`。逐页取
- * `getTextContent()` 的文本项拼接，不做版面还原（不合并断行、不识别表格），
- * 只保证"文本内容不丢"。
+ * Cài đặt dependency này vẫn đảm bảo `npm audit --audit-level=high` là 0 lỗ hổng nghiêm trọng, đáp ứng rào chắn an toàn,
+ * do đó thực hiện trích xuất thực tế thay vì trả về `unsupported_feature`. Lấy các mục văn bản từ `getTextContent()`
+ * theo từng trang và ghép lại, không tái tạo bố cục (không gộp ngắt dòng, không nhận diện bảng biểu),
+ * chỉ bảo đảm "không mất nội dung văn bản".
  */
 
-// pdfjs-dist 没有声明 exports map，按其 package.json 的实际产物路径直接导入子路径。
-// legacy 构建在没有 DOM/Worker 的 Node 环境下可直接同步解析，不需要额外配置 workerSrc。
+// pdfjs-dist không khai báo exports map, import trực tiếp đường dẫn con theo cấu trúc phân phối của package.json.
+// Bản build legacy trong môi trường Node không có DOM/Worker có thể giải mã trực tiếp, không cần cấu hình thêm workerSrc.
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export class PdfExtractionError extends Error {

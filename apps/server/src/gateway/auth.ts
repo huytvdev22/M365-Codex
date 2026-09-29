@@ -7,13 +7,12 @@ import type { AdminSessionRow } from '../repo/adminSessions.js';
 import { maskIp } from '../observability/logger.js';
 import { clampToCeiling } from './rateLimit.js';
 
-/** 鉴权：对外 API Key 与管理端会话两条独立通道。 */
+/** Xác thực: Hai kênh độc lập gồm API Key đối ngoại và phiên quản trị. */
 
 /**
- * API Key 级、已按全局天花板裁剪过的有效限额（§10.1）：`max_tool_calls`/
- * `max_file_bytes` 挂在这里供后续路由直接读取，不必再查一次库或重算一次
- * `clampToCeiling`——与 rpm/daily/concurrency（`gateway/rateLimit.ts`）走的
- * 是同一条「只能更严、不能突破全局上限」的规则。
+ * Hạn ngạch hiệu dụng cấp API Key đã được cắt tỉa theo trần toàn cục (§10.1): `max_tool_calls`/
+ * `max_file_bytes` được gán tại đây để các route tiếp theo đọc trực tiếp, không cần truy vấn DB lại hay tính lại
+ * `clampToCeiling` — áp dụng cùng quy tắc "chỉ có thể siết chặt hơn, không vượt quá giới hạn toàn cục" với rpm/daily/concurrency (`gateway/rateLimit.ts`).
  */
 export interface ApiKeyEffectiveLimits {
   maxToolCalls: number;
@@ -28,7 +27,7 @@ declare module 'fastify' {
   }
 }
 
-/** 同时支持 `Authorization: Bearer sk-…` 与 `X-API-Key: sk-…`。 */
+/** Đồng thời hỗ trợ `Authorization: Bearer sk-…` và `X-API-Key: sk-…`. */
 export function extractApiKey(request: FastifyRequest): string | null {
   const header = request.headers['x-api-key'];
   if (typeof header === 'string' && header.trim() !== '') {
@@ -49,13 +48,13 @@ export function extractBearerToken(request: FastifyRequest): string | null {
   return match?.[1]?.trim() ?? null;
 }
 
-/** 从请求里取出本次调用的端点标识（`METHOD /route/pattern`），用于限额白名单与幂等作用域。 */
+/** Lấy tag endpoint (`METHOD /route/pattern`) từ request, dùng cho whitelist hạn ngạch và phạm vi idempotency. */
 export function endpointTagFor(request: FastifyRequest): string {
   const pattern = request.routeOptions.url ?? request.url;
   return `${request.method} ${pattern}`;
 }
 
-/** 从已解析的请求体里取出 `model` 字段（仅 Responses / Chat Completions 请求有意义）。 */
+/** Lấy trường `model` từ request body đã parse (chỉ có ý nghĩa với request Responses / Chat Completions). */
 function modelFromBody(request: FastifyRequest): string | null {
   const body = request.body;
   if (body !== null && typeof body === 'object' && 'model' in body) {
@@ -66,8 +65,8 @@ function modelFromBody(request: FastifyRequest): string | null {
 }
 
 /**
- * 校验对外 API Key，并施加 §10 的限额（接口/模型白名单、RPM/日配额/最大并发）。
- * 前缀命中后仍逐个做恒定时间哈希比较，避免通过响应时间区分 Key 是否存在。
+ * Xác thực API Key đối ngoại và áp dụng hạn ngạch của §10 (whitelist endpoint/model, RPM, hạn mức ngày, concurrency tối đa).
+ * Sau khi khớp prefix vẫn so sánh hash thời gian hằng số (constant-time) từng ứng viên, tránh phân biệt sự tồn tại của Key qua thời gian phản hồi.
  */
 export function createApiKeyGuard(context: AppContext) {
   return async function apiKeyGuard(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -121,15 +120,14 @@ export function createApiKeyGuard(context: AppContext) {
         `已达到该 API Key 的${rateLimitReasonLabel(consumed.reason)}限额，请在 ${consumed.retryAfterSeconds} 秒后重试`,
       );
     }
-    // 并发额度用 HTTP 连接的 close 事件释放：流式（SSE）响应会 hijack，Fastify 的
-    // onResponse 钩子对 hijack 后的连接不生效，raw 的 close 事件则无论是否 hijack 都可靠触发
-    // （路由里客户端断线取消上游用的是同一个事件，已验证可靠）。
+    // Hạn mức đồng thời được giải phóng qua sự kiện close của kết nối HTTP: response stream (SSE) sẽ hijack,
+    // hook onResponse của Fastify không chạy đối với kết nối bị hijack, sự kiện close của raw socket kích hoạt tin cậy dù có hijack hay không
+    // (trong router việc client ngắt kết nối hủy upstream cũng dùng sự kiện này, đã kiểm chứng độ tin cậy).
     reply.raw.once('close', consumed.release);
 
     request.apiKeyRow = matched;
-    // §10.1：工具调用次数、单文件/上传分片大小这两项按 Key 收紧的限额，同样
-    // 遵守「不得突破全局天花板」——在这里统一裁剪好，供 responses/service.ts
-    // 与 files 路由直接读取，不必各自再查一次库
+    // §10.1: Số lần gọi công cụ, kích thước file/mảnh upload siết chặt theo Key cũng tuân theo "không vượt quá trần toàn cục" —
+    // tại đây cắt tỉa thống nhất để responses/service.ts và route files đọc trực tiếp, không cần mỗi bên truy vấn lại CSDL
     request.apiKeyLimits = {
       maxToolCalls: clampToCeiling(matched.max_tool_calls, context.config.tools.maxTotalCalls),
       maxFileBytes: clampToCeiling(matched.max_file_bytes, context.config.files.maxFileBytes),
@@ -149,7 +147,7 @@ function rateLimitReasonLabel(reason: 'rpm' | 'daily' | 'concurrency'): string {
   }
 }
 
-/** 限额/白名单命中要留痕，但绝不能把请求内容（model 之外的任何字段）写进审计或指标。 */
+/** Giới hạn/whitelist khớp phải lưu vết, nhưng tuyệt đối không ghi nội dung request (bất kỳ trường nào ngoài model) vào audit log hoặc metrics. */
 function recordRestrictionHit(
   context: AppContext,
   apiKeyId: string,
@@ -168,7 +166,7 @@ function recordRestrictionHit(
   });
 }
 
-/** 校验管理端会话令牌。 */
+/** Xác thực token phiên quản trị. */
 export function createAdminGuard(context: AppContext) {
   return async function adminGuard(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     const token = extractBearerToken(request);
@@ -183,7 +181,7 @@ export function createAdminGuard(context: AppContext) {
   };
 }
 
-/** 取客户端 IP：未开启 TRUST_PROXY 时忽略 X-Forwarded-*。 */
+/** Lấy IP của client: bỏ qua X-Forwarded-* khi chưa bật TRUST_PROXY. */
 export function clientIpFor(context: AppContext, request: FastifyRequest): string | null {
   if (context.config.trustProxy) {
     return request.ip;
@@ -191,7 +189,7 @@ export function clientIpFor(context: AppContext, request: FastifyRequest): strin
   return request.socket.remoteAddress ?? null;
 }
 
-/** 登录失败节流：按 IP 计数，防止在线暴力破解管理密码。 */
+/** Điều tiết thất bại đăng nhập (login throttle): Đếm theo IP để chống brute force mật khẩu quản trị trực tuyến. */
 export class LoginThrottle {
   readonly #attempts = new Map<string, { count: number; resetAt: number }>();
   readonly #maxAttempts: number;

@@ -8,16 +8,16 @@ import { InvalidStateTransitionError } from '../repo/accounts.js';
 import { maskEmail } from '../util/redact.js';
 
 /**
- * 账号与授权管理接口。所有响应都不含 Token。
+ * API quản lý tài khoản và ủy quyền. Mọi phản hồi đều không chứa Token.
  *
- * 添加账号只有一种方式：本网关自己的 PKCE 授权流程
- * （authorize-url → 浏览器登录 → callback）。
+ * Chỉ có một cách duy nhất để thêm tài khoản: quy trình ủy quyền PKCE riêng của gateway
+ * (authorize-url → đăng nhập trình duyệt → callback).
  */
 
-// 契约文档（§一）写的入参是 `{redirect_url}` 或 `{code, state}`；早期实现用的是
-// `{callback}`。三种都收——`callback`/`redirect_url` 同义（都是完整回调地址或裸查询串），
-// `{code, state}` 则是 WebUI 自己从回调地址里拆出来又传回来的形态，这里拼回等价的查询串，
-// 复用同一套 `parseCallback` 解析逻辑，不建第二套解析代码。
+// Tài liệu hợp đồng (§1) ghi nhận tham số đầu vào là `{redirect_url}` hoặc `{code, state}`; triển khai ban đầu dùng
+// `{callback}`. Chấp nhận cả 3 dạng — `callback`/`redirect_url` đồng nghĩa (đều là URL callback đầy đủ hoặc query string thô),
+// `{code, state}` là dạng mà WebUI tự bóc tách từ URL callback rồi gửi lại, tại đây ghép lại thành chuỗi truy vấn tương đương,
+// tái sử dụng cùng một logic phân tích của `parseCallback`, không tạo thêm mã phân tích thứ hai.
 const callbackSchema = z
   .object({
     callback: z.string().min(1).optional(),
@@ -42,8 +42,8 @@ const statusSchema = z.object({
   status: z.enum(ACCOUNT_STATUSES),
 });
 
-// 契约文档只用到了 status，但 PATCH /admin/accounts/:id 是通用入口，
-// 预留了以后可能追加的可改字段（display_name 等）不至于推翻这条路由。
+// Tài liệu hợp đồng chỉ dùng đến status, nhưng PATCH /admin/accounts/:id là endpoint chung,
+// dự trù các trường có thể bổ sung trong tương lai (display_name, v.v.) mà không làm thay đổi định tuyến này.
 const patchAccountSchema = z
   .object({
     status: z.enum(ACCOUNT_STATUSES).optional(),
@@ -63,7 +63,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   return result.data;
 }
 
-/** 解析结果不是 `z.ZodType<T>`（有 `.transform`）时用这个，逻辑与 `parseOrThrow` 一致。 */
+/** Sử dụng hàm này khi kết quả phân tích không phải là `z.ZodType<T>` (có `.transform`), logic nhất quán với `parseOrThrow`. */
 function parseTransformedOrThrow<Output>(
   schema: { safeParse: (payload: unknown) => z.SafeParseReturnType<unknown, Output> },
   payload: unknown,
@@ -79,7 +79,7 @@ function parseTransformedOrThrow<Output>(
 export function registerAccountRoutes(app: FastifyInstance, context: AppContext): void {
   const adminGuard = createAdminGuard(context);
 
-  // ---- 授权流程 ----
+  // ---- Quy trình ủy quyền ----
 
   app.post('/admin/oauth/authorize-url', { preHandler: adminGuard }, async (_request, reply) => {
     const started = context.oauth.start();
@@ -104,7 +104,7 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     return { pending: context.oauthSessions.countPending() };
   });
 
-  // ---- 账号管理 ----
+  // ---- Quản lý tài khoản ----
 
   app.get('/admin/accounts', { preHandler: adminGuard }, async () => {
     return { data: context.accounts.listViews() };
@@ -152,17 +152,17 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     },
   );
 
-  // 契约文档 §一「已存在」列出的是 PATCH /admin/accounts/:id（不带 /status 后缀）；
-  // 保留上面那条 /status 路由不动（避免破坏既有测试与调用方），这里补一条按契约
-  // 命名的通用入口，当前只支持改 status，字段名与语义完全对齐 /status 那条。
+  // Tài liệu hợp đồng §1 mục "Đã tồn tại" liệt kê PATCH /admin/accounts/:id (không có hậu tố /status);
+  // giữ nguyên route /status phía trên (tránh ảnh hưởng đến các bài test và caller hiện có), tại đây bổ sung một endpoint chung
+  // được đặt tên theo hợp đồng, hiện chỉ hỗ trợ sửa status, tên trường và ngữ nghĩa hoàn toàn đồng bộ với route /status.
   app.patch<{ Params: { id: string } }>(
     '/admin/accounts/:id',
     { preHandler: adminGuard },
     async (request) => {
       const body = parseOrThrow(patchAccountSchema, request.body);
       if (body.status === undefined) {
-        // 目前唯一支持的字段是 status；理论上不会走到这里（schema 已要求至少一项），
-        // 但显式报错比静默返回原样更诚实
+        // Hiện tại trường duy nhất được hỗ trợ là status; về mặt lý thuyết sẽ không rơi vào đây (schema đã yêu cầu tối thiểu một mục),
+        // nhưng báo lỗi rõ ràng sẽ trung thực hơn việc im lặng trả về như cũ
         throw ApiError.badRequest('当前只支持更新 status 字段', 'status');
       }
       return changeStatus(request.params.id, body.status);
@@ -220,7 +220,7 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
         action: 'account.token.refresh',
         target: request.params.id,
       });
-      // 返回视图而不是 Token——Token 永远不出网关
+      // Trả về view thay vì Token — Token tuyệt đối không rời khỏi gateway
       return context.accounts.getView(request.params.id);
     },
   );

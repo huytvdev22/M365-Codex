@@ -11,7 +11,7 @@ import { evaluateReadiness } from './health.js';
 import { APP_VERSION } from '../version.js';
 
 /**
- * 备份 / 恢复 / 诊断（对应实施计划 §15.4、§17，契约 §三）。
+ * Sao lưu / Phục hồi / Chẩn đoán (tương ứng kế hoạch triển khai §15.4, §17, hợp đồng §3).
  */
 
 interface MultipartFileField {
@@ -36,12 +36,12 @@ function requireUploadedFile(request: FastifyRequest): MultipartFileField {
 
 const createBackupSchema = z
   .object({
-    // 缺省保持原有行为（含文件），不能因为补这个入参悄悄改变默认语义
+    // Mặc định giữ hành vi ban đầu (bao gồm tệp), không vì bổ sung tham số này mà âm thầm thay đổi ngữ nghĩa mặc định
     includeFiles: z.boolean({ invalid_type_error: 'includeFiles 必须是布尔值' }).optional(),
   })
   .strict();
 
-/** 与 adminOps.ts 同款：解析失败就抛统一错误体，不静默回落。 */
+/** Giống adminOps.ts: Nếu phân tích thất bại thì ném lỗi đồng bộ, không âm thầm fallback. */
 function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
@@ -55,13 +55,13 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
   const adminGuard = createAdminGuard(context);
 
   // -----------------------------------------------------------------------
-  // 备份
+  // Sao lưu
   // -----------------------------------------------------------------------
   app.post('/admin/backup', { preHandler: adminGuard }, async (request, reply) => {
-    // 请求体是可选的：多数客户端不带 body，这时按缺省（含文件）走。
-    // 但**带了 body 就必须合法**——把 includeFiles 写成字符串之类的错误如果被静默
-    // 忽略，调用方会以为自己拿到的是「只含数据库」的包，实际拿到的是完整包。
-    // 影响语义的参数不能静默伪装生效（护栏 §1.7）。
+    // Body của request là tùy chọn: Phần lớn client không gửi kèm body, khi đó chạy theo mặc định (bao gồm tệp).
+    // Nhưng **nếu đã gửi kèm body thì phải hợp lệ** — nếu lỗi như viết includeFiles thành string bị âm thầm
+    // bỏ qua, bên gọi sẽ tưởng rằng mình nhận được gói "chỉ chứa DB", trong khi thực tế nhận được gói đầy đủ.
+    // Tham số ảnh hưởng đến ngữ nghĩa không được âm thầm giả vờ có hiệu lực (rào chắn §1.7).
     const rawBody = request.body;
     const bodyOmitted =
       rawBody === undefined ||
@@ -98,8 +98,8 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
   );
 
   // -----------------------------------------------------------------------
-  // 恢复：写盘校验通过即完成，但**必须重启进程才生效**——正在运行的连接
-  // 还握着旧数据库，这里绝不假装恢复已经对当前进程生效
+  // Phục hồi: Ghi đĩa và kiểm tra hợp lệ là xong, nhưng **phải khởi động lại tiến trình mới có hiệu lực** — các kết nối đang chạy
+  // vẫn giữ DB cũ, ở đây tuyệt đối không giả vờ rằng phục hồi đã có hiệu lực đối với tiến trình hiện tại
   // -----------------------------------------------------------------------
   app.post(
     '/admin/restore',
@@ -123,7 +123,7 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
   );
 
   // -----------------------------------------------------------------------
-  // 诊断包
+  // Gói chẩn đoán
   // -----------------------------------------------------------------------
   app.get('/admin/diagnostics', { preHandler: adminGuard }, async () => {
     const accounts = context.accounts.listViews();
@@ -156,8 +156,8 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
       startedAt: context.startedAt,
       now: Date.now(),
       accountsByStatus,
-      // 进程生命周期内的累计计数（重启归零），与 /admin/overview 的
-      // arg_pass_rate 是同一种「够用但不是历史精确值」的取舍
+      // Đếm tích lũy trong vòng đời tiến trình (về 0 khi khởi động lại), cùng chung đánh đổi
+      // "đủ dùng nhưng không phải giá trị chính xác lịch sử" với arg_pass_rate của /admin/overview
       recentErrorsByType: context.metrics.upstreamErrors.sumByLabel('disposition'),
       inFlightRequests: context.inFlight.size,
       configSummary: summarizeConfig(context.config),

@@ -3,8 +3,8 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * Idempotency-Key 接进 /v1/responses 与 /v1/chat/completions（§18）。
- * 核心诉求：不重复提交可能产生工具调用的上游请求；流式请求不做回放但仍挡并发。
+ * Idempotency-Key tích hợp vào /v1/responses và /v1/chat/completions (§18).
+ * Yêu cầu cốt lõi: Không gửi lặp lại yêu cầu upstream có thể sinh gọi công cụ; yêu cầu stream không replay nhưng vẫn chặn đồng thời.
  */
 
 let harness: TestHarness | undefined;
@@ -106,7 +106,7 @@ describe('并发同键', () => {
       h.app.inject({ method: 'POST', url: '/v1/responses', headers: headers(apiKey, 'idem-race'), payload }),
     ]);
     const codes = [first.statusCode, second.statusCode].sort();
-    // 两者都可能是 200（其中一个先跑完落库、后一个又刚好读到 replay）或 409（撞见 in_progress）
+    // Cả hai đều có thể là 200 (một cái chạy xong trước ghi DB, cái sau vừa hay đọc được replay) hoặc 409 (gặp in_progress)
     expect(codes.every((code) => code === 200 || code === 409)).toBe(true);
     expect(codes.includes(409) || (first.statusCode === 200 && second.statusCode === 200)).toBe(true);
   });
@@ -126,7 +126,7 @@ describe('流式请求：不回放，但仍挡并发', () => {
     expect(first.statusCode).toBe(200);
     expect(first.headers['content-type']).toContain('text/event-stream');
 
-    // 键已被释放（流式不落地可回放结果），同键请求会重新执行一次，而不是 409 或回放
+    // Key đã được giải phóng (stream không lưu kết quả có thể replay), yêu cầu cùng key sẽ thực thi lại một lần thay vì 409 hoặc replay
     const second = await h.app.inject({
       method: 'POST',
       url: '/v1/responses',

@@ -4,12 +4,12 @@ import { parseTool } from '../src/tools/registry.js';
 import type { UpstreamEvent } from '../src/adapter/protocol.js';
 
 /**
- * 提示词模拟的工具协议（§3.5、§7.3）：工具目录约束 + 从正文剥离工具调用。
- * 重点是「工具 JSON 不得同时作为正文重复输出」。
+ * Giao thức công cụ mô phỏng bằng prompt (§3.5, §7.3): Ràng buộc danh mục công cụ + bóc tách gọi công cụ khỏi nội dung văn bản.
+ * Trọng tâm là "JSON công cụ không được xuất lặp lại dưới dạng nội dung văn bản".
  */
 
-// parseTool 返回数组（namespace 分组会摊平成多个工具），这里取第一个；
-// 输入是单个 function 声明，必然摊平成恰好一个工具，因此这里断言非空
+// parseTool trả về mảng (nhóm namespace sẽ làm phẳng thành nhiều công cụ), ở đây lấy cái đầu tiên;
+// đầu vào là khai báo function đơn lẻ, chắc chắn làm phẳng thành đúng một công cụ, vì vậy ở đây assert không rỗng
 const weather = parseTool(
   {
     type: 'function',
@@ -20,7 +20,7 @@ const weather = parseTool(
   0,
 )[0]!;
 
-/** 把扫描器吃进的分片结果合并，便于断言。 */
+/** Gộp kết quả các chunk mà scanner đã nhận, thuận tiện cho việc assert. */
 function scan(chunks: string[]): { text: string; events: UpstreamEvent[] } {
   const scanner = new PromptToolScanner();
   let text = '';

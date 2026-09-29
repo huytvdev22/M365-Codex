@@ -49,7 +49,7 @@ describe('classifyFile', () => {
   });
 
   it('扩展名与内容都无法识别的二进制不猜测内容', () => {
-    // 0xC0/0xC1/0xF5.. 是恒定非法的 UTF-8 前导字节，确保魔数判定也拿不出「text」结论
+    // 0xC0/0xC1/0xF5.. là các byte tiền tố UTF-8 luôn không hợp lệ, đảm bảo phán đoán magic number cũng không thể đưa ra kết luận "text"
     const binary = Buffer.from([0xc0, 0xc1, 0xf5, 0xff]);
     const result = classifyFile('mystery.bin', null, binary);
     expect(result).toEqual({ kind: 'unknown', trusted: false });
@@ -61,7 +61,7 @@ describe('classifyFile', () => {
   });
 
   it('图片扩展名与魔数不一致时按不可信处理', () => {
-    const jpeg = fixture('sample.pdf'); // 故意给错内容
+    const jpeg = fixture('sample.pdf'); // Cố ý đưa sai nội dung
     const result = classifyFile('photo.jpg', 'image/jpeg', jpeg);
     expect(result.trusted).toBe(false);
   });

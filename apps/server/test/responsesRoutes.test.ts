@@ -3,8 +3,8 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * /v1/responses 全链路集成测试：路由 → 服务 → 状态机 → 调度器 → 真实连接 → 模拟 Sydney 上游。
- * 不接触真实网络与真实凭据。
+ * Test tích hợp toàn trình /v1/responses: Route → Service → State machine → Dispatcher → Kết nối thật → Mock Sydney upstream.
+ * Không chạm mạng thật và thông tin xác thực thật.
  */
 
 let harness: TestHarness | undefined;
@@ -38,7 +38,7 @@ function auth(key: string): Record<string, string> {
   return { authorization: `Bearer ${key}` };
 }
 
-/** 解析 SSE 文本为事件数组。 */
+/** Phân tích văn bản SSE thành mảng sự kiện. */
 function parseSse(body: string): { event: string; data: Record<string, unknown> }[] {
   const events: { event: string; data: Record<string, unknown> }[] = [];
   for (const block of body.split('\n\n')) {
@@ -93,7 +93,7 @@ describe('POST /v1/responses 非流式', () => {
     expect(body.id.startsWith('resp_')).toBe(true);
     const message = body.output.find((i) => i.type === 'message');
     expect(message?.content?.[0]?.text).toBe('你好，世界');
-    // 上游收到了用户输入（M6：文本按角色重建上下文，见 responses/schema.ts）
+    // Upstream đã nhận được input của người dùng (M6: văn bản tái tạo ngữ cảnh theo vai trò, xem responses/schema.ts)
     expect(server?.invocationTexts).toEqual(['【用户】\n在吗']);
   });
 
@@ -105,7 +105,7 @@ describe('POST /v1/responses 非流式', () => {
       headers: auth(apiKey),
       payload: { model: 'gpt-5-codex', input: 'q', reasoning: { effort: 'high' } },
     });
-    // requested 信息落库
+    // Thông tin requested được ghi vào database
     const row = h.db.prepare('SELECT requested_model, requested_reasoning_effort FROM responses').get() as {
       requested_model: string;
       requested_reasoning_effort: string;
@@ -159,16 +159,16 @@ describe('POST /v1/responses 流式 (SSE)', () => {
     expect(eventNames).toContain('response.output_text.delta');
     expect(eventNames.at(-1)).toBe('response.completed');
 
-    // 序号单调
+    // Số thứ tự đơn điệu
     const seqs = events.map((e) => e.data.sequence_number as number);
     for (let i = 1; i < seqs.length; i += 1) {
       expect(seqs[i]).toBe((seqs[i - 1] as number) + 1);
     }
-    // response_id 全程稳定
+    // response_id ổn định xuyên suốt
     const ids = new Set(events.map((e) => e.data.response_id));
     expect(ids.size).toBe(1);
 
-    // 增量拼接出完整文本
+    // Ghép các phần tăng dần thành văn bản hoàn chỉnh
     const text = events
       .filter((e) => e.event === 'response.output_text.delta')
       .map((e) => e.data.delta as string)
@@ -229,7 +229,7 @@ describe('GET /v1/responses/:id', () => {
 describe('previous_response_id 粘性', () => {
   it('续接时复用上一轮的账号', async () => {
     const { h, apiKey } = await setup(['第一轮']);
-    // 再加一个账号，制造多账号环境
+    // Thêm một tài khoản nữa để tạo môi trường đa tài khoản
     const second = h.context.accounts.upsert({
       tid: 'tenant-1',
       oid: 'user-2',
@@ -282,7 +282,7 @@ describe('取消', () => {
       })
     ).json() as { id: string };
 
-    // 已完成，cancel 返回 400
+    // Đã hoàn thành, cancel trả về 400
     const cancel = await h.app.inject({
       method: 'POST',
       url: `/v1/responses/${created.id}/cancel`,
@@ -290,7 +290,7 @@ describe('取消', () => {
     });
     expect(cancel.statusCode).toBe(400);
 
-    // delete 幂等返回 deleted
+    // delete idempotent trả về deleted
     const del = await h.app.inject({
       method: 'DELETE',
       url: `/v1/responses/${created.id}`,
@@ -320,7 +320,7 @@ describe('上游失败', () => {
       headers: auth(key.key),
       payload: { model: 'm', input: 'q' },
     });
-    // 流内 upstream_error（不可重试）→ 状态机收尾 failed → 非流式抛错
+    // upstream_error trong stream (không thể thử lại) → state machine kết thúc failed → non-stream ném lỗi
     expect(res.statusCode).toBeGreaterThanOrEqual(500);
   });
 });

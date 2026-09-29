@@ -9,16 +9,16 @@ import {
 } from './types.js';
 
 /**
- * Responses 状态机：把上游归一化事件流翻译成 OpenAI Responses 的 SSE 事件。
+ * State machine cho Responses: Dịch luồng sự kiện chuẩn hóa từ upstream thành các sự kiện SSE của OpenAI Responses.
  *
- * 保证（对应实施计划 §4.3 DoD）：
- * - 每个事件带单调递增的 `sequence_number`；
- * - 事件顺序正确：item added → content part added → deltas → part done → item done → completed；
- * - reasoning 摘要项在 message 项之前；
- * - `response_id` 全程稳定。
+ * Đảm bảo (tương ứng DoD kế hoạch triển khai §4.3):
+ * - Mỗi sự kiện mang một `sequence_number` tăng đơn điệu;
+ * - Thứ tự sự kiện chuẩn xác: item added → content part added → deltas → part done → item done → completed;
+ * - Mục tóm tắt reasoning đứng trước mục message;
+ * - `response_id` ổn định xuyên suốt.
  *
- * M4 只处理文本 + reasoning 摘要 + 引用（annotation）。工具调用事件的词汇表已在
- * types 里定义，实际产生留给 M5。
+ * M4 chỉ xử lý văn bản + tóm tắt reasoning + trích dẫn (annotation). Tập từ vựng cho sự kiện gọi công cụ đã được
+ * định nghĩa trong types, việc sinh thực tế dành cho M5.
  */
 
 interface ReasoningState {
@@ -88,23 +88,23 @@ export class ResponseStreamBuilder {
     return this.#response.id;
   }
 
-  /** 当前累积的助手文本（供非流式响应与持久化）。 */
+  /** Văn bản assistant tích lũy hiện tại (dùng cho phản hồi non-streaming và lưu trữ). */
   get accumulatedText(): string {
     return this.#message?.text ?? '';
   }
 
-  /** 返回当前 Response 对象快照（深拷贝，避免外部改动内部状态）。 */
+  /** Trả về snapshot đối tượng Response hiện tại (deep copy, tránh bên ngoài làm thay đổi trạng thái nội bộ). */
   snapshot(): ResponseObject {
     return structuredClone({ ...this.#response, output: this.#buildOutput() });
   }
 
-  /** 开始：response.created + response.in_progress。 */
+  /** Bắt đầu: response.created + response.in_progress. */
   begin(): SseEvent[] {
     this.#response.status = 'in_progress';
     return [this.#event(SSE_EVENTS.CREATED, {}), this.#event(SSE_EVENTS.IN_PROGRESS, {})];
   }
 
-  /** 消费一个上游事件，产出零或多个 SSE 事件。 */
+  /** Tiêu thụ một sự kiện từ upstream, sinh ra 0 hoặc nhiều sự kiện SSE. */
   consume(event: UpstreamEvent): SseEvent[] {
     switch (event.kind) {
       case 'reasoning_delta':
@@ -114,7 +114,7 @@ export class ResponseStreamBuilder {
       case 'citation':
         return this.#onCitation(event.url, event.title);
       case 'upstream_error':
-        // 流内的不可重试错误：记录，最终以 failed 收尾
+        // Lỗi không thể thử lại trong luồng: ghi nhận, kết thúc bằng failed
         if (!event.retryable) {
           this.#failed = true;
           this.#response.error = { code: 'upstream_error', message: event.message };
@@ -123,8 +123,8 @@ export class ResponseStreamBuilder {
       case 'tool_call_begin':
       case 'tool_call_args_delta':
       case 'tool_call_end':
-        // 工具调用由服务层缓冲、校验/修复后再经 emitFunctionCall 发出，
-        // 不直接经 consume（这样才能在发给客户端前做参数校验）
+        // Lệnh gọi công cụ do tầng service đệm lại, xác thực/sửa đổi rồi mới phát qua emitFunctionCall,
+        // không đi trực tiếp qua consume (để có thể xác thực tham số trước khi gửi cho client)
         return [];
       case 'completed':
       case 'raw':
@@ -133,13 +133,13 @@ export class ResponseStreamBuilder {
   }
 
   /**
-   * 发出一次已校验的工具调用（function_call）。
-   * 在 message 之后作为独立 output 项，带完整参数的 delta + done。
-   * 由服务层在参数校验/修复通过后调用。
+   * Phát ra một lệnh gọi công cụ đã qua kiểm tra (function_call).
+   * Đứng sau message dưới dạng một mục output độc lập, kèm delta + done chứa đầy đủ tham số.
+   * Do tầng service gọi sau khi việc xác thực/sửa đổi tham số thành công.
    */
   emitFunctionCall(callId: string, name: string, argumentsJson: string): SseEvent[] {
     const events: SseEvent[] = [];
-    // 先收尾可能开着的 reasoning / message
+    // Đóng các mục reasoning / message có thể đang mở trước
     events.push(...this.#closeReasoning());
     events.push(...this.#closeMessage());
 
@@ -190,15 +190,15 @@ export class ResponseStreamBuilder {
     return events;
   }
 
-  /** 正常收尾：关闭已开项 + response.completed。 */
+  /** Kết thúc bình thường: đóng các mục đã mở + response.completed. */
   finish(): SseEvent[] {
     if (this.#failed) {
       return this.fail(this.#response.error?.message ?? '上游返回错误');
     }
     const events: SseEvent[] = [];
     events.push(...this.#closeReasoning());
-    // 没有文本、也没有工具调用时，才补一个空 message 保持 output 非空；
-    // 有工具调用时 output 已非空，不强塞空 message
+    // Khi không có văn bản và cũng không có gọi công cụ, mới bù một message rỗng để output không rỗng;
+    // Khi có gọi công cụ thì output đã không rỗng rồi, không nhồi thêm message rỗng
     if (this.#message === null && this.#functionCalls.length === 0) {
       events.push(...this.#openMessage());
     }
@@ -208,21 +208,21 @@ export class ResponseStreamBuilder {
     return events;
   }
 
-  /** 失败收尾：response.failed。 */
+  /** Kết thúc thất bại: response.failed. */
   fail(message: string, code = 'upstream_error'): SseEvent[] {
     this.#response.status = 'failed';
     this.#response.error = { code, message };
     return [this.#event(SSE_EVENTS.FAILED, {})];
   }
 
-  /** 客户端取消收尾。 */
+  /** Client hủy yêu cầu. */
   cancel(): SseEvent[] {
     this.#response.status = 'cancelled';
     this.#response.incomplete_details = { reason: 'cancelled' };
     return [this.#event(SSE_EVENTS.INCOMPLETE, {})];
   }
 
-  // ---- 内部 ----
+  // ---- Nội bộ ----
 
   #onReasoningDelta(text: string): SseEvent[] {
     const events: SseEvent[] = [];
@@ -276,7 +276,7 @@ export class ResponseStreamBuilder {
       type: 'url_citation',
       url,
       title,
-      // M4 暂以当前文本长度作为锚点；精确区间待上游能力校准
+      // M4 tạm lấy độ dài văn bản hiện tại làm mỏ neo; khoảng chính xác chờ hiệu chuẩn năng lực upstream
       start_index: message.text.length,
       end_index: message.text.length,
     };
@@ -405,18 +405,18 @@ export class ResponseStreamBuilder {
     return output;
   }
 
-  /** 组装一个带单调 sequence_number 与 response_id 的 SSE 事件。 */
+  /** Lắp ráp một sự kiện SSE có sequence_number đơn điệu và response_id. */
   #event(name: SseEvent['event'], data: Record<string, unknown>): SseEvent {
     const payload: Record<string, unknown> = {
-      // `type` 必须写进 data 里：OpenAI 官方 SSE 就是这么发的，而真实客户端
-      // （codex-cli 实测）只解析 data 的 JSON、按其中的 type 分发，根本不看
-      // SSE 的 event: 行。少了它客户端会一直等不到 response.completed。
+      // `type` bắt buộc phải ghi vào trong data: SSE chuẩn của OpenAI gửi như vậy, và client thực tế
+      // (thực nghiệm trên codex-cli) chỉ phân tích JSON của data rồi dispatch theo type bên trong, hoàn toàn không xem
+      // dòng event: của SSE. Thiếu nó client sẽ mãi không nhận được response.completed.
       type: name,
       ...data,
       sequence_number: this.#seq++,
       response_id: this.#response.id,
     };
-    // created / in_progress / completed / failed / incomplete 携带完整 response 快照
+    // created / in_progress / completed / failed / incomplete mang snapshot response hoàn chỉnh
     if (
       name === SSE_EVENTS.CREATED ||
       name === SSE_EVENTS.IN_PROGRESS ||

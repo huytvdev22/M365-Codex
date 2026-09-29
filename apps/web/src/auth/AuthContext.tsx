@@ -3,8 +3,8 @@ import { api } from '../api';
 import { setAuthToken, setUnauthorizedHandler } from '../api/http';
 
 /**
- * 会话令牌只放两个地方：这里的 React state（内存）与 sessionStorage（用于刷新页面后恢复登录态）。
- * 绝不写 localStorage，绝不出现在任何日志/console 调用里。
+ * Token phiên làm việc chỉ lưu ở 2 nơi: React state (trong bộ nhớ) và sessionStorage (dùng để khôi phục khi tải lại trang).
+ * Tuyệt đối không ghi vào localStorage, tuyệt đối không xuất hiện trong bất kỳ log/console nào.
  */
 
 const SESSION_STORAGE_KEY = 'm365codex.admin.session';
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [clearSession]);
 
-  // 首次加载：尝试恢复 sessionStorage 里的会话，并向服务端校验仍然有效。
+  // Lần tải đầu tiên: Thử khôi phục phiên từ sessionStorage và xác thực lại với máy chủ xem còn hiệu lực không.
   useEffect(() => {
     const stored = readStoredSession();
     if (stored === null) {
@@ -81,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         clearSession();
       });
-    // clearSession 由 useCallback([]) 生成，引用恒定，加入依赖不会导致这个「仅挂载时执行一次」的
-    // 效果重复触发；但它确实在效果体内被使用，因此如实列出。
+    // clearSession được tạo bởi useCallback([]), tham chiếu ổn định, việc đưa vào dependency sẽ không làm effect này chạy lại;
+    // nhưng nó thực sự được sử dụng trong effect nên liệt kê đầy đủ.
   }, [clearSession]);
 
   const login = useCallback(async (password: string) => {
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     api.logout().catch(() => {
-      /* 注销失败也要清本地状态，不能把用户卡在已登录界面 */
+      /* Đăng xuất thất bại cũng phải xóa trạng thái cục bộ, tránh để người dùng bị kẹt ở trạng thái đã đăng nhập */
     });
     clearSession();
   }, [clearSession]);
@@ -111,6 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (ctx === null) throw new Error('useAuth 必须在 AuthProvider 内使用');
+  if (ctx === null) throw new Error('useAuth phải được sử dụng bên trong AuthProvider');
   return ctx;
 }

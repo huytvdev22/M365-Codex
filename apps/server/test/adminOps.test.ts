@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createTestHarness, loginAdmin, type TestHarness } from './helpers/testApp.js';
 
 /**
- * M7 新增管理端接口（契约 §二）：概览、请求记录、设置、出口代理池、
- * Codex 配置生成、文件管理视角、能力矩阵。
+ * Các endpoint admin bổ sung ở M7 (hợp đồng §2): Tổng quan, bản ghi yêu cầu, cài đặt, pool proxy gửi đi,
+ * sinh cấu hình Codex, góc nhìn quản lý file, ma trận năng lực.
  */
 
 let harness: TestHarness | undefined;

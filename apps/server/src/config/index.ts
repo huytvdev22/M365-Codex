@@ -9,12 +9,12 @@ import {
 } from '@m365-codex/shared';
 
 /**
- * 配置加载与校验（对应实施计划 §3）。
+ * Tải và kiểm tra cấu hình (tương ứng kế hoạch triển khai §3).
  *
- * 硬约束：
- * - `M365_CODEX_MASTER_KEY` 无默认值，缺失或非 32 字节一律拒绝启动；
- * - 禁止通过环境变量注入任何 Microsoft Token / OAuth 凭据；
- * - 上游地址、scope 等一律走配置，不硬编码进业务逻辑。
+ * Ràng buộc cứng:
+ * - `M365_CODEX_MASTER_KEY` không có giá trị mặc định, thiếu hoặc không đủ 32 byte đều từ chối khởi động;
+ * - Nghiêm cấm đưa bất kỳ Microsoft Token / thông tin xác thực OAuth nào qua biến môi trường;
+ * - Địa chỉ upstream, scope v.v. đều đi qua cấu hình, không hardcode vào logic nghiệp vụ.
  */
 
 export class ConfigError extends Error {
@@ -28,8 +28,9 @@ export class ConfigError extends Error {
 }
 
 /**
- * 明确禁止出现的环境变量名。出现即拒绝启动，避免运维图省事把
- * 真实 Token 塞进容器环境，从而绕过加密入库与审计。
+ * Danh sách tên biến môi trường bị cấm tuyệt đối. Xuất hiện là từ chối khởi động ngay,
+ * tránh việc vận hành tiện tay nhét token thật vào môi trường container,
+ * từ đó vượt qua lưu trữ mã hóa và kiểm toán.
  */
 export const FORBIDDEN_ENV_KEYS: readonly string[] = [
   'M365_ACCESS_TOKEN',
@@ -47,11 +48,11 @@ export const FORBIDDEN_ENV_KEYS: readonly string[] = [
 ];
 
 /**
- * OAuth 上游参数。
+ * Tham số upstream OAuth.
  *
- * 全部走配置：上游端点会漂移（已观察到 substrate.office.com 与
- * substrate.svc.cloud.microsoft 两种形态），CLIENT_ID 与 scope 也可能随之调整，
- * 因此这里只提供默认值，不在业务逻辑里硬编码。
+ * Toàn bộ đi qua cấu hình: endpoint upstream có thể thay đổi (đã quan sát thấy hai dạng
+ * substrate.office.com và substrate.svc.cloud.microsoft), CLIENT_ID và scope cũng có thể điều chỉnh theo,
+ * do đó ở đây chỉ cung cấp giá trị mặc định, không hardcode trong logic nghiệp vụ.
  */
 export interface OAuthConfig {
   readonly clientId: string;
@@ -61,7 +62,7 @@ export interface OAuthConfig {
   readonly scopes: readonly string[];
 }
 
-/** 默认值来自公开的 Microsoft 原生客户端 PKCE 流程，均非机密。 */
+/** Giá trị mặc định lấy từ quy trình PKCE client native công khai của Microsoft, đều không phải bí mật. */
 export const DEFAULT_OAUTH_CLIENT_ID = 'c0ab8ce9-e9a0-42e7-b064-33d422df41f1';
 export const DEFAULT_OAUTH_REDIRECT_URI =
   'https://login.microsoftonline.com/common/oauth2/nativeclient';
@@ -77,35 +78,35 @@ export const DEFAULT_OAUTH_SCOPES: readonly string[] = [
 ];
 
 /**
- * Sydney / BizChat 上游 WebSocket 参数。
+ * Tham số WebSocket upstream Sydney / BizChat.
  *
- * 上游端点会漂移（已观察到 substrate.office.com 与 substrate.svc.cloud.microsoft
- * 两种形态），所以基址、路径模板、协议版本全部走配置。路径模板里的占位符：
- *   {oid} {tid} 会被替换为账号的对象 ID 与租户 ID。
- * access_token 通过查询参数附加，不写进模板（避免误入日志）。
+ * Endpoint upstream có thể thay đổi (đã quan sát thấy hai dạng substrate.office.com và substrate.svc.cloud.microsoft),
+ * vì vậy base URL, template đường dẫn, phiên bản giao thức đều đi qua cấu hình. Placeholder trong template đường dẫn:
+ *   {oid} {tid} sẽ được thay thế bằng Object ID và Tenant ID của tài khoản.
+ * access_token được gắn qua query param, không ghi vào template (tránh vô tình lọt vào log).
  */
 export interface UpstreamConfig {
   readonly wsBase: string;
   readonly pathTemplate: string;
-  /** 协议适配层版本，独立于业务版本；M0 探针确认真实协议后可切换 */
+  /** Phiên bản tầng adapter giao thức, độc lập với phiên bản nghiệp vụ; có thể chuyển đổi sau khi probe M0 xác nhận giao thức thực tế */
   readonly protocolVersion: string;
-  /** 心跳间隔（毫秒） */
+  /** Khoảng thời gian heartbeat (mili-giây) */
   readonly heartbeatIntervalMs: number;
-  /** 握手超时（毫秒） */
+  /** Timeout bắt tay (mili-giây) */
   readonly handshakeTimeoutMs: number;
-  /** 单条消息空闲超时（毫秒）：超过该时间没有任何上游帧则判定卡死 */
+  /** Timeout rảnh rỗi cho từng tin nhắn (mili-giây): quá thời gian này mà không nhận được frame upstream nào thì coi là bị treo */
   readonly idleTimeoutMs: number;
-  /** WS 断开后的最大重连次数（同一账号内） */
+  /** Số lần kết nối lại tối đa sau khi WS bị ngắt (trong cùng một tài khoản) */
   readonly maxReconnects: number;
   /**
-   * WebSocket 握手时必须带的 `X-Scenario` 头。
+   * Header `X-Scenario` bắt buộc phải có khi bắt tay WebSocket.
    *
-   * 2026-07-27 用真实账号实测：这个头是**上游放行的唯一硬条件**——不带它，
-   * 无论 token 多正确、放查询参数还是 Authorization 头，一律 403（空响应体、
-   * 无 WWW-Authenticate，看起来像"账号没权限"，极具误导性）。取值必须精确匹配，
-   * `bizchat` / `M365Chat` / 任意其它值都是 403。
+   * Đã kiểm thử thực tế với tài khoản thật vào ngày 27-07-2026: header này là **điều kiện cứng duy nhất để upstream chấp thuận** — không có nó,
+   * dù token đúng đến đâu, đặt ở query param hay header Authorization, đều trả về 403 (body rỗng,
+   * không có WWW-Authenticate, trông giống như "tài khoản không có quyền", cực kỳ dễ gây nhầm lẫn). Giá trị phải khớp chính xác,
+   * `bizchat` / `M365Chat` / bất kỳ giá trị nào khác đều bị 403.
    *
-   * 做成配置项是因为它显然属于会随上游变动的东西；默认值来自实测。
+   * Đưa thành mục cấu hình vì nó rõ ràng thuộc về thứ có thể thay đổi theo upstream; giá trị mặc định lấy từ thực nghiệm.
    */
   readonly scenario: string;
 }
@@ -113,61 +114,61 @@ export interface UpstreamConfig {
 export const DEFAULT_UPSTREAM_WS_BASE = 'wss://substrate.office.com';
 export const DEFAULT_UPSTREAM_PATH_TEMPLATE = '/m365Copilot/Chathub/{oid}@{tid}';
 export const DEFAULT_UPSTREAM_PROTOCOL_VERSION = 'sydney-json-v1';
-/** 实测值：上游只认这一个取值，换成别的一律 403（见 UpstreamConfig.scenario 注释）。 */
+/** Giá trị thực nghiệm: upstream chỉ chấp nhận một giá trị duy nhất này, đổi sang giá trị khác đều bị 403 (xem chú thích UpstreamConfig.scenario). */
 export const DEFAULT_UPSTREAM_SCENARIO = 'officeweb';
 
 /**
- * 工具调用与代理循环的全局上限（对应实施计划 §7.4）。
+ * Giới hạn toàn cục cho gọi công cụ và vòng lặp agent (tương ứng kế hoạch triển khai §7.4).
  *
- * 这些是**全局天花板**，API Key 级限制只能更严、不能突破（§10，M7 落地）。
- * `mode` 决定怎么把工具目录交给上游：
- *   native —— 只在 invocation 里带结构化工具声明（上游原生支持时）；
- *   prompt —— 只用提示词约束输出 `<tool_call>` JSON（上游不支持原生工具时）；
- *   auto   —— 两者都上，并同时解析两种回应形态。M0 探针出结论前的默认值。
+ * Đây là **mức trần toàn cục**, giới hạn ở cấp API Key chỉ có thể nghiêm ngặt hơn chứ không thể vượt qua (§10, triển khai ở M7).
+ * `mode` quyết định cách thức chuyển danh mục công cụ cho upstream:
+ *   native —— chỉ gửi khai báo công cụ có cấu trúc trong invocation (khi upstream hỗ trợ gốc);
+ *   prompt —— chỉ dùng prompt để ràng buộc đầu ra JSON `<tool_call>` (khi upstream không hỗ trợ công cụ gốc);
+ *   auto   —— áp dụng cả hai và đồng thời phân tích hai dạng phản hồi. Giá trị mặc định trước khi có kết luận từ probe M0.
  */
 export type ToolsMode = 'native' | 'prompt' | 'auto';
 
 export interface ToolsConfig {
   readonly mode: ToolsMode;
-  /** 单轮最多接受多少个工具调用 */
+  /** Số lượng lệnh gọi công cụ tối đa được chấp nhận trong một vòng */
   readonly maxCallsPerRound: number;
-  /** 一条对话链上最多几轮工具调用 */
+  /** Số vòng gọi công cụ tối đa trên một chuỗi hội thoại */
   readonly maxRounds: number;
-  /** 一条对话链上累计最多多少个工具调用 */
+  /** Tổng số lệnh gọi công cụ tích lũy tối đa trên một chuỗi hội thoại */
   readonly maxTotalCalls: number;
-  /** 单个工具结果的最大字节数 */
+  /** Kích thước byte tối đa cho kết quả của một công cụ */
   readonly maxResultBytes: number;
-  /** 参数不合法时向上游请求修复的最多次数（§7.3 上限为 2） */
+  /** Số lần yêu cầu upstream sửa lại tối đa khi tham số không hợp lệ (mức trần §7.3 là 2) */
   readonly maxArgRepairs: number;
-  /** 是否允许一轮里出现多个工具调用 */
+  /** Cho phép xuất hiện nhiều lệnh gọi công cụ trong một vòng hay không */
   readonly allowParallel: boolean;
 }
 
 export const MAX_ARG_REPAIRS_CEILING = 2;
 
 /**
- * 文件子系统的限额（对应实施计划 §11、§M6）。
+ * Hạn ngạch của hệ thống con tệp (tương ứng kế hoạch triển khai §11, §M6).
  *
- * 全部走配置，且都是**天花板**：单文件、单请求、单 Key 累计存储三层限制，
- * 任何一层超限都返回明确错误，不做静默截断。
+ * Toàn bộ đi qua cấu hình và đều là **mức trần**: ba tầng giới hạn gồm đơn tệp, đơn yêu cầu, dung lượng tích lũy theo Key,
+ * vượt quá bất kỳ tầng nào đều trả về lỗi rõ ràng, không âm thầm cắt ngắn.
  */
 export interface FilesConfig {
-  /** 单个文件（或 Upload 单个 part）最大字节数 */
+  /** Số byte tối đa của một tệp đơn (hoặc một part đơn của Upload) */
   readonly maxFileBytes: number;
-  /** 单次 multipart 请求最大字节数（须 ≥ maxFileBytes，供路由设置 Fastify 的 bodyLimit） */
+  /** Số byte tối đa của một yêu cầu multipart đơn (phải ≥ maxFileBytes, dùng cho route thiết lập bodyLimit của Fastify) */
   readonly maxRequestBytes: number;
-  /** 单个 API Key 累计存储上限（未删除文件的字节数之和） */
+  /** Giới hạn dung lượng lưu trữ tích lũy cho một API Key (tổng số byte của các tệp chưa xóa) */
   readonly maxTotalBytesPerKey: number;
-  /** 文件保留期（毫秒），超过 created_at + 该值即视为过期；0 表示不自动过期 */
+  /** Thời gian lưu giữ tệp (mili-giây), vượt quá created_at + giá trị này được coi là hết hạn; 0 nghĩa là không tự động hết hạn */
   readonly retentionMs: number;
-  /** 未完成 Upload 的存活时间（毫秒），超过后视为过期并清理已收到的分片 */
+  /** Thời gian tồn tại của Upload chưa hoàn thành (mili-giây), quá hạn coi như hết hạn và dọn dẹp các chunk đã nhận */
   readonly uploadTtlMs: number;
 }
 
 /**
- * API Key 限额的**全局天花板**（对应实施计划 §10 末句:「API Key 限制不得超过
- * 系统全局限制」)。单个 Key 的 rpm_limit / daily_limit / max_concurrency 只能
- * 比这里更严，绝不允许突破——具体裁剪逻辑在 `gateway/rateLimit.ts`。
+ * **Mức trần toàn cục** cho hạn ngạch API Key (tương ứng câu cuối §10 kế hoạch: "Giới hạn của API Key không được vượt quá
+ * giới hạn toàn cục của hệ thống"). rpm_limit / daily_limit / max_concurrency của từng Key chỉ có thể
+ * nghiêm ngặt hơn ở đây, tuyệt đối không được phép vượt qua — logic cắt giảm cụ thể nằm tại `gateway/rateLimit.ts`.
  */
 export interface RateLimitConfig {
   readonly globalRpmLimit: number;
@@ -176,32 +177,32 @@ export interface RateLimitConfig {
 }
 
 /**
- * 定时清理的间隔与保留期（对应实施计划 §18）。
- * 文件/Upload 自己的保留期复用 `FilesConfig`，这里只放专属于 M7 清理任务的项。
+ * Khoảng thời gian và chu kỳ lưu giữ cho tác vụ dọn dẹp định kỳ (tương ứng kế hoạch triển khai §18).
+ * Thời gian lưu giữ của tệp/Upload tái sử dụng `FilesConfig`, ở đây chỉ đặt các mục riêng cho tác vụ dọn dẹp M7.
  */
 export interface CleanupConfig {
-  /** 各清理任务共用的运行间隔 */
+  /** Khoảng thời gian chạy dùng chung cho các tác vụ dọn dẹp */
   readonly intervalMs: number;
-  /** 已结束（completed/failed/cancelled/incomplete）的 Response 保留多久 */
+  /** Response đã kết thúc (completed/failed/cancelled/incomplete) được giữ lại trong bao lâu */
   readonly responseRetentionMs: number;
-  /** 审计日志保留多久 */
+  /** Nhật ký kiểm toán được giữ lại trong bao lâu */
   readonly auditLogRetentionMs: number;
-  /** 幂等记录保留多久 */
+  /** Bản ghi idempotent được giữ lại trong bao lâu */
   readonly idempotencyRetentionMs: number;
 }
 
 /**
- * 指标与备份（对应实施计划 §17、§15.4，M8 新增）。
+ * Metrics và sao lưu (tương ứng kế hoạch triển khai §17, §15.4, bổ sung ở M8).
  *
- * `metricsRequireAuth` 默认开启：`/metrics` 会暴露账号数量、错误分布这类信息，
- * 不应该无鉴权公开；显式改为 false 时走无鉴权（适合放进只在内网可达的抓取器）。
+ * `metricsRequireAuth` mặc định bật: `/metrics` sẽ để lộ thông tin như số lượng tài khoản, phân bố lỗi,
+ * không nên công khai mà không có xác thực; khi chuyển rõ ràng thành false thì không cần xác thực (thích hợp đưa vào bộ thu thập nội bộ).
  */
 export interface MetricsConfig {
   readonly enabled: boolean;
   readonly requireAuth: boolean;
 }
 
-/** 备份保留份数：`POST /admin/backup` 生成的包超过这个数量后，定时清理会删掉最旧的。 */
+/** Số bản sao lưu giữ lại: khi các gói do `POST /admin/backup` tạo ra vượt quá số này, dọn dẹp định kỳ sẽ xóa bản cũ nhất. */
 export interface BackupConfig {
   readonly retentionCount: number;
 }
@@ -217,10 +218,10 @@ export interface AppConfig {
   readonly trustProxy: boolean;
   readonly logPrivacyMode: LogPrivacyMode;
   /**
-   * `debug` 隐私模式的默认自动过期时长（毫秒，对应实施计划 §15.3）。
-   * debug 会记录更多请求信息，不能无限期停留在这一档；切到 debug 时按这个
-   * 时长自动计算 `logging.debug_expires_at`，到期由 `settings/service.ts`
-   * 的定时任务自动恢复 strict。
+   * Thời gian tự động hết hạn mặc định của chế độ riêng tư `debug` (mili-giây, tương ứng kế hoạch §15.3).
+   * debug sẽ ghi lại nhiều thông tin yêu cầu hơn, không được duy trì vô thời hạn ở mức này; khi chuyển sang debug sẽ dựa vào
+   * khoảng thời gian này để tự động tính `logging.debug_expires_at`, hết hạn sẽ được cron trong `settings/service.ts`
+   * tự động khôi phục về strict.
    */
   readonly logPrivacyDebugTtlMs: number;
   readonly logLevel: string;
@@ -234,34 +235,34 @@ export interface AppConfig {
   readonly files: FilesConfig;
   readonly rateLimit: RateLimitConfig;
   readonly cleanup: CleanupConfig;
-  /** 出口代理健康检查超时（毫秒，契约 §2.4 `POST /admin/proxies/:id/check`） */
+  /** Timeout kiểm tra sức khỏe proxy gửi đi (mili-giây, hợp đồng §2.4 `POST /admin/proxies/:id/check`) */
   readonly proxyCheckTimeoutMs: number;
-  /** M8：`/metrics` 端点的开关与鉴权要求 */
+  /** M8: Bật/tắt và yêu cầu xác thực của endpoint `/metrics` */
   readonly metrics: MetricsConfig;
-  /** M8：备份保留份数 */
+  /** M8: Số bản sao lưu giữ lại */
   readonly backup: BackupConfig;
   /**
-   * 启动时原始环境变量里显式出现过的键名（非空值）。
-   * `/admin/settings` 据此判断某项是否 `source: "env"`——容器编排是唯一真源，
-   * 一旦环境变量显式设置过，UI 就不能悄悄盖掉（见实施计划 §M7、契约 §2.3）。
+   * Tên các key xuất hiện rõ ràng trong biến môi trường ban đầu khi khởi động (giá trị không rỗng).
+   * `/admin/settings` dựa vào đây để xác định mục nào có `source: "env"` — điều phối container là nguồn chân lý duy nhất,
+   * một khi biến môi trường đã được đặt tường minh thì UI không thể âm thầm ghi đè (xem kế hoạch §M7, hợp đồng §2.3).
    */
   readonly envKeysPresent: ReadonlySet<string>;
   /**
-   * 上游是否真支持图片输入。默认 false——上游能力要等 M0 真实探针校准，
-   * 探针结论出来前一律拒绝并返回 unsupported_feature，不假装支持。
+   * Upstream có thực sự hỗ trợ đầu vào hình ảnh hay không. Mặc định false — năng lực upstream phải chờ probe M0 thực tế hiệu chuẩn,
+   * trước khi có kết luận từ probe thì từ chối toàn bộ và trả về unsupported_feature, không giả vờ hỗ trợ.
    */
   readonly upstreamImageInput: boolean;
   /**
-   * 重建出的对话上下文超过多少字符就从最旧历史开始截断（见
-   * `responses/schema.ts` 的 `extractInputText`）。Codex 这类 `store:false`
-   * 客户端每轮会带上几万字符的系统指令 + 完整历史，默认给一个宽松值。
+   * Ngữ cảnh đối thoại tái tạo vượt quá bao nhiêu ký tự thì bắt đầu cắt ngắn từ lịch sử cũ nhất (xem
+   * `extractInputText` trong `responses/schema.ts`). Các client `store:false` như Codex mỗi vòng sẽ gửi kèm
+   * hàng chục nghìn ký tự chỉ thị hệ thống + toàn bộ lịch sử, mặc định đặt một giá trị rộng rãi.
    */
   readonly contextMaxChars: number;
 }
 
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 
-/** 解析并校验 Base64 主密钥，失败时抛出可读原因。 */
+/** Phân tích cú pháp và kiểm tra khóa chính Base64, ném ra lý do dễ đọc khi thất bại. */
 export function parseMasterKey(raw: string): Buffer {
   const value = raw.trim();
   if (value.length === 0) {
@@ -337,7 +338,7 @@ const envSchema = z.object({
   PUBLIC_ADMIN_URL: optionalUrl,
   TRUST_PROXY: booleanFromEnv,
   LOG_PRIVACY_MODE: z.enum(LOG_PRIVACY_MODES).optional(),
-  // 保守默认 1 小时：debug 模式记录更多请求信息，不该无限期停留
+  // Mặc định thận trọng 1 giờ: chế độ debug ghi lại nhiều thông tin yêu cầu hơn, không nên duy trì vô hạn
   LOG_PRIVACY_DEBUG_TTL_MS: positiveIntFromEnv(60 * 60 * 1000, 60_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   UPSTREAM_WS_BASE: optionalWsUrl,
@@ -383,7 +384,7 @@ const envSchema = z.object({
   FILES_MAX_FILE_BYTES: positiveIntFromEnv(25 * 1024 * 1024, 1024),
   FILES_MAX_REQUEST_BYTES: positiveIntFromEnv(26 * 1024 * 1024, 1024),
   FILES_MAX_TOTAL_BYTES_PER_KEY: positiveIntFromEnv(200 * 1024 * 1024, 1024),
-  // 0 表示不自动过期，因此下限放宽到 0（不能用 positiveIntFromEnv，它的下限是 min）
+  // 0 biểu thị không tự động hết hạn, do đó hạ giới hạn dưới xuống 0 (không dùng positiveIntFromEnv vì giới hạn dưới của nó là min)
   FILES_RETENTION_MS: z
     .string()
     .optional()
@@ -392,24 +393,24 @@ const envSchema = z.object({
   FILES_UPLOAD_TTL_MS: positiveIntFromEnv(24 * 60 * 60 * 1000, 60_000),
   UPSTREAM_IMAGE_INPUT: booleanFromEnv,
   CONTEXT_MAX_CHARS: positiveIntFromEnv(400_000, 10_000),
-  // --- API Key 限额的全局天花板（§10）---
+  // --- Mức trần toàn cục cho hạn ngạch API Key (§10) ---
   RATE_LIMIT_GLOBAL_RPM: positiveIntFromEnv(600, 1),
   RATE_LIMIT_GLOBAL_DAILY: positiveIntFromEnv(50_000, 1),
   RATE_LIMIT_GLOBAL_MAX_CONCURRENCY: positiveIntFromEnv(50, 1),
-  // --- 定时清理（§18）---
+  // --- Dọn dẹp định kỳ (§18) ---
   CLEANUP_INTERVAL_MS: positiveIntFromEnv(10 * 60 * 1000, 30_000),
   CLEANUP_RESPONSE_RETENTION_MS: positiveIntFromEnv(7 * 24 * 60 * 60 * 1000, 60_000),
   CLEANUP_AUDIT_LOG_RETENTION_MS: positiveIntFromEnv(90 * 24 * 60 * 60 * 1000, 60_000),
   CLEANUP_IDEMPOTENCY_RETENTION_MS: positiveIntFromEnv(24 * 60 * 60 * 1000, 60_000),
   PROXY_CHECK_TIMEOUT_MS: positiveIntFromEnv(5_000, 500),
-  // --- 指标与备份（M8，§17、§15.4）---
+  // --- Metrics và sao lưu (M8, §17, §15.4) ---
   METRICS_ENABLED: booleanFromEnv,
-  // 默认开启：/metrics 会暴露账号数量与错误分布，不应无鉴权公开
+  // Mặc định bật: /metrics sẽ để lộ số lượng tài khoản và phân bố lỗi, không nên mở công khai khi chưa xác thực
   METRICS_REQUIRE_AUTH: booleanFromEnv,
   BACKUP_RETENTION_COUNT: positiveIntFromEnv(7, 1),
 });
 
-/** 生成一个「可选正整数、带默认值与下限」的 env 解析器。 */
+/** Tạo một parser env "số nguyên dương tùy chọn, có giá trị mặc định và giới hạn dưới". */
 function positiveIntFromEnv(defaultValue: number, min: number) {
   return z
     .string()
@@ -420,7 +421,7 @@ function positiveIntFromEnv(defaultValue: number, min: number) {
     });
 }
 
-/** scope 允许用空格或逗号分隔，兼容两种常见写法。 */
+/** scope cho phép phân tách bằng dấu cách hoặc dấu phẩy, tương thích với cả hai cách viết phổ biến. */
 function parseScopes(raw: string | undefined): readonly string[] {
   if (raw === undefined) return DEFAULT_OAUTH_SCOPES;
   const parsed = raw
@@ -433,8 +434,8 @@ function parseScopes(raw: string | undefined): readonly string[] {
 export type RawEnv = Record<string, string | undefined>;
 
 /**
- * 从环境变量加载配置。任何一项不合法都会汇总后一次性抛出 ConfigError，
- * 避免运维反复试错。错误信息中不会回显敏感值。
+ * Tải cấu hình từ biến môi trường. Bất kỳ mục nào không hợp lệ đều được tổng hợp và ném ra ConfigError một lần,
+ * tránh việc vận hành phải thử đi thử lại. Thông tin lỗi không phản hồi lại giá trị nhạy cảm.
  */
 export function loadConfig(env: RawEnv = process.env): AppConfig {
   const issues: string[] = [];
@@ -551,7 +552,7 @@ export function loadConfig(env: RawEnv = process.env): AppConfig {
   });
 }
 
-/** 记录启动时哪些环境变量被显式赋了非空值，供 `/admin/settings` 判断 `source: "env"`。 */
+/** Ghi nhận các biến môi trường nào được gán giá trị không rỗng rõ ràng khi khởi động, để `/admin/settings` xác định `source: "env"`. */
 function computeEnvKeysPresent(env: RawEnv): ReadonlySet<string> {
   const keys = new Set<string>();
   for (const [key, value] of Object.entries(env)) {
@@ -560,7 +561,7 @@ function computeEnvKeysPresent(env: RawEnv): ReadonlySet<string> {
   return keys;
 }
 
-/** 生成可安全写入日志的配置摘要：不含密钥与密码。 */
+/** Tạo bản tóm tắt cấu hình an toàn để ghi log: không chứa khóa bí mật và mật khẩu. */
 export function summarizeConfig(config: AppConfig): Record<string, unknown> {
   return {
     port: config.port,

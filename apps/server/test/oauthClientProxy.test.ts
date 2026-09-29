@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { resolveDispatcherForTokenUrl } from '../src/oauth/client.js';
 
 /**
- * OAuth token 端点的出口代理选择要尊重 NO_PROXY（同上游 WebSocket 连接层的
- * 约定，见 test/connection.test.ts 的 NO_PROXY 分组）：命中排除列表时，
- * 无论传入全局默认代理还是账号专属代理，都必须直连。
+ * Việc chọn proxy gửi đi cho endpoint OAuth token phải tuân thủ NO_PROXY (giống quy ước tầng kết nối WebSocket
+ * upstream, xem nhóm NO_PROXY trong test/connection.test.ts): Khi khớp danh sách loại trừ,
+ * dù truyền proxy mặc định toàn cục hay proxy riêng của tài khoản, đều bắt buộc kết nối trực tiếp.
  */
 
 const TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
@@ -31,7 +31,7 @@ describe('resolveDispatcherForTokenUrl', () => {
   });
 
   it('NO_PROXY 命中的是账号专属代理覆盖时同样直连', () => {
-    // 模拟账号绑定了专属代理（TokenManager.refresh 的 proxyUrl 覆盖场景）
+    // Mô phỏng tài khoản đã liên kết proxy riêng (kịch bản ghi đè proxyUrl của TokenManager.refresh)
     const dispatcher = resolveDispatcherForTokenUrl(
       TOKEN_URL,
       'http://account-specific-proxy.invalid:8080',

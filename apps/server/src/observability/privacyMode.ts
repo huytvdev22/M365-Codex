@@ -1,19 +1,19 @@
 import type { LogPrivacyMode } from '@m365-codex/shared';
 
 /**
- * 当前生效的日志隐私模式的可变容器（对应实施计划 §15.3 debug 自动过期）。
+ * Container khả biến lưu trữ chế độ riêng tư log đang có hiệu lực hiện tại (tương ứng tự động hết hạn debug trong kế hoạch triển khai §15.3).
  *
- * `AppConfig` 是启动时锁定、`Object.freeze` 过的快照；`settings/service.ts`
- * 里除 `logging.log_level` 外的项都要等重启才生效，`pending_restart` 列表
- * 就是为此存在的。但 `log_privacy_mode` 的 debug 自动过期必须是个例外——
- * debug 档会记录更多请求信息，如果“过期”只是把 `settings` 表里的值改回
- * strict、真正生效要等到下次不知道什么时候的重启，这段窗口里服务仍在
- * 按 debug 记录，安全机制等于形同虚设。
+ * `AppConfig` là snapshot được khóa lại và `Object.freeze` lúc khởi động; trong `settings/service.ts`
+ * ngoại trừ `logging.log_level` thì các mục khác đều phải đợi khởi động lại mới có hiệu lực, danh sách `pending_restart`
+ * tồn tại chính vì điều này. Tuy nhiên việc tự động hết hạn debug của `log_privacy_mode` bắt buộc phải là ngoại lệ —
+ * mức debug sẽ ghi lại nhiều thông tin yêu cầu hơn, nếu việc "hết hạn" chỉ đổi giá trị trong bảng `settings` về lại
+ * strict còn hiệu lực thực tế phải đợi đến lần khởi động lại tiếp theo (không biết khi nào), thì trong khoảng thời gian cửa sổ này dịch vụ vẫn
+ * ghi log theo debug, cơ chế an toàn coi như bị vô hiệu hóa.
  *
- * 因此 `log_privacy_mode` 和 `log_level` 一样做成热生效：各处读取“当前隐私
- * 模式”时改用这个可变容器（`context.privacyMode.current`），而不是
- * `config.logPrivacyMode`（那是启动时的初始值，仍用于 `/admin/settings`
- * 展示 default 来源与 `pending_restart` 判定的基准）。
+ * Vì vậy `log_privacy_mode` cũng giống như `log_level` được thiết kế có hiệu lực nóng (hot-reload): các nơi khi đọc "chế độ riêng tư
+ * hiện tại" sẽ chuyển sang dùng container khả biến này (`context.privacyMode.current`), thay vì
+ * `config.logPrivacyMode` (đó là giá trị ban đầu lúc khởi động, vẫn dùng cho `/admin/settings`
+ * hiển thị nguồn default và làm chuẩn xác định `pending_restart`).
  */
 export class PrivacyModeHolder {
   #current: LogPrivacyMode;

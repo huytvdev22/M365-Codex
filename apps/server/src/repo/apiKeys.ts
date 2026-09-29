@@ -3,7 +3,7 @@ import type { ApiKeyView } from '@m365-codex/shared';
 import { generateApiKey, maskApiKey } from '../crypto/apiKey.js';
 import { asRow, asRows, type Database } from '../db/index.js';
 
-/** API Key 数据访问层。库中永不出现明文 Key。 */
+/** Tầng truy cập dữ liệu API Key. Trong DB vĩnh viễn không xuất hiện Key dạng văn bản rõ. */
 
 export interface ApiKeyRow {
   id: string;
@@ -23,22 +23,22 @@ export interface ApiKeyRow {
   created_at: number;
   last_used_at: number | null;
   last_used_ip: string | null;
-  /** 备注，纯展示用，不参与任何鉴权/限额判定 */
+  /** Ghi chú, thuần túy để hiển thị, không tham gia vào bất kỳ phán đoán xác thực/hạn mức nào */
   note: string | null;
-  /** 累计请求次数（管理界面用量展示），随 touch() 一起递增，不在热路径上单独多一次写 */
+  /** Số lượt yêu cầu tích lũy (hiển thị lượng sử dụng trên giao diện quản trị), tăng dần cùng với touch(), không tốn thêm 1 lần ghi riêng trên hot path */
   request_count: number;
-  /** 按 Key 收紧的工具调用次数上限（对话链累计），null 表示不额外收紧，只受全局天花板约束 */
+  /** Giới hạn số lần gọi công cụ siết chặt theo Key (tích lũy chuỗi hội thoại), null biểu thị không siết chặt thêm, chỉ chịu ràng buộc trần toàn cục */
   max_tool_calls: number | null;
-  /** 按 Key 收紧的单文件/单个上传分片大小上限（字节），null 表示不额外收紧 */
+  /** Giới hạn dung lượng đơn file/từng chunk tải lên siết chặt theo Key (byte), null biểu thị không siết chặt thêm */
   max_file_bytes: number | null;
 }
 
 /**
- * `ApiKeyView`/`ApiKeyCreated`（`@m365-codex/shared`）还没收进这四个字段——
- * 本次改动范围限定在 `apps/server/**`，不改共享包（避免和同时改 `apps/web`
- * 的另一处改动冲突）。这里在 server 内部扩展一层，字段值仍原样通过 JSON
- * 返回给管理界面；后续若要给 WebUI 提供静态类型，再把这几个字段合并进
- * `packages/shared` 的公共契约类型。
+ * `ApiKeyView`/`ApiKeyCreated` (`@m365-codex/shared`) chưa thu nhận 4 trường này —
+ * Phạm vi sửa đổi lần này giới hạn trong `apps/server/**`, không sửa package chia sẻ (tránh xung đột
+ * với sửa đổi đồng thời ở `apps/web`). Ở đây mở rộng một tầng nội bộ trong server, giá trị trường vẫn giữ nguyên qua JSON
+ * trả về cho giao diện quản trị; sau này nếu muốn cung cấp static type cho WebUI, sẽ gộp các trường này vào
+ * type contract công khai của `packages/shared`.
  */
 export interface ApiKeyViewExt extends ApiKeyView {
   note: string | null;
@@ -48,7 +48,7 @@ export interface ApiKeyViewExt extends ApiKeyView {
 }
 
 export interface ApiKeyCreatedExt extends ApiKeyViewExt {
-  /** 明文 API Key，仅创建时返回一次，服务端不保存 */
+  /** API Key dạng văn bản rõ, chỉ trả về 1 lần duy nhất khi tạo, server không lưu trữ */
   key: string;
 }
 
@@ -81,7 +81,7 @@ export interface UpdateApiKeyInput {
   maxFileBytes?: number | null;
 }
 
-/** 导出给 `gateway/rateLimit.ts` 复用，避免第二份 JSON 解析逻辑。 */
+/** Export cho `gateway/rateLimit.ts` tái sử dụng, tránh có thêm bản sao logic parse JSON thứ hai. */
 export function parseList(value: string | null): string[] | null {
   if (value === null || value === '') return null;
   try {
@@ -168,7 +168,7 @@ export class ApiKeyRepository {
     return asRow<ApiKeyRow>(this.#db.prepare('SELECT * FROM api_keys WHERE id = ?').get(id));
   }
 
-  /** 前缀可能重复（概率极低），返回全部候选交由调用方逐一做恒定时间校验。 */
+  /** Tiền tố có thể trùng (xác suất cực thấp), trả về toàn bộ ứng viên để bên gọi kiểm tra từng cái bằng constant-time. */
   findByPrefix(prefix: string): ApiKeyRow[] {
     return asRows<ApiKeyRow>(this.#db.prepare('SELECT * FROM api_keys WHERE prefix = ?').all(prefix));
   }
@@ -233,7 +233,7 @@ export class ApiKeyRepository {
     return row === undefined ? undefined : toApiKeyView(row);
   }
 
-  /** 撤销：保留记录用于审计，但立即失效。 */
+  /** Thu hồi: giữ lại bản ghi để kiểm toán nhưng lập tức vô hiệu hóa. */
   revoke(id: string, now = Date.now()): ApiKeyViewExt | undefined {
     const existing = this.getRowById(id);
     if (existing === undefined) return undefined;
@@ -245,8 +245,8 @@ export class ApiKeyRepository {
   }
 
   /**
-   * 更新最近使用时间/IP，并把累计请求次数 +1（§10.1）。跟 last_used_at
-   * 用同一条 UPDATE 语句一起写，不在鉴权热路径上为计数单独多一次落库。
+   * Cập nhật thời gian/IP sử dụng gần nhất, đồng thời cộng dồn số lượt yêu cầu +1 (§10.1).
+   * Ghi chung trong 1 câu UPDATE với last_used_at, không tốn thêm 1 lần ghi DB riêng trên hot path xác thực.
    */
   touch(id: string, ip: string | null, now = Date.now()): void {
     this.#db
@@ -257,7 +257,7 @@ export class ApiKeyRepository {
   }
 }
 
-/** Key 是否处于可用状态；返回不可用原因便于给出清晰错误。 */
+/** Key có đang ở trạng thái khả dụng hay không; trả về lý do không khả dụng giúp đưa ra lỗi rõ ràng. */
 export function evaluateApiKeyUsability(
   row: ApiKeyRow,
   now = Date.now(),

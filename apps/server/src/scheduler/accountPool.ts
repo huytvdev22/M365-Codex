@@ -1,31 +1,31 @@
 import type { AccountRepository, AccountView } from '../repo/accounts.js';
 
 /**
- * 账号池选择与并发计数。
+ * Lựa chọn tài khoản trong pool và đếm đồng thời.
  *
- * 选择策略：带权最少连接（weighted least-connections）。
- * - 只在「可用」账号里选：状态为 online / probing / busy，且不在冷却期；
- * - 连接数越少越优先；并列时连续失败次数少的优先；
- * - 支持排除集合（本次请求已经试过并失败的账号）。
+ * Chiến lược lựa chọn: Weighted least-connections (kết nối ít nhất có trọng số).
+ * - Chỉ chọn trong các tài khoản "khả dụng": Trạng thái online / probing / busy, và không trong thời gian cooldown;
+ * - Số kết nối càng ít càng ưu tiên; nếu hòa thì số lần thất bại liên tiếp ít hơn được ưu tiên;
+ * - Hỗ trợ tập loại trừ (các tài khoản đã thử trong request này và bị thất bại).
  *
- * 并发计数存在内存里——它反映的是「本进程此刻正占用某账号的连接数」，
- * 属于运行时状态，不需要持久化。
+ * Bộ đếm đồng thời được lưu trong bộ nhớ — phản ánh "số kết nối tiến trình này đang chiếm dụng của tài khoản đó",
+ * thuộc trạng thái runtime, không cần lưu trữ vĩnh viễn.
  */
 
-/** 可参与调度的账号状态。 */
+/** Các trạng thái tài khoản có thể tham gia điều phối. */
 const SCHEDULABLE_STATUSES = new Set(['online', 'probing', 'busy']);
 
 export interface PickOptions {
-  /** 本次请求已排除的账号（试过且失败） */
+  /** Các tài khoản đã loại trừ trong request này (đã thử và thất bại) */
   exclude?: ReadonlySet<string>;
-  /** 优先尝试的账号（粘性：上一轮绑定的账号） */
+  /** Tài khoản ưu tiên thử (tính bám dính: tài khoản đã liên kết ở vòng trước) */
   prefer?: string | null;
   now?: number;
 }
 
 export class AccountPool {
   readonly #accounts: AccountRepository;
-  /** accountId → 当前活跃连接数 */
+  /** accountId → Số kết nối đang hoạt động */
   readonly #active = new Map<string, number>();
 
   constructor(accounts: AccountRepository) {
@@ -46,14 +46,14 @@ export class AccountPool {
     else this.#active.set(accountId, next);
   }
 
-  /** 当前是否存在任何可调度账号（忽略排除集）。用于区分「池空」与「都被排除了」。 */
+  /** Hiện có tài khoản nào có thể điều phối không (bỏ qua tập loại trừ). Dùng để phân biệt "pool rỗng" và "tất cả đều bị loại trừ". */
   hasAnySchedulable(now = Date.now()): boolean {
     return this.#accounts.listViews().some((account) => this.#isUsable(account, now));
   }
 
   /**
-   * 选一个账号。返回 null 表示没有可用账号（调用方据此返回 503）。
-   * prefer 命中且可用时直接返回它，实现请求↔账号粘性。
+   * Chọn một tài khoản. Trả về null nếu không có tài khoản khả dụng (bên gọi dựa vào đây trả về 503).
+   * Khi prefer trúng và khả dụng sẽ trả về trực tiếp, hiện thực hóa tính bám dính request ↔ tài khoản.
    */
   pick(options: PickOptions = {}): AccountView | null {
     const now = options.now ?? Date.now();
@@ -69,7 +69,7 @@ export class AccountPool {
       if (preferred !== undefined) return preferred;
     }
 
-    // 带权最少连接：先比活跃连接数，再比连续失败数，最后比 updated_at 求稳定
+    // Weighted least-connections: So sánh số kết nối hoạt động trước, sau đó so số lần thất bại liên tiếp, cuối cùng so updated_at để giữ tính ổn định
     return candidates.sort((a, b) => {
       const activeDiff = this.activeCount(a.id) - this.activeCount(b.id);
       if (activeDiff !== 0) return activeDiff;

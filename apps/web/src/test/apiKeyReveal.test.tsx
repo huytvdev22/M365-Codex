@@ -32,16 +32,16 @@ function renderPage() {
   );
 }
 
-describe('API Key 明文只显示一次', () => {
+describe('Khóa API dạng văn bản rõ chỉ hiển thị một lần', () => {
   beforeEach(() => {
     listApiKeys.mockReset().mockResolvedValue([]);
     createApiKey.mockReset();
   });
 
-  it('创建后弹窗展示明文，关闭前必须勾选「我已保存」，关闭后列表只剩掩码', async () => {
+  it('Sau khi tạo popup hiển thị khóa rõ, trước khi đóng phải tích chọn đã lưu, sau khi đóng danh sách chỉ còn khóa che', async () => {
     const created: ApiKeyCreated = {
       id: 'key_new',
-      name: '测试密钥',
+      name: 'Khóa thử nghiệm',
       masked_key: 'sk-Ab12************wxYZ',
       enabled: true,
       created_at: Date.now(),
@@ -58,24 +58,24 @@ describe('API Key 明文只显示一次', () => {
     };
     createApiKey.mockResolvedValue(created);
     listApiKeys
-      .mockResolvedValueOnce([]) // 初次加载
-      .mockResolvedValueOnce([created]); // 创建后刷新
+      .mockResolvedValueOnce([]) // Tải lần đầu
+      .mockResolvedValueOnce([created]); // Làm mới sau khi tạo
 
     renderPage();
 
-    const nameInput = await screen.findByLabelText('名称');
-    fireEvent.change(nameInput, { target: { value: '测试密钥' } });
-    fireEvent.click(screen.getByRole('button', { name: '创建' }));
+    const nameInput = await screen.findByLabelText('Tên gợi nhớ');
+    fireEvent.change(nameInput, { target: { value: 'Khóa thử nghiệm' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo mới' }));
 
-    // 明文只应该在弹窗里出现一次
+    // Khóa rõ chỉ xuất hiện 1 lần trong modal
     await screen.findByText(PLAINTEXT_KEY);
-    expect(screen.getByText('这是唯一一次显示完整密钥的机会')).toBeTruthy();
+    expect(screen.getByText('Đây là lần duy nhất hiển thị toàn bộ khóa bí mật')).toBeTruthy();
 
-    const closeButton = screen.getByRole('button', { name: '关闭' });
-    // 未勾选「我已保存」之前，关闭按钮必须被禁用
+    const closeButton = screen.getByRole('button', { name: 'Đóng' });
+    // Chưa tích chọn "Tôi đã lưu lại khóa bí mật này" thì nút đóng bị vô hiệu hóa
     expect((closeButton as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.click(screen.getByLabelText('我已保存这个密钥'));
+    fireEvent.click(screen.getByLabelText('Tôi đã lưu lại khóa bí mật này'));
     expect((closeButton as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(closeButton);
@@ -83,7 +83,7 @@ describe('API Key 明文只显示一次', () => {
     await waitFor(() => {
       expect(screen.queryByText(PLAINTEXT_KEY)).toBeNull();
     });
-    // 关闭后列表页只应该显示掩码，明文不能残留在 DOM 任何地方
+    // Sau khi đóng, trang danh sách chỉ hiển thị khóa che, văn bản rõ không tồn tại trong DOM
     expect(screen.getByText(created.masked_key)).toBeTruthy();
     expect(document.body.textContent?.includes(PLAINTEXT_KEY)).toBe(false);
   });

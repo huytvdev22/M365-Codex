@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { IconCheck, IconCopy } from './icons';
 
-/** 复制到剪贴板；复制成功后短暂显示对勾反馈。剪贴板 API 不可用时静默失败，不抛错打断页面。 */
-export function CopyButton({ value, label = '复制' }: { value: string; label?: string }) {
+/** Sao chép vào clipboard; hiển thị dấu tích phản hồi ngắn sau khi sao chép. Thất bại trong im lặng nếu Clipboard API không khả dụng. */
+export function CopyButton({ value, label = 'Sao chép' }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -13,14 +13,14 @@ export function CopyButton({ value, label = '复制' }: { value: string; label?:
         setTimeout(() => setCopied(false), 1500);
       })
       .catch(() => {
-        /* 剪贴板权限被拒绝等场景：不打断用户，静默即可 */
+        /* Trường hợp quyền truy cập clipboard bị từ chối: không làm phiền người dùng, giữ im lặng */
       });
   };
 
   return (
     <button type="button" className="btn btn-sm" onClick={handleCopy}>
       {copied ? <IconCheck /> : <IconCopy />}
-      {copied ? '已复制' : label}
+      {copied ? 'Đã sao chép' : label}
     </button>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildDiagnostics, deriveSystemStatus, type DiagnosticsInput } from '../src/observability/diagnostics.js';
 
 /**
- * 诊断包（§17）。判断某项该不该进包的标准：把它贴到公开 issue 里会不会后悔。
+ * Gói chẩn đoán (§17). Tiêu chuẩn để xác định một mục có nên vào gói hay không: dán nó vào issue công khai có phải hối hận không.
  */
 
 function input(overrides: Partial<DiagnosticsInput> = {}): DiagnosticsInput {
@@ -63,7 +63,7 @@ describe('诊断包内容', () => {
     const report = buildDiagnostics(input());
     expect(report.app_version).toBe('1.0.0');
     expect(report.uptime_ms).toBe(60_000);
-    // online + busy 才算可用；cooldown 不算
+    // online + busy mới tính là khả dụng; cooldown không tính
     expect(report.accounts_usable).toBe(3);
     expect(report.system_status).toBe('normal');
     expect(report.schema.ok).toBe(true);
@@ -97,14 +97,14 @@ describe('诊断包内容', () => {
 
 describe('隐私', () => {
   it('诊断包里没有邮箱、提示词、Token 之类的东西', () => {
-    // 就算调用方不小心把敏感值塞进 configSummary，也应当由 summarizeConfig 负责脱敏；
-    // 这里断言的是诊断包本身不会主动去取任何用户内容字段
+    // Cho dù phía gọi vô tình nhét giá trị nhạy cảm vào configSummary, summarizeConfig cũng phải chịu trách nhiệm khử nhạy cảm;
+    // ở đây assert là bản thân gói chẩn đoán sẽ không chủ động lấy bất kỳ trường nội dung người dùng nào
     const report = buildDiagnostics(input());
     const dump = JSON.stringify(report);
     expect(dump).not.toContain('@');
     expect(dump).not.toMatch(/eyJ[A-Za-z0-9_-]{6,}/);
     expect(dump).not.toContain('sk-');
-    // 只应包含结构化计数与配置摘要
+    // Chỉ nên chứa các bộ đếm có cấu trúc và tóm tắt cấu hình
     expect(Object.keys(report)).toEqual(
       expect.arrayContaining(['accounts', 'recent_errors', 'storage', 'readiness', 'config']),
     );

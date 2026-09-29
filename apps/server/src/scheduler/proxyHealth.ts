@@ -1,12 +1,12 @@
 import { connect } from 'node:net';
 
 /**
- * 出口代理健康检查（对应实施计划 §13.1、契约 §2.4 `POST /admin/proxies/:id/check`）。
+ * Kiểm tra sức khỏe proxy đầu ra (tương ứng kế hoạch triển khai §13.1, hợp đồng §2.4 `POST /admin/proxies/:id/check`).
  *
- * 只验证代理端点自身的 TCP 连通性，不验证经它转发到公网目标的完整链路——
- * 后者需要一个总能连通的公网目标做探测靶子，在离线/内网/CI 环境里并不现实，
- * 也不该让「健康检查」依赖一个外部服务的可用性。这是有意的取舍，写在这里
- * 避免以后有人误以为它验证了完整的代理转发能力。
+ * Chỉ xác thực khả năng kết nối TCP tới chính endpoint proxy, không xác thực toàn bộ chuỗi chuyển tiếp qua nó tới mục tiêu trên Internet —
+ * việc sau cần một mục tiêu Internet luôn kết nối được làm bia ngắm thăm dò, điều này không thực tế trong môi trường offline/mạng nội bộ/CI,
+ * và cũng không nên để "kiểm tra sức khỏe" phụ thuộc vào tính khả dụng của một dịch vụ bên ngoài. Đây là sự đánh đổi có chủ ý, ghi chú tại đây
+ * để tránh việc sau này có người hiểu nhầm rằng nó xác thực khả năng chuyển tiếp proxy hoàn chỉnh.
  */
 
 export interface ProxyCheckResult {

@@ -5,14 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import Ajv2020Cjs from 'ajv/dist/2020.js';
 
-// ajv 是 CJS 模块，NodeNext 下默认导入绑定的是命名空间，真正的类在 .default 上
+// ajv là module CJS, dưới NodeNext default import gắn vào namespace, class thật nằm trên .default
 const Ajv2020 = Ajv2020Cjs.default;
 import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * OpenAPI 契约测试（对应实施计划 §M4 DoD）。
- * 用 openapi/openapi.json 里的 schema 校验真实接口返回，保证实现不偏离契约。
+ * Test hợp đồng OpenAPI (tương ứng DoD §M4 của kế hoạch triển khai).
+ * Dùng schema trong openapi/openapi.json để kiểm tra phản hồi endpoint thật, đảm bảo triển khai không lệch hợp đồng.
  */
 
 const openapiPath = fileURLToPath(new URL('../../../openapi/openapi.json', import.meta.url));
@@ -21,7 +21,7 @@ const openapi = JSON.parse(readFileSync(openapiPath, 'utf8')) as {
 };
 
 const ajv = new Ajv2020({ strict: false, allErrors: true });
-// 注册所有组件 schema，供 $ref 解析
+// Đăng ký toàn bộ schema component, phục vụ phân giải $ref
 for (const [name, schema] of Object.entries(openapi.components.schemas)) {
   ajv.addSchema(schema, `#/components/schemas/${name}`);
 }

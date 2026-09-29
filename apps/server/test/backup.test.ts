@@ -17,10 +17,10 @@ import { packArchive, unpackArchive } from '../src/backup/archive.js';
 import { DB_FILE_NAME, LATEST_SCHEMA_VERSION, openDatabase, runMigrations, type Database } from '../src/db/index.js';
 
 /**
- * 备份与恢复（§15.4）。重点：
- * - 快照是一致性的（VACUUM INTO），不是直接拷贝正在写的库；
- * - **主密钥绝不进备份包**，只记录版本号用于校验；
- * - 恢复前校验格式版本、结构版本与主密钥版本，不合就明确拒绝。
+ * Sao lưu và phục hồi (§15.4). Điểm mấu chốt:
+ * - Snapshot có tính nhất quán (VACUUM INTO), không phải copy trực tiếp DB đang ghi;
+ * - **Khóa chính tuyệt đối không vào gói sao lưu**, chỉ ghi nhận số phiên bản để kiểm tra;
+ * - Trước khi phục hồi kiểm tra phiên bản định dạng, phiên bản cấu trúc và phiên bản khóa chính, không khớp sẽ từ chối rõ ràng.
  */
 
 let dir: string;
@@ -65,7 +65,7 @@ describe('生成备份', () => {
     expect(manifest.schema_version).toBe(LATEST_SCHEMA_VERSION);
     expect(manifest.file_count).toBe(1);
 
-    // 快照必须是能打开的 SQLite（前 16 字节是 SQLite 魔数）
+    // Snapshot phải là SQLite có thể mở được (16 byte đầu là magic number SQLite)
     const snapshot = entries.find((e) => e.path === 'db.sqlite')?.content as Buffer;
     expect(snapshot.subarray(0, 15).toString('ascii')).toBe('SQLite format 3');
   });
@@ -100,16 +100,16 @@ describe('恢复', () => {
     seedFile('file-a', '原始内容');
     const { archive } = service().create();
 
-    // 破坏现状：改文件、加一个备份里没有的孤儿文件
+    // Phá hoại hiện trạng: Sửa file, thêm file mồ côi không có trong bản sao lưu
     writeFileSync(join(dir, 'files', 'file-a', 'content'), '被改坏了', 'utf8');
     seedFile('file-orphan', '孤儿');
 
     const manifest = service().restore(archive, 1_700_000_000_000);
     expect(manifest.file_count).toBe(1);
     expect(readFileSync(join(dir, 'files', 'file-a', 'content'), 'utf8')).toBe('原始内容');
-    // 备份里没有的文件不保留，避免「库里没有、盘上还在」的孤儿
+    // File không có trong bản sao lưu không được giữ lại, tránh file mồ côi "DB không có nhưng đĩa vẫn còn"
     expect(existsSync(join(dir, 'files', 'file-orphan', 'content'))).toBe(false);
-    // 旧库留底，恢复出问题还能人工找回
+    // Giữ lại DB cũ làm bản lưu, khi phục hồi gặp sự cố vẫn có thể tìm lại thủ công
     expect(existsSync(join(dir, `${DB_FILE_NAME}.replaced-1700000000000`))).toBe(true);
   });
 

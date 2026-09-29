@@ -64,7 +64,7 @@ describe('pick 基本可用性', () => {
     const id = seed(accounts, 'cooling', 'online');
     accounts.recordFailure(id, 'rate_limited', { cooldownUntil: Date.now() + 60_000 });
     expect(pool.pick()).toBeNull();
-    // 冷却过期后可选
+    // Có thể chọn lại sau khi hết thời gian làm nguội
     expect(pool.pick({ now: Date.now() + 61_000 })?.id).toBe(id);
   });
 });
@@ -115,7 +115,7 @@ describe('排除与粘性', () => {
     seed(accounts, 'b');
     pool.acquire(a);
     pool.acquire(a);
-    // 尽管 a 连接更多，粘性优先
+    // Dù a có nhiều kết nối hơn, ưu tiên tính dính (stickiness)
     expect(pool.pick({ prefer: a })?.id).toBe(a);
   });
 

@@ -6,7 +6,7 @@ import { SydneyCodecV1 } from '../../apps/server/dist/adapter/codecV1.js';
 import { runRawSession } from '../src/rawSession.js';
 
 /**
- * 探针「原始会话」引擎的自测：只打模拟 Sydney 上游，绝不连真实 Microsoft。
+ * Tự kiểm thử cho engine "phiên thô" của probe: Chỉ gọi mock Sydney upstream, tuyệt đối không kết nối Microsoft thật.
  */
 
 let server: MockSydneyServer | undefined;
@@ -114,9 +114,9 @@ describe('runRawSession', () => {
 });
 
 describe('participant.id', () => {
-  // 这个字段是可选的，漏传不会报错、不会失败，只会让探针发出的请求
-  // 和真实客户端不一样——而探针的全部价值就在于「贴近真实形态」。
-  // 它已经悄悄漏过一次，所以这里用一条测试钉住它。
+  // Trường này là tùy chọn, quên gửi sẽ không báo lỗi, không thất bại, chỉ làm cho yêu cầu do probe gửi đi
+  // khác với client thật — trong khi toàn bộ giá trị của probe nằm ở việc "bám sát hình thái thật".
+  // Nó đã từng âm thầm bị bỏ sót một lần, vì vậy ở đây dùng một test để chốt chặn nó.
   it('传了 oid 就会编码进 invocation 的 participant.id', async () => {
     server = await startMockSydneyServer({ kind: 'normal', chunks: ['ok'] });
     const sent: string[] = [];
@@ -146,7 +146,7 @@ describe('participant.id', () => {
   });
 });
 
-/** 包一层 WebSocket，把发出去的帧记下来供断言。 */
+/** Bọc một tầng WebSocket, ghi nhận lại các frame đã gửi đi để assert. */
 function capturingSocket(url: string, sent: string[]): WebSocket {
   const ws = new WebSocket(url, { headers: { 'X-Scenario': 'officeweb' } });
   const original = ws.send.bind(ws);
@@ -157,7 +157,7 @@ function capturingSocket(url: string, sent: string[]): WebSocket {
   return ws;
 }
 
-/** 一条 WebSocket 消息里可能含多个 0x1e 分隔的帧。 */
+/** Một tin nhắn WebSocket có thể chứa nhiều frame phân tách bằng 0x1e. */
 function parseFrames(raw: string): { target?: string; arguments?: unknown[] }[] {
   return raw
     .split('\u001e')

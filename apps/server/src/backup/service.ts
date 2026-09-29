@@ -7,16 +7,16 @@ import { DB_FILE_NAME, LATEST_SCHEMA_VERSION } from '../db/index.js';
 import { packArchive, unpackArchive, type ArchiveEntry } from './archive.js';
 
 /**
- * 备份与恢复（对应实施计划 §15.4）。
+ * Sao lưu và khôi phục (tương ứng với Kế hoạch thực hiện §15.4).
  *
- * 备份包是一个标准 tar.gz，内含：
- *   manifest.json   —— 版本、schema 版本、主密钥版本、生成时间、内容清单
- *   db.sqlite       —— 用 `VACUUM INTO` 生成的一致性快照（不是直接拷贝正在写的库）
- *   files/<id>/…    —— 上传文件的原始内容（可选）
+ * Gói sao lưu là một file tar.gz tiêu chuẩn, bao gồm:
+ *   manifest.json   —— Phiên bản, schema version, phiên bản khóa chính, thời gian tạo, danh mục nội dung
+ *   db.sqlite       —— Bản snapshot nhất quán được tạo bằng `VACUUM INTO` (không phải sao chép trực tiếp file DB đang ghi)
+ *   files/<id>/…    —— Nội dung gốc của các tệp đã upload (tùy chọn)
  *
- * **主密钥不在备份包里**：库中的 Token 仍是 AES-256-GCM 密文，换一台机器恢复时
- * 必须提供同一个 `M365_CODEX_MASTER_KEY` 才解得开。manifest 里只记录密钥**版本号**
- * 用于校验，绝不写入密钥本身。这样备份包泄露也不等于 Token 泄露。
+ * **Khóa chính không nằm trong gói sao lưu**: Token trong cơ sở dữ liệu vẫn là bản mã AES-256-GCM, khi chuyển sang máy khác khôi phục
+ * bắt buộc phải cung cấp cùng một `M365_CODEX_MASTER_KEY` mới giải mã được. manifest chỉ ghi lại **số phiên bản** của khóa
+ * để kiểm tra tính tương thích, tuyệt đối không ghi bản thân khóa. Nhờ vậy việc lộ gói sao lưu không đồng nghĩa với lộ Token.
  */
 
 export const BACKUP_FORMAT_VERSION = 1;
@@ -43,7 +43,7 @@ export interface BackupDeps {
   masterKeyVersion: number;
 }
 
-/** 列出 files 目录下的所有普通文件，返回归档内相对路径。 */
+/** Liệt kê tất cả các tệp thông thường trong thư mục files, trả về đường dẫn tương đối trong file lưu trữ. */
 function listFiles(root: string): { archivePath: string; absolute: string }[] {
   if (!existsSync(root)) return [];
   const out: { archivePath: string; absolute: string }[] = [];
@@ -71,8 +71,8 @@ export class BackupService {
   }
 
   /**
-   * 生成备份包。
-   * 数据库用 VACUUM INTO 出一份一致性快照——直接读正在写的库文件可能拿到撕裂状态。
+   * Tạo gói sao lưu.
+   * Cơ sở dữ liệu dùng VACUUM INTO để xuất ra snapshot nhất quán — đọc trực tiếp file CSDL đang ghi có thể gặp trạng thái rách dữ liệu (torn read).
    */
   create(options: { includeFiles?: boolean } = {}, now = Date.now()): BackupResult {
     const includeFiles = options.includeFiles ?? true;
@@ -84,7 +84,7 @@ export class BackupService {
     rmSync(snapshotPath, { force: true });
 
     try {
-      // VACUUM INTO 的路径要转义单引号，虽然这里是自造路径，仍不省这一步
+      // Đường dẫn của VACUUM INTO cần escape dấu nháy đơn, dù ở đây là đường dẫn tự sinh vẫn không bỏ bước này
       this.#deps.db.exec(`VACUUM INTO '${snapshotPath.replace(/'/g, "''")}'`);
       const dbSnapshot = readFileSync(snapshotPath);
 
@@ -112,18 +112,18 @@ export class BackupService {
   }
 
   /**
-   * 校验备份包并把内容落到目标目录。
+   * Xác thực gói sao lưu và ghi nội dung vào thư mục đích.
    *
-   * 恢复是**替换式**的，且必须在服务重启后才生效——正在运行的进程持有旧库的连接。
-   * 因此这里只负责写盘与校验，重启由调用方（管理接口）提示管理员执行。
+   * Khôi phục theo cơ chế **ghi đè thay thế**, và chỉ có hiệu lực sau khi server khởi động lại — tiến trình đang chạy giữ kết nối tới DB cũ.
+   * Vì vậy ở đây chỉ chịu trách nhiệm ghi đĩa và kiểm tra hợp lệ, việc restart do bên gọi (API admin) thông báo cho quản trị viên thực hiện.
    */
   restore(archive: Buffer, now = Date.now()): BackupManifest {
     let entries: ArchiveEntry[];
     try {
       entries = unpackArchive(archive);
     } catch (error) {
-      // gzip/tar 解析失败（比如上传了个随便的文件）是用户输入问题，不是服务端故障，
-      // 不能让它变成 500——那样调用方看不出「我传错了」还是「服务坏了」
+      // gzip/tar parse thất bại (ví dụ upload file linh tinh) là lỗi input người dùng, không phải lỗi server,
+      // không được để thành 500 — nếu không bên gọi không phân biệt được là do mình gửi sai hay server hỏng
       throw ApiError.badRequest(
         `备份包无法解析（不是合法的 tar.gz）：${error instanceof Error ? error.message : String(error)}`,
       );
@@ -146,7 +146,7 @@ export class BackupService {
       );
     }
     if (manifest.schema_version > LATEST_SCHEMA_VERSION) {
-      // 来自更新版本的备份可能含本版本不认识的表结构，恢复了也跑不起来
+      // Sao lưu từ phiên bản mới hơn có thể chứa cấu trúc bảng phiên bản này không nhận biết, khôi phục cũng không chạy được
       throw ApiError.badRequest(
         `备份包的数据库结构版本（v${manifest.schema_version}）高于当前程序支持的 v${LATEST_SCHEMA_VERSION}，请先升级程序再恢复`,
       );
@@ -166,14 +166,14 @@ export class BackupService {
     const { dataDir } = this.#deps;
     mkdirSync(dataDir, { recursive: true });
 
-    // 旧库先改名留底，恢复出问题时还能人工找回
+    // Đổi tên DB cũ để lưu dự phòng, khi khôi phục có sự cố vẫn có thể tìm lại thủ công
     const dbPath = join(dataDir, DB_FILE_NAME);
     if (existsSync(dbPath)) {
       writeFileSync(`${dbPath}.replaced-${now}`, readFileSync(dbPath));
     }
     writeFileSync(dbPath, dbEntry.content);
 
-    // 文件内容整体替换：备份里没有的文件不保留，避免恢复后出现「库里没有、盘上还在」的孤儿
+    // Thay thế toàn bộ nội dung files: không giữ lại các tệp không có trong bản backup, tránh tình trạng file mồ côi
     const filesRoot = join(dataDir, 'files');
     if (manifest.includes_files) {
       rmSync(filesRoot, { recursive: true, force: true });
@@ -188,7 +188,7 @@ export class BackupService {
     return manifest;
   }
 
-  /** 数据占用概览，供管理界面显示。 */
+  /** Tổng quan mức chiếm dụng dữ liệu, dùng để hiển thị trên trang quản trị. */
   usage(): { dbBytes: number; filesBytes: number; fileCount: number } {
     const dbPath = join(this.#deps.dataDir, DB_FILE_NAME);
     const dbBytes = existsSync(dbPath) ? statSync(dbPath).size : 0;

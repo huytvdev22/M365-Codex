@@ -1,5 +1,5 @@
 /**
- * 内联 SVG 图标集合——不引入任何图标包，图标故意做得极简（描边风格，统一 1.6 描边宽度）。
+ * Tập hợp icon SVG nội tuyến — không phụ thuộc gói icon ngoài, phong cách tối giản (stroke 1.6).
  */
 import type { ReactNode, SVGProps } from 'react';
 

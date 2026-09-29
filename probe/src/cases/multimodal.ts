@@ -12,10 +12,10 @@ import type { CapabilityResult, ProbeContext } from '../types.js';
 
 const IMAGE_COLOR_HINTS = ['蓝', 'blue', 'navy', '靛'];
 
-/** #4 图片理解：能否接受一张探针自带的纯色测试图片，并说出正确的颜色。 */
+/** #4 Hiểu hình ảnh: Có chấp nhận một ảnh thử nghiệm đơn sắc có sẵn của probe và nói đúng màu sắc không. */
 export async function caseImageUnderstanding(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
-  // 字段名是 codecV1.ts 里的建模约定（`SydneyArgument.images`），真实字段待 M0 校准
+  // Tên trường là quy ước mô hình hóa trong codecV1.ts (`SydneyArgument.images`), trường thực tế chờ M0 hiệu chuẩn
   const outcome = await runText(ctx, IMAGE_PROMPT, {
     passthrough: { images: [{ url: TEST_IMAGE_DATA_URL, detail: null }] },
   });
@@ -58,9 +58,9 @@ interface AttachmentCaseSpec {
 async function runAttachmentCase(ctx: ProbeContext, spec: AttachmentCaseSpec): Promise<CapabilityResult> {
   const requestedAt = Date.now();
 
-  // 方式一：把提取出的文本直接内联进消息正文（M6 现有文件管线就是这么做的，预期总能work）
+  // Cách 1: Chèn trực tiếp văn bản đã trích xuất vào nội dung tin nhắn (pipeline file hiện tại của M6 làm như vậy, kỳ vọng luôn hoạt động)
   const inline = await runText(ctx, spec.summaryPrompt);
-  // 方式二：额外尝试一个探针自定义的 attachments 约定字段，纯粹用于探测上游是否有原生附件概念
+  // Cách 2: Thử thêm một trường quy ước attachments do probe tự định nghĩa, thuần túy để thăm dò upstream có khái niệm tệp đính kèm gốc hay không
   const viaAttachmentField = await runText(ctx, `请总结附件内容。`, {
     passthrough: {
       attachments: [{ name: 'probe-sample.txt', mimeType: 'text/plain', textContent: spec.sampleText }],
@@ -97,7 +97,7 @@ async function runAttachmentCase(ctx: ProbeContext, spec: AttachmentCaseSpec): P
   });
 }
 
-/** #5 文本附件：能否对内联的文本内容做摘要。 */
+/** #5 Tệp đính kèm văn bản: Có thể tóm tắt nội dung văn bản nội dòng hay không. */
 export function caseTextAttachment(ctx: ProbeContext): Promise<CapabilityResult> {
   return runAttachmentCase(ctx, {
     id: 'text_attachment',
@@ -108,7 +108,7 @@ export function caseTextAttachment(ctx: ProbeContext): Promise<CapabilityResult>
   });
 }
 
-/** #6 PDF 与 Office 附件：能否对「已提取出的 PDF/Office 文本」做摘要（提取本身是服务端 M6 的职责，探针只测上游对提取结果的处理）。 */
+/** #6 Tệp đính kèm PDF và Office: Có thể tóm tắt "văn bản PDF/Office đã trích xuất" không (việc trích xuất là trách nhiệm của M6 server, probe chỉ kiểm tra việc upstream xử lý kết quả trích xuất). */
 export function casePdfOfficeAttachment(ctx: ProbeContext): Promise<CapabilityResult> {
   return runAttachmentCase(ctx, {
     id: 'pdf_office_attachment',

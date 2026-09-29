@@ -16,25 +16,27 @@ import {
 } from './protocol.js';
 
 /**
- * 单次上游对话连接。
+ * Kết nối đối thoại upstream đơn lẻ.
  *
- * 一个 SydneyConnection 实例 = 一次 WebSocket 连接上的一次 invocation。
- * 负责：握手、心跳、空闲超时、帧重组、把原始消息映射为归一化事件、取消。
+ * Một instance SydneyConnection = một lần invocation trên một kết nối WebSocket.
+ * Chịu trách nhiệm: bắt tay, nhịp tim (heartbeat), hết thời gian chờ rỗi (idle timeout),
+ * tái tổ hợp frame, ánh xạ raw message thành các sự kiện đã chuẩn hóa, hủy bỏ.
  *
- * 断线重连与切账号不在这里——它们意味着「用本地已累积的上下文重建对话」，
- * 由调度器编排（见 scheduler）。本层只忠实反映一次连接的生命周期，
- * 出错时抛出**已分类**的 UpstreamError。
+ * Việc kết nối lại khi mất mạng và đổi tài khoản không nằm ở đây — chúng biểu thị việc
+ * "tái tạo đối thoại bằng ngữ cảnh đã tích lũy ở local", do scheduler điều phối (xem scheduler).
+ * Tầng này chỉ phản ánh trung thực vòng đời của một kết nối đơn lẻ,
+ * khi lỗi xảy ra sẽ throw UpstreamError **đã được phân loại**.
  */
 
 export interface ConnectionDeps {
   config: UpstreamConfig;
   codec: ProtocolCodec;
   logger: Logger;
-  /** 出口代理 URL（HTTPS_PROXY / HTTP_PROXY），用于把上游流量绑定到指定出口 */
+  /** URL proxy outbound (HTTPS_PROXY / HTTP_PROXY), dùng để liên kết lưu lượng upstream tới outbound chỉ định */
   proxyUrl?: string | null;
-  /** NO_PROXY 排除列表；目标主机命中时即使配置了 proxyUrl 也直连 */
+  /** Danh sách loại trừ NO_PROXY; máy chủ đích nếu khớp sẽ kết nối trực tiếp dù proxyUrl đã được cấu hình */
   noProxy?: string | null;
-  /** 注入 WebSocket 实现，测试用；默认使用 ws 库 */
+  /** Inject implementation WebSocket, dùng cho kiểm thử; mặc định dùng thư viện ws */
   wsFactory?: (url: string, options: ClientOptions) => WebSocket;
 }
 
@@ -43,12 +45,12 @@ export interface RunInput {
   invocationId: string;
   text: string;
   conversationRef?: string | undefined;
-  /** 账号的对象 ID，原样转交给 codec 填 `participant.id`（M0 实测确认真实上游需要这个字段） */
+  /** Object ID của tài khoản, truyền nguyên trạng cho codec điền `participant.id` (M0 xác nhận upstream thật cần trường này) */
   oid?: string | undefined;
   passthrough?: Record<string, unknown> | undefined;
   tools?: readonly ToolDeclaration[] | undefined;
   toolResults?: readonly ToolResultInput[] | undefined;
-  /** 外部取消信号：中止后连接会向上游发取消帧并关闭 */
+  /** Tín hiệu hủy từ bên ngoài: sau khi abort kết nối sẽ gửi frame hủy lên upstream và đóng lại */
   signal?: AbortSignal | undefined;
 }
 
@@ -64,8 +66,8 @@ export class SydneyConnection {
   }
 
   /**
-   * 连接并跑完一次 invocation，按到达顺序 yield 归一化事件。
-   * 正常结束于 completion；异常抛 UpstreamError。
+   * Kết nối và chạy trọn vẹn một invocation, yield các sự kiện đã chuẩn hóa theo thứ tự đến.
+   * Kết thúc bình thường tại completion; bất thường sẽ ném UpstreamError.
    */
   async *run(input: RunInput): AsyncGenerator<UpstreamEvent> {
     const { config, codec, logger } = this.#deps;
@@ -73,8 +75,8 @@ export class SydneyConnection {
     const reassembler = new FrameReassembler();
     let handshakeAcked = false;
 
-    // X-Scenario 是上游放行的硬条件：不带它一律 403（空响应体、无 WWW-Authenticate，
-    // 看起来完全像「这个账号没权限」，实测排查时极具误导性）。取值必须精确匹配。
+    // X-Scenario là điều kiện cứng để upstream thông qua: thiếu nó luôn bị 403 (body rỗng, không có WWW-Authenticate,
+    // trông hoàn toàn như "tài khoản này không có quyền", gây hiểu nhầm rất lớn khi điều tra thực tế). Giá trị phải khớp chính xác.
     const options: ClientOptions = {
       handshakeTimeout: config.handshakeTimeoutMs,
       headers: { 'X-Scenario': config.scenario },
@@ -83,7 +85,7 @@ export class SydneyConnection {
       const targetHost = hostnameFromUrl(input.url);
       const bypass = targetHost !== null && shouldBypassProxy(targetHost, this.#deps.noProxy);
       if (bypass) {
-        logger.debug({ url: redactWsUrl(input.url) }, '目标主机命中 NO_PROXY，直连不走出口代理');
+        logger.debug({ url: redactWsUrl(input.url) }, 'Máy chủ đích khớp NO_PROXY, kết nối trực tiếp không qua proxy');
       } else {
         options.agent = new HttpsProxyAgent(this.#deps.proxyUrl);
       }
@@ -96,21 +98,21 @@ export class SydneyConnection {
       if (this.#idleTimer !== null) clearTimeout(this.#idleTimer);
       this.#idleTimer = setTimeout(() => {
         queue.fail(
-          new UpstreamError('上游空闲超时，未在预期时间内收到帧', 'retry_or_switch', { statusCode: null }),
+          new UpstreamError('Upstream hết thời gian chờ rỗi, không nhận được frame trong thời gian dự kiến', 'retry_or_switch', { statusCode: null }),
         );
         this.#teardown(1000);
       }, config.idleTimeoutMs);
       this.#idleTimer.unref?.();
     };
 
-    // WS 握手阶段的 HTTP 错误（401/403/429）在这里才能拿到状态码
+    // Lỗi HTTP giai đoạn bắt tay WS (401/403/429) chỉ ở đây mới lấy được mã trạng thái
     ws.on('unexpected-response', (_req, res) => {
       queue.fail(classifyHttpStatus(readStatusCode(res), readRetryAfterHeader(res)));
       this.#teardown();
     });
 
     ws.on('open', () => {
-      logger.debug({ url: redactWsUrl(input.url) }, '上游 WebSocket 已连接，发送握手');
+      logger.debug({ url: redactWsUrl(input.url) }, 'WebSocket upstream đã kết nối, gửi bắt tay (handshake)');
       ws.send(codec.encodeHandshake());
       resetIdle();
     });
@@ -118,7 +120,7 @@ export class SydneyConnection {
     ws.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
       resetIdle();
       const text = bufferToString(data);
-      // 握手 ack 之前，第一段文本用于确认握手成功并触发 invocation
+      // Trước khi nhận ack bắt tay, đoạn văn bản đầu tiên dùng để xác nhận bắt tay thành công và kích hoạt invocation
       if (!handshakeAcked) {
         if (codec.isHandshakeAck(text)) {
           handshakeAcked = true;
@@ -136,14 +138,14 @@ export class SydneyConnection {
           );
           return;
         }
-        // 首帧不是 ack：可能握手就把内容一起回来了，继续按普通消息处理
+        // Frame đầu tiên không phải ack: có thể việc bắt tay đã trả về nội dung cùng lúc, tiếp tục xử lý như message thông thường
         handshakeAcked = true;
         this.#startHeartbeat(ws, codec, config.heartbeatIntervalMs);
       }
 
       for (const message of reassembler.push(text)) {
         if (message.type === MESSAGE_TYPE.PING) {
-          // 回应心跳
+          // Phản hồi nhịp tim ping
           ws.send(codec.encodePing());
           continue;
         }
@@ -170,9 +172,9 @@ export class SydneyConnection {
     });
 
     ws.on('error', (error: Error) => {
-      // 'error' 常伴随 'close'/'unexpected-response'；若队列已结束则忽略
+      // 'error' thường đi kèm 'close' / 'unexpected-response'; nếu hàng đợi đã kết thúc thì bỏ qua
       queue.fail(
-        new UpstreamError(`上游连接错误：${error.message}`, 'retry_or_switch', {
+        new UpstreamError(`Lỗi kết nối upstream: ${error.message}`, 'retry_or_switch', {
           statusCode: null,
           cause: error,
         }),
@@ -181,13 +183,13 @@ export class SydneyConnection {
     });
 
     const onAbort = (): void => {
-      logger.debug('收到取消信号，向上游发送取消帧');
+      logger.debug('Nhận được tín hiệu hủy, gửi frame hủy lên upstream');
       try {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(codec.encodeCancel(input.invocationId));
         }
       } catch {
-        // 取消是尽力而为，发送失败也要继续关闭
+        // Hủy theo cơ chế nỗ lực tối đa (best-effort), dù gửi thất bại cũng tiếp tục đóng
       }
       queue.end();
       this.#teardown(1000);
@@ -215,7 +217,7 @@ export class SydneyConnection {
         try {
           ws.send(codec.encodePing());
         } catch {
-          // 发送失败会由 error/close 事件接管
+          // Gửi thất bại sẽ do sự kiện error/close tiếp quản
         }
       }
     }, intervalMs);
@@ -238,7 +240,7 @@ export class SydneyConnection {
         if (closeCode !== undefined) this.#ws.close(closeCode);
         else this.#ws.terminate();
       } catch {
-        // 关闭异常忽略
+        // Bỏ qua ngoại lệ khi đóng
       }
       this.#ws = null;
     }
@@ -256,9 +258,9 @@ function bufferToString(data: Buffer | ArrayBuffer | Buffer[]): string {
 }
 
 /**
- * 从 ws 的 'unexpected-response' 回调里安全取出状态码与 Retry-After。
- * ws 对该回调参数的类型标注在不同版本间会退化成 any，这里按 unknown 处理，
- * 不让 any 泄漏进业务逻辑。
+ * Trích xuất an toàn mã trạng thái và Retry-After từ callback 'unexpected-response' của ws.
+ * Type annotation của ws cho tham số callback này có thể suy biến thành any qua các phiên bản,
+ * ở đây xử lý theo unknown để không để any rò rỉ vào logic nghiệp vụ.
  */
 function readStatusCode(res: unknown): number {
   if (typeof res === 'object' && res !== null) {

@@ -5,7 +5,7 @@ import { openDatabase, runMigrations, type Database } from '../src/db/index.js';
 import { maskProxyUrl, protocolOf, ProxyNodeRepository } from '../src/repo/proxyNodes.js';
 
 /**
- * 出口代理池（§13.1）：url 含账号密码，必须加密存储；对外只出现打码结果。
+ * Pool proxy gửi đi (§13.1): URL chứa username/password, bắt buộc phải lưu trữ mã hóa; ra ngoài chỉ hiển thị kết quả đã mask.
  */
 
 let db: Database;
@@ -45,7 +45,7 @@ describe('协议识别', () => {
     expect(protocolOf('http://x:1')).toBe('http');
     expect(protocolOf('https://x:1')).toBe('https');
     expect(protocolOf('socks5://u:p@x:1')).toBe('socks5');
-    expect(protocolOf('ftp://x:1')).toBe('http'); // 未识别的一律归为 http
+    expect(protocolOf('ftp://x:1')).toBe('http'); // Không nhận diện được đều quy về http
   });
 });
 

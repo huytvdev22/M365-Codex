@@ -2,18 +2,18 @@ import { ApiError } from '@m365-codex/shared';
 import Ajv2020Cjs from 'ajv/dist/2020.js';
 import type { ToolDeclaration } from '../adapter/protocol.js';
 
-// ajv 是 CJS，NodeNext 下默认导入绑定命名空间，真正的类在 .default 上
+// ajv là CJS, dưới NodeNext import mặc định liên kết namespace, class thực sự nằm trên .default
 const Ajv2020 = Ajv2020Cjs.default;
 
 /**
- * 工具（函数）声明的解析、校验与参数校验（对应实施计划 §7.2、§7.3）。
+ * Phân tích, xác thực khai báo công cụ (hàm) và xác thực tham số (tương ứng kế hoạch triển khai §7.2, §7.3).
  *
- * 接受 OpenAI Responses 的两种 function 工具写法：
- *   { type: 'function', name, description, parameters }        （扁平）
- *   { type: 'function', function: { name, description, parameters } }（嵌套）
+ * Chấp nhận 2 cách viết công cụ function của OpenAI Responses:
+ *   { type: 'function', name, description, parameters }        (phẳng)
+ *   { type: 'function', function: { name, description, parameters } } (lồng nhau)
  *
- * 参数用 JSON Schema 校验模型产出的工具调用参数；不合法时给出可读错误，
- * 供「最多两次参数修复」使用。
+ * Tham số dùng JSON Schema để kiểm tra tham số gọi công cụ do mô hình sinh ra; khi không hợp lệ sẽ trả về lỗi dễ đọc,
+ * phục vụ cho cơ chế "tối đa 2 lần sửa tham số".
  */
 
 export interface ParsedTool {
@@ -21,24 +21,24 @@ export interface ParsedTool {
   description: string | null;
   parameters: Record<string, unknown> | null;
   /**
-   * 是否可能产生副作用。默认 true（保守：从不自动跨账号重放任何工具调用）。
-   * 工具定义里可用 `x_side_effect: false` 显式标为只读。
+   * Có khả năng gây tác dụng phụ hay không. Mặc định true (thận trọng: không bao giờ tự động phát lại bất kỳ lệnh gọi công cụ nào qua tài khoản khác).
+   * Trong định nghĩa công cụ có thể dùng `x_side_effect: false` để đánh dấu rõ ràng là chỉ đọc.
    */
   sideEffect: boolean;
 }
 
 /**
- * 参数校验失败的原因。三者的处置不同（§7.3）：
- * - `undeclared`  —— 调了没声明的工具，修复无果后**绝不发给客户端**；
- * - `invalid_json` —— 参数不是合法 JSON，修复无果后发出去客户端也解析不了，判失败；
- * - `schema`      —— JSON 合法但不满足工具 schema，修复无果后如实发出并记录告警。
+ * Lý do kiểm tra tham số thất bại. Cách xử lý của 3 loại này khác nhau (§7.3):
+ * - `undeclared`  —— Gọi công cụ chưa khai báo, sau khi sửa không thành công thì **tuyệt đối không gửi cho client**;
+ * - `invalid_json` —— Tham số không phải JSON hợp lệ, sửa không thành công thì gửi đi client cũng không parse được, đánh giá thất bại;
+ * - `schema`      —— JSON hợp lệ nhưng không thỏa mãn schema công cụ, sửa không thành công thì gửi nguyên dạng và ghi log cảnh báo.
  */
 export type ValidationReason = 'undeclared' | 'invalid_json' | 'schema';
 
 export interface ArgumentValidation {
   valid: boolean;
   reason?: ValidationReason;
-  /** 人类可读的错误摘要，用于向模型请求修复 */
+  /** Tóm tắt lỗi con người có thể đọc được, dùng để yêu cầu mô hình sửa đổi */
   errors: string[];
 }
 
@@ -46,7 +46,7 @@ function asObject(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }
 
-/** 被跳过的工具：客户端声明了，但本网关执行不了（OpenAI 托管工具等）。 */
+/** Công cụ bị bỏ qua: Client đã khai báo nhưng gateway này không thể thực thi (công cụ OpenAI quản lý, v.v.). */
 export interface SkippedTool {
   name: string;
   type: string;
@@ -54,18 +54,18 @@ export interface SkippedTool {
 }
 
 /**
- * 解析一个工具定义，返回**一个或多个** ParsedTool。
+ * Phân tích một định nghĩa công cụ, trả về **một hoặc nhiều** ParsedTool.
  *
- * 真实 Codex（v0.145）一次会发三种形态，这里都要认（2026-07-26 实测抓包）：
- *   { type:'function', name, description, strict, parameters }   —— 扁平 function
- *   { type:'function', function:{…} }                            —— 嵌套 function
- *   { type:'namespace', name, description, tools:[function…] }   —— 一组子工具（如 multi_agent_v1）
- * namespace 按其子工具**摊平**登记：模型仍按子工具原名调用，本网关只是把分组拆开。
+ * Codex thực tế (v0.145) sẽ gửi 3 dạng, ở đây đều phải nhận diện (packet capture thực tế ngày 2026-07-26):
+ *   { type:'function', name, description, strict, parameters }   —— function phẳng
+ *   { type:'function', function:{…} }                            —— function lồng nhau
+ *   { type:'namespace', name, description, tools:[function…] }   —— một nhóm công cụ con (như multi_agent_v1)
+ * namespace được **làm phẳng** theo các công cụ con của nó để đăng ký: Mô hình vẫn gọi theo tên gốc của công cụ con, gateway chỉ tách nhóm ra.
  *
- * 其余类型（web_search / file_search / code_interpreter / image_generation…）是
- * OpenAI 托管工具，本项目执行不了（见 §24.3）。这类**跳过而不是报错**：
- * 直接 422 会让默认配置的 Codex 完全用不了，而跳过既不假装支持（工具不会出现在
- * 给上游的目录里，模型真去调也会被「未声明工具」挡下），又能通过 skipped 明确告知调用方。
+ * Các loại còn lại (web_search / file_search / code_interpreter / image_generation…) là
+ * công cụ do OpenAI quản lý, dự án này không thể thực thi (xem §24.3). Loại này **bỏ qua thay vì báo lỗi**:
+ * Trả về 422 trực tiếp sẽ khiến Codex với cấu hình mặc định hoàn toàn không dùng được, trong khi bỏ qua vừa không giả vờ hỗ trợ (công cụ không xuất hiện
+ * trong danh mục gửi cho upstream, mô hình thực sự gọi cũng sẽ bị chặn bởi "công cụ chưa khai báo"), vừa có thể thông báo rõ cho caller qua skipped.
  */
 export function parseTool(raw: unknown, index: number, skipped?: SkippedTool[]): ParsedTool[] {
   const obj = asObject(raw);
@@ -105,7 +105,7 @@ export function parseTool(raw: unknown, index: number, skipped?: SkippedTool[]):
   return [{ name, description, parameters, sideEffect }];
 }
 
-/** 工具注册表：按名字索引，供参数校验与副作用判定。 */
+/** Registry công cụ: index theo tên, dùng để kiểm tra tham số và xác định tác dụng phụ. */
 export class ToolRegistry {
   readonly #tools = new Map<string, ParsedTool>();
   readonly #skipped: SkippedTool[];
@@ -122,7 +122,7 @@ export class ToolRegistry {
     if (rawTools === undefined) return new ToolRegistry([]);
     const skipped: SkippedTool[] = [];
     const parsed = rawTools.flatMap((raw, index) => parseTool(raw, index, skipped));
-    // 名字重复直接报错，避免歧义
+    // Tên trùng lặp báo lỗi trực tiếp để tránh nhập nhằng
     const seen = new Set<string>();
     for (const tool of parsed) {
       if (seen.has(tool.name)) {
@@ -133,7 +133,7 @@ export class ToolRegistry {
     return new ToolRegistry(parsed, skipped);
   }
 
-  /** 客户端声明了但本网关执行不了、已被跳过的工具。调用方应据此告知用户。 */
+  /** Công cụ client khai báo nhưng gateway này không thể thực thi và đã bị bỏ qua. Phía gọi nên dựa vào đây để thông báo cho người dùng. */
   get skipped(): readonly SkippedTool[] {
     return this.#skipped;
   }
@@ -155,11 +155,11 @@ export class ToolRegistry {
   }
 
   isSideEffect(name: string): boolean {
-    // 未声明的工具也按副作用处理（保守）
+    // Công cụ chưa khai báo cũng xử lý như có tác dụng phụ (thận trọng)
     return this.#tools.get(name)?.sideEffect ?? true;
   }
 
-  /** 转成给上游的工具声明。 */
+  /** Chuyển đổi thành khai báo công cụ gửi cho upstream. */
   toDeclarations(): ToolDeclaration[] {
     return [...this.#tools.values()].map((tool) => ({
       name: tool.name,
@@ -169,13 +169,13 @@ export class ToolRegistry {
   }
 
   /**
-   * 校验模型产出的工具调用参数。
-   * 未声明的工具、非法 JSON、或不符合 schema 都返回 valid=false 与错误摘要。
+   * Kiểm tra tham số gọi công cụ do mô hình sinh ra.
+   * Công cụ chưa khai báo, JSON không hợp lệ hoặc không khớp schema đều trả về valid=false kèm tóm tắt lỗi.
    */
   validateArguments(name: string, argumentsJson: string): ArgumentValidation {
     const tool = this.#tools.get(name);
     if (tool === undefined) {
-      // 工具名精确匹配：大小写、空格差异都算未声明
+      // Tên công cụ khớp chính xác: khác biệt chữ hoa/thường, khoảng trắng đều tính là chưa khai báo
       return { valid: false, reason: 'undeclared', errors: [`调用了未声明的工具 ${name}`] };
     }
 
@@ -186,7 +186,7 @@ export class ToolRegistry {
       return { valid: false, reason: 'invalid_json', errors: ['工具参数不是合法 JSON'] };
     }
 
-    // 无参数 schema 的工具只要求参数是 JSON 对象
+    // Công cụ không có schema tham số chỉ yêu cầu tham số là đối tượng JSON
     if (tool.parameters === null) {
       return typeof parsed === 'object' && parsed !== null
         ? { valid: true, errors: [] }
@@ -197,7 +197,7 @@ export class ToolRegistry {
     try {
       validate = this.#ajv.compile(tool.parameters);
     } catch (error) {
-      // schema 本身无法编译：不拦截调用，但记录
+      // Bản thân schema không thể biên dịch: không chặn lệnh gọi nhưng ghi nhận lại
       return {
         valid: false,
         reason: 'schema',

@@ -16,7 +16,7 @@
     "build": "tsc -b apps/server && npm run build --prefix apps/web",
     "clean": "tsc -b --clean apps/server",
     "dev": "npm run dev --workspace @m365-codex/server",
-    "start": "node apps/server/dist/server.js",
+    "start": "node --env-file=.env apps/server/dist/server.js",
     "test": "npm run test --workspace @m365-codex/server",
     "test:coverage": "npm run test:coverage --workspace @m365-codex/server",
     "typecheck": "tsc -b apps/server && tsc --noEmit -p apps/server/tsconfig.test.json",

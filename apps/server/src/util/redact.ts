@@ -1,6 +1,6 @@
-/** 脱敏工具：写日志/审计时对敏感字段打码。 */
+/** Công cụ che giấu thông tin nhạy cảm (redact): Che mờ các trường nhạy cảm khi ghi log / kiểm toán. */
 
-/** 邮箱脱敏：保留前 2 位与域名，其余打码，例如 `fo***@example.com`。 */
+/** Che giấu email: Giữ lại 2 ký tự đầu và tên miền, phần còn lại che bằng dấu sao, ví dụ `fo***@example.com`. */
 export function maskEmail(email: string | null | undefined): string {
   if (email == null || email === '') return '(无邮箱)';
   const at = email.indexOf('@');

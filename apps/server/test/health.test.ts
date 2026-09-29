@@ -54,7 +54,7 @@ describe('GET /readyz', () => {
     const { testEnv } = await import('./helpers/testApp.js');
 
     const config = loadConfig(testEnv());
-    const db = openDatabase(':memory:'); // 故意不执行迁移
+    const db = openDatabase(':memory:'); // Cố ý không thực thi migration
     const context = createContext({ config, db, logger: pino({ level: 'silent' }) });
     const app = buildApp(context);
     await app.ready();

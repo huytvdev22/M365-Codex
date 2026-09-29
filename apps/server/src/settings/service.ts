@@ -6,13 +6,13 @@ import type { SettingsRepository } from '../repo/settings.js';
 import type { PrivacyModeHolder } from '../observability/privacyMode.js';
 
 /**
- * 设置读写的分组语义（对应实施计划 §M7、契约 §2.3）。
+ * Ngữ nghĩa phân nhóm khi đọc và ghi cài đặt (tương ứng kế hoạch triển khai §M7, hợp đồng §2.3).
  *
- * 核心规则：环境变量显式设置过的项 `source: "env"`、`editable: false`——容器
- * 编排是唯一真源，UI 不能悄悄盖掉；其余项存进 `settings` 表，`requires_restart`
- * 为真的项要等下次进程重启（`server.ts` 把 settings 表内容合成 env 覆盖层，
- * 重新走一遍 `loadConfig`）才会生效，此前体现为 `/admin/overview` 的
- * `pending_restart` 列表；只有 `logging.log_level` 是真正热生效的项。
+ * Quy tắc cốt lõi: Các mục đã thiết lập rõ ràng qua biến môi trường sẽ có `source: "env"`, `editable: false` — bộ điều phối
+ * container là nguồn chân lý duy nhất, UI không thể âm thầm ghi đè; các mục còn lại được lưu vào bảng `settings`, mục nào có `requires_restart`
+ * là true sẽ phải đợi lần khởi động lại tiến trình tiếp theo (`server.ts` tổng hợp nội dung bảng settings thành lớp ghi đè env,
+ * chạy lại `loadConfig`) mới có hiệu lực, trước đó sẽ thể hiện trong danh sách `pending_restart` của `/admin/overview`;
+ * chỉ có `logging.log_level` là mục thực sự có hiệu lực nóng (hot-reload).
  */
 
 export type SettingGroup = 'network' | 'scheduler' | 'logging' | 'oauth' | 'tools' | 'files';
@@ -39,9 +39,9 @@ interface FieldDef {
   envVar: string;
   type: SettingValueType;
   requiresRestart: boolean;
-  /** 当前生效值：来自本进程启动时锁定的 `AppConfig`。 */
+  /** Giá trị hiệu lực hiện tại: Lấy từ `AppConfig` đã khóa khi tiến trình này khởi động. */
   readConfig: (config: AppConfig) => unknown;
-  /** 额外的语义校验（类型校验之外），例如上限约束。 */
+  /** Xác thực ngữ nghĩa bổ sung (ngoài kiểm tra kiểu dữ liệu), ví dụ ràng buộc giới hạn trên. */
   validate?: (value: unknown) => string | null;
 }
 
@@ -146,9 +146,9 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
       field: 'log_privacy_mode',
       envVar: 'LOG_PRIVACY_MODE',
       type: 'string',
-      // 与 log_level 一样是热生效的例外：debug 的自动过期必须立刻收紧回
-      // strict，不能等到不知道什么时候的下次重启（见 #applyHot 与
-      // observability/privacyMode.ts 顶部注释）
+      // Cùng là ngoại lệ có hiệu lực nóng giống log_level: debug tự động hết hạn phải ngay lập tức siết chặt về
+      // strict, không thể chờ đến lần khởi động lại tiếp theo (xem #applyHot và
+      // chú thích đầu file observability/privacyMode.ts)
       requiresRestart: false,
       readConfig: (c) => c.logPrivacyMode,
       validate: (v) =>
@@ -237,7 +237,7 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
       type: 'number',
       requiresRestart: true,
       readConfig: (c) => c.tools.maxArgRepairs,
-      // 上限被协议规则锁死为 2（§7.3），设置项不能突破这个天花板
+      // Giới hạn trên bị quy tắc giao thức khóa cứng ở mức 2 (§7.3), mục cài đặt không thể vượt quá trần này
       validate: (v) =>
         typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= MAX_ARG_REPAIRS_CEILING
           ? null
@@ -315,9 +315,9 @@ export class SettingsService {
     repo: SettingsRepository;
     config: AppConfig;
     logger: Logger;
-    /** 用于让 log_privacy_mode 真正热生效；不传时该项的写入只落库，不影响运行时行为 */
+    /** Dùng để log_privacy_mode thực sự có hiệu lực nóng; nếu không truyền thì ghi nhận mục này chỉ lưu DB, không ảnh hưởng hành vi runtime */
     privacyMode?: PrivacyModeHolder;
-    /** debug 自动过期时写审计日志；不传时静默跳过（供不关心审计的场景，如轻量单测） */
+    /** Ghi audit log khi debug tự động hết hạn; nếu không truyền sẽ âm thầm bỏ qua (dành cho ngữ cảnh không quan tâm audit, như unit test nhẹ) */
     auditLogs?: AuditLogRepository;
   }) {
     this.#repo = deps.repo;
@@ -334,9 +334,9 @@ export class SettingsService {
       out[def.field] = this.#view(group, def);
     }
     if (group === 'logging') {
-      // debug_expires_at 不是普通配置项（不能通过 PATCH 直接设置具体时间戳，
-      // 只能靠把 log_privacy_mode 切到 debug 间接产生），因此不走 FIELD_DEFS，
-      // 单独合成一份只读视图供管理界面展示（契约 §2.3 的扩展）
+      // debug_expires_at không phải mục cấu hình thông thường (không thể trực tiếp đặt timestamp cụ thể qua PATCH,
+      // chỉ sinh ra gián tiếp khi chuyển log_privacy_mode sang debug), do đó không đi qua FIELD_DEFS,
+      // được tổng hợp riêng thành một view chỉ đọc để giao diện quản trị hiển thị (mở rộng của hợp đồng §2.3)
       out.debug_expires_at = this.#debugExpiresAtView();
     }
     return out;
@@ -348,7 +348,7 @@ export class SettingsService {
     return out;
   }
 
-  /** 批量写一个分组；任何一项不合法或触碰 env 锁定项都整体拒绝，不留半截更新。 */
+  /** Ghi hàng loạt cho một nhóm; bất kỳ mục nào không hợp lệ hoặc chạm vào mục env bị khóa đều từ chối toàn bộ, không để lại cập nhật dở dang. */
   patchGroup(group: SettingGroup, values: Record<string, unknown>): Record<string, SettingFieldView> {
     const defs = FIELD_DEFS[group];
     if (defs === undefined) throw ApiError.badRequest(`未知的设置分组：${group}`, 'group');
@@ -371,7 +371,7 @@ export class SettingsService {
       if (error !== null) throw ApiError.badRequest(error, field);
     }
 
-    // 校验全部通过后再落库，避免一半写入一半报错
+    // Kiểm tra tất cả đều hợp lệ rồi mới ghi DB, tránh việc một nửa ghi được một nửa báo lỗi
     for (const field of Object.keys(values)) {
       const def = byField.get(field);
       if (def === undefined) continue;
@@ -379,8 +379,8 @@ export class SettingsService {
       if (!def.requiresRestart) this.#applyHot(group, def, values[field]);
     }
 
-    // debug 自动过期（§15.3）：只在这次 PATCH 确实改了 log_privacy_mode 时才
-    // 重新计算/清除，避免每次改别的日志项（如 log_level）都误触发
+    // Tự động hết hạn debug (§15.3): Chỉ khi lần PATCH này thực sự thay đổi log_privacy_mode mới
+    // tính toán lại / xóa bỏ, tránh việc mỗi lần đổi mục log khác (như log_level) đều kích hoạt nhầm
     if (group === 'logging' && Object.prototype.hasOwnProperty.call(values, 'log_privacy_mode')) {
       this.#syncDebugExpiry(values.log_privacy_mode as LogPrivacyMode);
     }
@@ -388,10 +388,10 @@ export class SettingsService {
   }
 
   /**
-   * debug 到期检查（对应实施计划 §15.3）：过期后自动恢复 strict、清掉过期
-   * 时间、写一条审计日志。设计成被 `MaintenanceScheduler` 定时调用，不再
-   * 另起一个定时器；返回值是本次是否发生了恢复动作（0 或 1），与其它
-   * maintenance job 的 `run()` 约定一致，供调度状态里的“处理条数”展示。
+   * Kiểm tra hết hạn debug (tương ứng kế hoạch triển khai §15.3): Sau khi hết hạn tự động khôi phục strict, xóa bỏ
+   * thời gian hết hạn, ghi một dòng nhật ký kiểm toán. Thiết kế để MaintenanceScheduler gọi định kỳ, không cần
+   * tạo thêm một timer riêng; giá trị trả về là lần này có phát sinh hành động khôi phục hay không (0 hoặc 1),
+   * khớp với quy ước run() của các job bảo trì khác, phục vụ hiển thị "số bản ghi đã xử lý" trong trạng thái lập lịch.
    */
   enforceDebugExpiry(now = Date.now()): number {
     const row = this.#repo.get('logging.debug_expires_at');
@@ -400,11 +400,11 @@ export class SettingsService {
     if (typeof expiresAt !== 'number' || now < expiresAt) return 0;
 
     this.#repo.delete('logging.debug_expires_at');
-    // env 显式锁定 LOG_PRIVACY_MODE 时不动它的值——正常情况下这不会发生
-    // （patchGroup 校验阶段就会拒绝把 env 锁定项写成 'debug'），只有重启时
-    // 「settings 表里的历史改动被合成一层 env 覆盖」这个既有机制（见
-    // server.ts 的 reloadConfigWithSettings）可能让它在重启后被误判为
-    // env 锁定；这种边缘情况下只清掉过期时间、不谎报"已恢复 strict"
+    // Biến môi trường khóa rõ ràng LOG_PRIVACY_MODE thì không động vào giá trị của nó — trong điều kiện bình thường điều này không xảy ra
+    // (giai đoạn kiểm tra patchGroup sẽ từ chối đổi mục khóa env thành 'debug'), chỉ khi khởi động lại
+    // cơ chế sẵn có "các thay đổi lịch sử trong bảng settings được tổng hợp thành một lớp ghi đè env" (xem
+    // reloadConfigWithSettings trong server.ts) có thể khiến nó bị phán đoán nhầm là
+    // khóa bởi env sau khi khởi động lại; trong trường hợp biên này chỉ xóa thời gian hết hạn, không báo giả "đã khôi phục strict"
     if (!this.#envKeysPresent.has('LOG_PRIVACY_MODE')) {
       this.#repo.set('logging.log_privacy_mode', JSON.stringify('strict'), now);
       this.#privacyMode?.set('strict');
@@ -422,9 +422,9 @@ export class SettingsService {
   }
 
   /**
-   * 切到 debug 时按配置的 TTL 计算过期时间并落库；切回其它模式时清掉过期
-   * 时间，不留悬空状态（一个「已经不是 debug 了、却还有个未来过期时间」的
-   * 陈旧记录会误导管理界面）。
+   * Khi chuyển sang debug, tính toán thời gian hết hạn theo TTL đã cấu hình và lưu DB; khi chuyển về chế độ khác thì xóa
+   * thời gian hết hạn, không để lại trạng thái lơ lửng (bản ghi cũ "đã không còn là debug nữa nhưng vẫn còn thời gian hết hạn tương lai"
+   * sẽ gây hiểu lầm cho giao diện quản trị).
    */
   #syncDebugExpiry(mode: LogPrivacyMode, now = Date.now()): void {
     if (mode === 'debug') {
@@ -442,13 +442,13 @@ export class SettingsService {
     return { value, source: value === null ? 'default' : 'db', editable: false, requires_restart: false };
   }
 
-  /** `/admin/overview` 用：改了但要等重启才生效的配置项（以环境变量名表示）。 */
+  /** Dùng cho /admin/overview: Các mục cấu hình đã thay đổi nhưng phải đợi khởi động lại mới có hiệu lực (biểu thị bằng tên biến môi trường). */
   pendingRestartEnvVars(): string[] {
     const names: string[] = [];
     for (const group of SETTING_GROUPS) {
       for (const def of FIELD_DEFS[group]) {
         if (!def.requiresRestart) continue;
-        if (this.#envKeysPresent.has(def.envVar)) continue; // env 是唯一真源，没有"待生效"一说
+        if (this.#envKeysPresent.has(def.envVar)) continue; // env là nguồn chân lý duy nhất, không có khái niệm "chờ hiệu lực"
         const row = this.#repo.get(`${group}.${def.field}`);
         if (row === undefined) continue;
         const stored = safeParse(row.value);
@@ -481,9 +481,9 @@ export class SettingsService {
   }
 
   /**
-   * 热生效项：`logging.log_level`（pino 的 level 可运行时修改）与
-   * `logging.log_privacy_mode`（debug 自动过期必须立刻收紧，见
-   * observability/privacyMode.ts）。
+   * Các mục hiệu lực nóng: `logging.log_level` (level của pino có thể sửa đổi tại runtime) và
+   * `logging.log_privacy_mode` (debug tự động hết hạn phải lập tức siết chặt, xem
+   * observability/privacyMode.ts).
    */
   #applyHot(group: SettingGroup, def: FieldDef, value: unknown): void {
     if (group !== 'logging') return;
@@ -512,8 +512,8 @@ function toEnvString(type: SettingValueType, value: unknown): string | null {
 }
 
 /**
- * 把 settings 表里「需要重启才生效」的历史改动，合成一层 env 覆盖，供 `server.ts`
- * 在下一次启动时重新 `loadConfig()`。环境变量本身显式设置过的项永远不被覆盖。
+ * Tổng hợp các thay đổi lịch sử "cần khởi động lại mới có hiệu lực" trong bảng settings thành một lớp ghi đè env, để `server.ts`
+ * chạy lại `loadConfig()` ở lần khởi động kế tiếp. Các mục đã thiết lập rõ ràng qua biến môi trường sẽ không bao giờ bị ghi đè.
  */
 export function buildEnvOverridesFromSettings(
   repo: SettingsRepository,

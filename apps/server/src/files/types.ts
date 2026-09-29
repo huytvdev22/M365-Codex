@@ -1,49 +1,49 @@
 /**
- * 文件子系统的领域类型（对应实施计划 §11、§M6）。
+ * Các kiểu dữ liệu domain của hệ thống con tệp (tương ứng với Kế hoạch thực hiện §11, §M6).
  */
 
-/** 内容类别：决定走哪条文本提取路径，以及是否可作为图片输入。 */
+/** Loại nội dung: quyết định đi qua đường dẫn trích xuất văn bản nào, và có thể làm hình ảnh đầu vào hay không. */
 export const FILE_KINDS = ['text', 'pdf', 'docx', 'xlsx', 'pptx', 'image', 'unknown'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
-/** 文件行的处理状态。unsupported_feature（如 PDF 提取因审计不过关而禁用）单独归为 error 并写明原因。 */
+/** Trạng thái xử lý của dòng file. unsupported_feature (như trích xuất PDF bị tắt do audit) quy về error và nêu rõ lý do. */
 export const FILE_STATUSES = ['processed', 'error'] as const;
 export type FileStatus = (typeof FILE_STATUSES)[number];
 
 export const UPLOAD_STATUSES = ['pending', 'completed', 'cancelled', 'expired'] as const;
 export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
 
-/** 提取结果：成功给出文本；明确跳过（如图片/未识别二进制）给出原因；失败给出错误原因。 */
+/** Kết quả trích xuất: thành công trả về text; chủ động bỏ qua (như ảnh/binary không rõ) trả về lý do; thất bại trả về nguyên nhân lỗi. */
 export interface ExtractionResult {
-  /** 是否产出了可用文本 */
+  /** Có tạo ra văn bản khả dụng hay không */
   ok: boolean;
   text: string | null;
-  /** 未产出文本时的说明（跳过原因或失败原因），供 files 表 extraction_note 使用 */
+  /** Giải thích khi không tạo ra văn bản (lý do bỏ qua hoặc thất bại), dùng cho extraction_note của bảng files */
   note: string | null;
   /**
-   * ok=false 时区分两种情况：true=明确不提取（策略性跳过，如图片/未识别二进制/
-   * 不可信），不算错误；false=本该能提取却失败了（如 PDF/Office 文档解析出错、
-   * 声称是文本但内容不是合法 UTF-8）。files 表据此决定 status 是 processed 还是 error。
+   * Khi ok=false phân biệt 2 tình huống: true=chủ động không trích xuất (bỏ qua theo chính sách, như ảnh/binary không rõ/
+   * không đáng tin), không tính là lỗi; false=đáng lẽ trích xuất được nhưng thất bại (như PDF/Office hỏng,
+   * khai là text nhưng nội dung không phải UTF-8 hợp lệ). Bảng files dựa vào đây để quyết định status là processed hay error.
    */
   skipped: boolean;
 }
 
-/** 对外的 File 对象（对齐 OpenAI Files API 字段命名）。 */
+/** Đối tượng File đối ngoại (đồng bộ cách đặt tên trường với OpenAI Files API). */
 export interface FileObject {
   id: string;
   object: 'file';
   bytes: number;
-  /** 秒级 epoch，与 OpenAI 对齐 */
+  /** Epoch tính bằng giây, đồng bộ với OpenAI */
   created_at: number;
   filename: string;
   purpose: string;
   status: FileStatus;
   status_details: string | null;
-  /** 秒级 epoch；null 表示不自动过期 */
+  /** Epoch tính bằng giây; null biểu thị không tự động hết hạn */
   expires_at: number | null;
 }
 
-/** 对外的 Upload.Part 对象。 */
+/** Đối tượng Upload.Part đối ngoại. */
 export interface UploadPartObject {
   id: string;
   object: 'upload.part';
@@ -51,7 +51,7 @@ export interface UploadPartObject {
   upload_id: string;
 }
 
-/** 对外的 Upload 对象。 */
+/** Đối tượng Upload đối ngoại. */
 export interface UploadObject {
   id: string;
   object: 'upload';

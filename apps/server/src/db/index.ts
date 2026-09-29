@@ -6,7 +6,7 @@ import { LATEST_SCHEMA_VERSION, MIGRATIONS, type Migration } from './migrations.
 export { LATEST_SCHEMA_VERSION, MIGRATIONS };
 export type { Migration };
 
-/** SQLite 句柄类型别名，便于后续替换实现。 */
+/** Bí danh kiểu con trỏ SQLite, thuận tiện thay thế triển khai sau này. */
 export type Database = DatabaseSync;
 
 export const DB_FILE_NAME = 'm365-codex.sqlite';
@@ -18,14 +18,14 @@ export class DatabaseError extends Error {
   }
 }
 
-/** 由数据目录推导数据库文件路径。`:memory:` 直接透传，供测试使用。 */
+/** Suy ra đường dẫn file cơ sở dữ liệu từ thư mục dữ liệu. `:memory:` được truyền thẳng, dùng cho test. */
 export function resolveDatabasePath(dataDir: string): string {
   return dataDir === ':memory:' ? ':memory:' : join(dataDir, DB_FILE_NAME);
 }
 
 /**
- * 打开数据库并设置 WAL 等 pragma。
- * 目录不存在时自动创建，避免容器首次挂载空卷启动失败。
+ * Mở cơ sở dữ liệu và thiết lập các pragma như WAL.
+ * Tự động tạo thư mục nếu chưa tồn tại, tránh lỗi khởi động khi container mount volume rỗng lần đầu.
  */
 export function openDatabase(path: string): Database {
   if (path !== ':memory:') {
@@ -49,7 +49,7 @@ function ensureMigrationTable(db: Database): void {
   `);
 }
 
-/** 当前已应用的最高迁移版本；未初始化时返回 0。 */
+/** Phiên bản migration cao nhất đã áp dụng hiện tại; trả về 0 khi chưa khởi tạo. */
 export function currentSchemaVersion(db: Database): number {
   ensureMigrationTable(db);
   const result = asRow<{ version: number | null }>(
@@ -64,8 +64,8 @@ export interface MigrationResult {
 }
 
 /**
- * 按版本顺序执行未应用的迁移，整体包在一个事务里。
- * 任何一条失败都会回滚，不会留下半截 schema。
+ * Thực thi các migration chưa được áp dụng theo thứ tự phiên bản, được bao bọc trong một transaction.
+ * Bất kỳ câu lệnh nào thất bại sẽ rollback toàn bộ, không để lại schema dở dang.
  */
 export function runMigrations(db: Database, migrations: readonly Migration[] = MIGRATIONS): MigrationResult {
   ensureMigrationTable(db);
@@ -101,9 +101,9 @@ export function runMigrations(db: Database, migrations: readonly Migration[] = M
 }
 
 /**
- * node:sqlite 返回的是 `Record<string, SQLOutputValue>`，与业务行类型没有结构重叠，
- * 直接断言会被 TS 拒绝。这两个helper 把「查询结果 → 行类型」的转换集中到一处，
- * 避免在各 repo 里散落 `as unknown as`。
+ * node:sqlite trả về `Record<string, SQLOutputValue>`, không chồng chéo cấu trúc với row type của nghiệp vụ,
+ * ép kiểu trực tiếp sẽ bị TS từ chối. Hai helper này tập trung chuyển đổi "kết quả truy vấn → row type" về một nơi,
+ * tránh rải rác `as unknown as` trong các repo.
  */
 export function asRows<T>(result: unknown): T[] {
   return result as T[];
@@ -113,13 +113,13 @@ export function asRow<T>(result: unknown): T | undefined {
   return result as T | undefined;
 }
 
-/** 判断数据库是否可写：readyz 用它区分「只读挂载」这类部署错误。 */
+/** Kiểm tra cơ sở dữ liệu có thể ghi hay không: readyz dùng nó để phát hiện lỗi triển khai như mount read-only. */
 export function checkWritable(db: Database): { ok: boolean; detail: string } {
   try {
     db.exec('CREATE TABLE IF NOT EXISTS _write_probe (id INTEGER PRIMARY KEY)');
     db.exec('DELETE FROM _write_probe');
-    return { ok: true, detail: '数据库可写' };
+    return { ok: true, detail: 'Cơ sở dữ liệu có thể ghi' };
   } catch (error) {
-    return { ok: false, detail: `数据库不可写：${(error as Error).message}` };
+    return { ok: false, detail: `Cơ sở dữ liệu không thể ghi: ${(error as Error).message}` };
   }
 }

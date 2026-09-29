@@ -2,7 +2,7 @@ import { buildEvidence, makeResult, runText } from '../caseHelpers.js';
 import { TEXT_SHORT, ownLiterals } from '../testInputs.js';
 import type { CapabilityResult, ProbeContext } from '../types.js';
 
-/** #1 WebSocket 握手与鉴权：access_token 放在查询参数里，能否建立连接并完成一次握手。 */
+/** #1 Bắt tay WebSocket và xác thực: access_token đặt trong query param, xem có thể thiết lập kết nối và hoàn thành một lần bắt tay hay không. */
 export async function caseHandshakeAuth(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, TEXT_SHORT);

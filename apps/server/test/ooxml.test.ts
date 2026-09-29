@@ -10,8 +10,8 @@ import {
 } from '../src/files/ooxml.js';
 
 /**
- * 用 Python `zipfile`（deflate 压缩）生成的真实 ZIP 结构做夹具，
- * 而不是自己写的 ZIP 又自己读——避免"读写互相印证却都错"的问题。
+ * Dùng cấu trúc ZIP thật được tạo bởi `zipfile` (nén deflate) của Python làm fixture,
+ * thay vì tự viết ZIP rồi tự đọc — tránh vấn đề "đọc và ghi tự xác nhận lẫn nhau nhưng cả hai đều sai".
  */
 function fixture(name: string): Buffer {
   return readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)));

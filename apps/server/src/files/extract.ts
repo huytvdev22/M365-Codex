@@ -3,11 +3,11 @@ import { extractPdfText, PdfExtractionError } from './pdf.js';
 import type { ExtractionResult, FileKind } from './types.js';
 
 /**
- * 文本提取总调度（对应实施计划 §11、§M6）。
+ * Tổng điều phối trích xuất văn bản (tương ứng với Kế hoạch thực hiện §11, §M6).
  *
- * 提取本身绝不吞错误：能提取的给出文本，明确跳过的给出原因，失败的给出失败
- * 原因——三种情况在 `ExtractionResult` 里都清楚区分，不允许"看似成功但内容是
- * 空字符串"这种含糊状态。
+ * Bản thân việc trích xuất không nuốt lỗi: Có thể trích xuất được thì trả về văn bản, chủ động bỏ qua thì nêu rõ lý do,
+ * thất bại thì trả về nguyên nhân lỗi — cả 3 trường hợp đều phân biệt rõ ràng trong `ExtractionResult`, không cho phép
+ * trạng thái mơ hồ như "tưởng như thành công nhưng nội dung là chuỗi rỗng".
  */
 export async function extractText(
   buffer: Buffer,
@@ -30,7 +30,7 @@ export async function extractText(
     case 'pptx':
       return extractZipXml(() => extractPptxText(buffer));
     case 'image':
-      // 图片走 Responses 的 input_image 通道，不是文本提取的对象
+      // Hình ảnh đi qua kênh input_image của Responses, không phải đối tượng trích xuất văn bản
       return skip('图片文件用于图片输入，不做文本提取');
     case 'unknown':
       return skip('未识别的二进制文件，不猜测内容，仅存储');
@@ -43,8 +43,8 @@ function skip(note: string): ExtractionResult {
 
 function extractPlainText(buffer: Buffer): ExtractionResult {
   try {
-    // classify 阶段已用 fatal 解码验证过合法性，这里再解码一次是为了拿到真正的
-    // 字符串内容；理论上不会在这里失败，失败即视为内容不可提取而非抛异常中断。
+    // Giai đoạn classify đã giải mã bằng fatal để kiểm tra tính hợp lệ, giải mã lại ở đây để lấy chuỗi
+    // nội dung thực sự; về lý thuyết sẽ không lỗi ở đây, nếu lỗi tính là nội dung không thể trích xuất chứ không ngắt quãng tiến trình.
     const text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
     return { ok: true, text, note: null, skipped: false };
   } catch (error) {

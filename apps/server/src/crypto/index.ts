@@ -3,13 +3,13 @@ import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from '
 import { MASTER_KEY_BYTES } from '@m365-codex/shared';
 
 /**
- * AES-256-GCM 字段级加密（对应实施计划 §1.2）。
+ * Mã hóa cấp độ trường AES-256-GCM (tương ứng với Kế hoạch thực hiện §1.2).
  *
- * 设计要点：
- * - 每个敏感字段独立随机 nonce，绝不复用；
- * - 密文中附带认证标签，任何篡改都会在解密时失败；
- * - 记录密钥版本号，为后续主密钥轮换保留空间；
- * - 支持 AAD 绑定（例如账号 ID），防止把 A 账号的密文搬到 B 账号行上。
+ * Điểm thiết kế chính:
+ * - Mỗi trường nhạy cảm dùng một nonce ngẫu nhiên độc lập, tuyệt đối không tái sử dụng;
+ * - Bản mã kèm theo thẻ xác thực (auth tag), mọi hành vi giả mạo đều thất bại khi giải mã;
+ * - Ghi lại số phiên bản khóa, chừa không gian cho việc xoay vòng khóa chính sau này;
+ * - Hỗ trợ liên kết AAD (ví dụ account ID), ngăn chặn việc chuyển bản mã của tài khoản A sang dòng của tài khoản B.
  */
 
 export const NONCE_BYTES = 12;
@@ -23,9 +23,9 @@ export class CryptoError extends Error {
   }
 }
 
-/** 加密后的字段：三者需一起持久化。 */
+/** Trường sau khi mã hóa: Cả 3 thành phần cần được lưu trữ cùng nhau. */
 export interface SealedValue {
-  /** 密文 + 16 字节认证标签 */
+  /** Bản mã + 16 byte thẻ xác thực */
   ciphertext: Buffer;
   nonce: Buffer;
   keyVersion: number;
@@ -36,9 +36,9 @@ export class Cryptor {
   readonly #currentVersion: number;
 
   /**
-   * @param currentKey 当前主密钥（32 字节）
-   * @param currentVersion 当前密钥版本号
-   * @param previousKeys 历史密钥，仅用于解密旧数据
+   * @param currentKey Khóa chính hiện tại (32 byte)
+   * @param currentVersion Số phiên bản khóa hiện tại
+   * @param previousKeys Các khóa lịch sử, chỉ dùng để giải mã dữ liệu cũ
    */
   constructor(
     currentKey: Buffer,
@@ -65,7 +65,7 @@ export class Cryptor {
     return this.#currentVersion;
   }
 
-  /** 用当前密钥加密。`aad` 用于把密文绑定到特定记录。 */
+  /** Mã hóa bằng khóa hiện tại. `aad` dùng để liên kết bản mã với một bản ghi cụ thể. */
   seal(plaintext: string, aad?: string): SealedValue {
     const key = this.#requireKey(this.#currentVersion);
     const nonce = randomBytes(NONCE_BYTES);
@@ -78,7 +78,7 @@ export class Cryptor {
     return { ciphertext: Buffer.concat([body, tag]), nonce, keyVersion: this.#currentVersion };
   }
 
-  /** 解密。密文被篡改、nonce 不匹配或 AAD 不一致都会抛 CryptoError。 */
+  /** Giải mã. Bản mã bị giả mạo, nonce không khớp hoặc AAD không đồng nhất sẽ ném CryptoError. */
   open(sealed: SealedValue, aad?: string): string {
     if (sealed.nonce.byteLength !== NONCE_BYTES) {
       throw new CryptoError('nonce 长度非法');
@@ -101,7 +101,7 @@ export class Cryptor {
     }
   }
 
-  /** 该密文是否使用当前密钥版本加密（用于判断是否需要重加密轮换）。 */
+  /** Bản mã này có đang dùng phiên bản khóa hiện tại không (dùng để xác định xem có cần mã hóa lại khi xoay vòng). */
   needsRotation(sealed: SealedValue): boolean {
     return sealed.keyVersion !== this.#currentVersion;
   }
@@ -115,17 +115,17 @@ export class Cryptor {
   }
 }
 
-/** 生成一个新的随机主密钥（Base64），供运维初始化使用。 */
+/** Tạo một khóa chính ngẫu nhiên mới (Base64), dùng cho khởi tạo vận hành. */
 export function generateMasterKeyBase64(): string {
   return randomBytes(KEY_BYTES).toString('base64');
 }
 
-/** 定长安全比较，避免字符串比较造成的时序侧信道。 */
+/** So sánh an toàn độ dài cố định, tránh kênh phụ về mặt thời gian do so sánh chuỗi. */
 export function safeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
   if (bufA.byteLength !== bufB.byteLength) {
-    // 长度不同也走一次比较，减少长度信息泄露带来的时序差异
+    // Chiều dài khác nhau cũng chạy so sánh một lần để giảm sự khác biệt về thời gian rò rỉ độ dài
     timingSafeEqual(bufA, bufA);
     return false;
   }

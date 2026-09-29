@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { ADMIN_SESSION_TTL_MS } from '@m365-codex/shared';
 import { asRow, type Database } from '../db/index.js';
 
-/** 管理端会话：库中只存令牌哈希，明文令牌只在登录响应里出现一次。 */
+/** Phiên quản trị viên: DB chỉ lưu hash của token, token dạng văn bản rõ chỉ xuất hiện đúng 1 lần trong phản hồi đăng nhập. */
 
 export interface AdminSessionRow {
   id: string;
@@ -41,7 +41,7 @@ export class AdminSessionRepository {
     return { token, expiresAt };
   }
 
-  /** 校验令牌；有效则顺带刷新 last_seen_at。过期会话即时删除。 */
+  /** Xác thực token; nếu hợp lệ thì tiện thể làm mới last_seen_at. Phiên hết hạn được xóa ngay lập tức. */
   verify(token: string, now = Date.now()): AdminSessionRow | undefined {
     const row = asRow<AdminSessionRow>(
       this.#db.prepare('SELECT * FROM admin_sessions WHERE token_hash = ?').get(hashToken(token)),

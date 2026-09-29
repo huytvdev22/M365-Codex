@@ -176,7 +176,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  // 兜底日志：此时 pino logger 可能还没创建成功（如配置解析阶段就失败），直接用 stderr
+  // Log dự phòng: Lúc này pino logger có thể chưa tạo thành công (như thất bại ở giai đoạn parse config), dùng trực tiếp stderr
   process.stderr.write(`探针运行失败：${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
 });

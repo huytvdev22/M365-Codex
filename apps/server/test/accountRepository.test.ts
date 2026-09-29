@@ -88,7 +88,7 @@ describe('upsert', () => {
     const repo = createRepo();
     const a = seed(repo, { oid: 'user-a' });
     const b = seed(repo, { oid: 'user-b' });
-    // 把 a 的密文搬到 b 的行上，AAD 不匹配应导致解密失败
+    // Chuyển bản mã của a sang dòng của b, AAD không khớp phải dẫn đến giải mã thất bại
     const rowA = db!
       .prepare('SELECT access_token_enc, access_nonce FROM account_tokens WHERE account_id = ?')
       .get(a.id) as { access_token_enc: Uint8Array; access_nonce: Uint8Array };
@@ -154,7 +154,7 @@ describe('状态机', () => {
     const view = seed(repo);
     repo.forceStatus(view.id, 'disabled');
     expect(() => repo.setStatus(view.id, 'online')).toThrow(InvalidStateTransitionError);
-    // 只能先回到 probing 重新探测
+    // Chỉ có thể quay về probing để thăm dò lại
     expect(repo.setStatus(view.id, 'probing').status).toBe('probing');
   });
 
@@ -219,8 +219,8 @@ describe('删除', () => {
     expect(db!.prepare('SELECT COUNT(*) AS c FROM account_health').get()).toEqual({ c: 0 });
   });
 
-  // 线上实测撞到的：账号一旦服务过请求，responses.account_id 与
-  // conversation_bindings.account_id 这两个普通外键会把它钉死，删除直接 500
+  // Đã gặp khi thực nghiệm thực tế: Khi tài khoản đã từng phục vụ yêu cầu, responses.account_id và
+  // conversation_bindings.account_id là hai khóa ngoại thông thường sẽ ghim chặt nó, xóa sẽ bị 500 ngay
   it('账号服务过请求后仍能删除：历史记录留下、粘性绑定清掉', () => {
     const repo = createRepo();
     const view = seed(repo);
@@ -240,21 +240,21 @@ describe('删除', () => {
 
     expect(repo.remove(view.id)).toBe(true);
 
-    // 请求确实发生过，记录要留；只是不再知道由哪个账号承担
+    // Yêu cầu thực sự đã diễn ra, bản ghi cần được giữ; chỉ là không còn biết tài khoản nào đảm nhận
     const response = db!.prepare('SELECT account_id, status FROM responses WHERE id = ?').get('resp_1') as {
       account_id: string | null;
       status: string;
     };
     expect(response.status).toBe('completed');
     expect(response.account_id).toBeNull();
-    // 绑定没了账号就没有意义，不留僵尸行
+    // Binding mất tài khoản thì không còn ý nghĩa, không giữ lại dòng rác (zombie)
     expect(db!.prepare('SELECT COUNT(*) AS c FROM conversation_bindings').get()).toEqual({ c: 0 });
   });
 
   it('删除失败时整体回滚，不会留下半删状态', () => {
     const repo = createRepo();
     const view = seed(repo);
-    // 删一个不存在的 ID：不应影响既有账号，也不该抛错
+    // Xóa một ID không tồn tại: không ảnh hưởng tài khoản hiện có và không được ném lỗi
     expect(repo.remove('not-a-real-account')).toBe(false);
     expect(repo.getView(view.id)).toBeDefined();
     expect(db!.prepare('SELECT COUNT(*) AS c FROM account_tokens').get()).toEqual({ c: 1 });

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { CopyButton } from './CopyButton';
 
 /**
- * API Key 创建后明文只会出现这一次——服务端不保存明文，之后任何接口都拿不到它。
- * 关闭前必须勾选「我已保存」，避免用户手滑关掉弹窗后再也找不回这个密钥。
+ * Sau khi tạo API Key, khóa rõ chỉ xuất hiện lần này duy nhất — máy chủ không lưu văn bản thô, sau đó không thể lấy lại.
+ * Trước khi đóng bắt buộc phải tích chọn "Tôi đã lưu lại khóa bí mật này" để tránh người dùng lỡ tay đóng mất khóa.
  */
 export function RevealApiKeyModal({ apiKey, onClose }: { apiKey: string; onClose: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
@@ -12,17 +12,17 @@ export function RevealApiKeyModal({ apiKey, onClose }: { apiKey: string; onClose
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reveal-key-title">
       <div className="modal">
         <h2 id="reveal-key-title" style={{ marginTop: 0 }}>
-          密钥已创建
+          Khóa API Đã Được Tạo
         </h2>
         <div className="error-banner" style={{ marginBottom: 16 }}>
-          <div className="error-title">这是唯一一次显示完整密钥的机会</div>
-          <div>关闭本弹窗后，服务端不会再保存明文，也无法再次查看——请立即复制并妥善保存。</div>
+          <div className="error-title">Đây là lần duy nhất hiển thị toàn bộ khóa bí mật</div>
+          <div>Sau khi đóng cửa sổ này, máy chủ sẽ không lưu văn bản thô và không thể xem lại — vui lòng sao chép và lưu trữ cẩn thận ngay.</div>
         </div>
         <div className="mono-copy" style={{ width: '100%', justifyContent: 'space-between' }}>
           <span style={{ overflowWrap: 'anywhere' }}>{apiKey}</span>
         </div>
         <div style={{ marginTop: 10 }}>
-          <CopyButton value={apiKey} label="复制密钥" />
+          <CopyButton value={apiKey} label="Sao chép khóa" />
         </div>
         <label className="checkbox-row" style={{ marginTop: 20 }}>
           <input
@@ -30,11 +30,11 @@ export function RevealApiKeyModal({ apiKey, onClose }: { apiKey: string; onClose
             checked={confirmed}
             onChange={(e) => setConfirmed(e.target.checked)}
           />
-          我已保存这个密钥
+          Tôi đã lưu lại khóa bí mật này
         </label>
         <div style={{ marginTop: 16 }}>
           <button type="button" className="btn btn-primary" disabled={!confirmed} onClick={onClose}>
-            关闭
+            Đóng
           </button>
         </div>
       </div>

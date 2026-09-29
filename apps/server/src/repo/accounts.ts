@@ -6,10 +6,10 @@ import { asRow, asRows, type Database } from '../db/index.js';
 import type { Metrics } from '../observability/metrics.js';
 
 /**
- * 账号与 Token 的数据访问层。
+ * Tầng truy cập dữ liệu cho tài khoản và Token.
  *
- * 铁律：Token 明文只在内存中短暂存在，落库前必须经 Cryptor 加密；
- * 本文件不做任何日志输出，杜绝 Token 顺着日志泄漏。
+ * Quy tắc thép: Token dạng văn bản rõ chỉ tồn tại tạm thời trong bộ nhớ, trước khi lưu DB bắt buộc phải mã hóa qua Cryptor;
+ * File này không in bất kỳ log nào, triệt tiêu nguy cơ rò rỉ Token qua log.
  */
 
 export interface AccountRow {
@@ -46,7 +46,7 @@ export interface AccountHealthRow {
   updated_at: number;
 }
 
-/** 对外展示的账号视图，绝不含 Token。 */
+/** View tài khoản hiển thị ra ngoài, tuyệt đối không chứa Token. */
 export interface AccountView {
   id: string;
   tid: string;
@@ -55,7 +55,7 @@ export interface AccountView {
   display_name: string | null;
   status: AccountStatus;
   source: string;
-  /** 绑定的出口代理节点 ID（契约 §2.4），未绑定为 null */
+  /** ID node proxy đầu ra được liên kết (hợp đồng §2.4), chưa liên kết là null */
   proxy_node_id: string | null;
   created_at: number;
   updated_at: number;
@@ -68,11 +68,11 @@ export interface AccountView {
   last_error_type: string | null;
 }
 
-/** 写入账号时携带的 Token 明文。调用方负责尽快丢弃这些字符串。 */
+/** Token dạng văn bản rõ mang theo khi ghi tài khoản. Bên gọi có trách nhiệm hủy bỏ các chuỗi này càng sớm càng tốt. */
 export interface TokenMaterial {
   accessToken: string;
   refreshToken: string | null;
-  /** 毫秒 epoch */
+  /** Epoch mili-giây */
   expiresAt: number | null;
 }
 
@@ -81,14 +81,14 @@ export interface UpsertAccountInput {
   oid: string;
   email: string | null;
   displayName: string | null;
-  /** 来源标记：`oauth`（本机授权）或 `import:<名称>`（外部导入） */
+  /** Đánh dấu nguồn: `oauth` (cấp quyền cục bộ) hoặc `import:<tên>` (nhập từ bên ngoài) */
   source: string;
   tokens: TokenMaterial;
 }
 
 /**
- * 允许的状态迁移。
- * 收敛在一处而不是散落在业务代码里，避免出现「谁都能把账号改成 online」。
+ * Các bước chuyển đổi trạng thái được phép.
+ * Tập trung tại một nơi thay vì rải rác trong code nghiệp vụ, tránh việc "ai cũng có thể đổi tài khoản sang online".
  */
 const ALLOWED_TRANSITIONS: Readonly<Record<AccountStatus, readonly AccountStatus[]>> = {
   probing: ['online', 'unsupported', 'reauth_required', 'error', 'disabled'],
@@ -96,7 +96,7 @@ const ALLOWED_TRANSITIONS: Readonly<Record<AccountStatus, readonly AccountStatus
   busy: ['online', 'cooldown', 'reauth_required', 'error', 'disabled'],
   cooldown: ['online', 'probing', 'reauth_required', 'error', 'disabled'],
   reauth_required: ['probing', 'online', 'disabled', 'error'],
-  // 停用是人工动作，只能人工恢复到 probing 重新探测
+  // Vô hiệu hóa là hành động thủ công, chỉ có thể khôi phục thủ công về probing để thăm dò lại
   disabled: ['probing'],
   unsupported: ['probing', 'disabled'],
   error: ['probing', 'online', 'cooldown', 'reauth_required', 'disabled'],
@@ -122,7 +122,7 @@ function toBuffer(value: Uint8Array | null): Buffer | null {
 export class AccountRepository {
   readonly #db: Database;
   readonly #cryptor: Cryptor;
-  /** M8：账号状态迁移打点（§17），可选——不传时（多数单测直接构造本类）静默跳过。 */
+  /** M8: Đo đạc chuyển trạng thái tài khoản (§17), tùy chọn — khi không truyền (phần lớn unit test khởi tạo trực tiếp) sẽ bỏ qua trong im lặng. */
   readonly #metrics: Metrics | undefined;
 
   constructor(db: Database, cryptor: Cryptor, metrics?: Metrics) {
@@ -132,14 +132,14 @@ export class AccountRepository {
   }
 
   /**
-   * 按 (tid, oid) 唯一键新增或更新账号，并原子地替换 Token。
-   * 重复授权同一账号只会更新，不会在池里产生重复条目。
+   * Thêm mới hoặc cập nhật tài khoản theo khóa duy nhất (tid, oid), và thay thế Token một cách nguyên tử.
+   * Cấp quyền lặp lại cùng một tài khoản sẽ chỉ cập nhật, không tạo mục trùng lặp trong pool.
    */
   upsert(input: UpsertAccountInput, now = Date.now()): AccountView {
     const existing = this.findByTenantObject(input.tid, input.oid);
     const id = existing?.id ?? randomUUID();
-    // 重新授权说明凭据刚刚更新，回到 probing 由后续探测决定是否 online；
-    // 但人工停用的账号不因一次授权被悄悄启用
+    // Cấp quyền lại nghĩa là thông tin xác thực vừa cập nhật, quay về probing để lần thăm dò tiếp theo quyết định có online không;
+    // Nhưng tài khoản bị vô hiệu hóa thủ công sẽ không bị kích hoạt âm thầm chỉ vì một lần cấp quyền
     const nextStatus: AccountStatus =
       existing === undefined ? 'probing' : existing.status === 'disabled' ? 'disabled' : 'probing';
 
@@ -206,7 +206,7 @@ export class AccountRepository {
     return view;
   }
 
-  /** 只替换 Token，不动账号身份字段。用于刷新流程的原子写回。 */
+  /** Chỉ thay thế Token, không động tới các trường danh tính tài khoản. Dùng cho việc ghi đè nguyên tử trong luồng làm mới. */
   replaceTokens(accountId: string, tokens: TokenMaterial, now = Date.now()): void {
     const sealedAccess = this.#cryptor.seal(tokens.accessToken, `account:${accountId}:access`);
     const sealedRefresh =
@@ -216,7 +216,7 @@ export class AccountRepository {
 
     this.#db.exec('BEGIN IMMEDIATE');
     try {
-      // refresh_token 为空时保留原值：Microsoft 并非每次刷新都下发新的 refresh_token
+      // Khi refresh_token là null thì giữ nguyên giá trị cũ: Microsoft không phải lần làm mới nào cũng cấp refresh_token mới
       this.#db
         .prepare(
           `UPDATE account_tokens SET
@@ -244,7 +244,7 @@ export class AccountRepository {
     }
   }
 
-  /** 解密取出 access token。账号不存在或无 Token 时返回 null。 */
+  /** Giải mã lấy access token. Trả về null khi tài khoản không tồn tại hoặc không có Token. */
   readAccessToken(accountId: string): { token: string; expiresAt: number | null } | null {
     const row = this.#tokenRow(accountId);
     if (row?.access_token_enc == null || row.access_nonce == null) return null;
@@ -317,7 +317,7 @@ export class AccountRepository {
       .filter((view): view is AccountView => view !== undefined);
   }
 
-  /** 按状态机迁移账号状态；非法迁移抛错而不是悄悄写入。 */
+  /** Chuyển đổi trạng thái tài khoản theo state machine; chuyển đổi phi pháp sẽ throw lỗi thay vì ghi âm thầm. */
   setStatus(accountId: string, next: AccountStatus, now = Date.now()): AccountView {
     const account = this.findById(accountId);
     if (account === undefined) throw new Error(`账号不存在：${accountId}`);
@@ -331,7 +331,7 @@ export class AccountRepository {
     return view;
   }
 
-  /** 强制设置状态，绕过状态机。仅用于管理员显式操作，会写审计。 */
+  /** Ép đổi trạng thái, bỏ qua state machine. Chỉ dùng cho thao tác tường minh của admin, sẽ ghi log kiểm toán. */
   forceStatus(accountId: string, next: AccountStatus, now = Date.now()): AccountView | undefined {
     const before = this.findById(accountId);
     this.#db.prepare('UPDATE accounts SET status = ?, updated_at = ? WHERE id = ?').run(next, now, accountId);
@@ -367,7 +367,7 @@ export class AccountRepository {
       .run(now, errorType, options.cooldownUntil ?? null, now, accountId);
   }
 
-  /** 绑定/解绑出口代理（契约 §2.4 `POST /admin/accounts/:id/proxy`）；传 null 解绑。 */
+  /** Gắn/hủy gắn proxy đầu ra (hợp đồng §2.4 `POST /admin/accounts/:id/proxy`); truyền null để hủy gắn. */
   setProxyNode(accountId: string, proxyNodeId: string | null, now = Date.now()): AccountView | undefined {
     this.#db
       .prepare('UPDATE accounts SET proxy_node_id = ?, updated_at = ? WHERE id = ?')
@@ -376,17 +376,17 @@ export class AccountRepository {
   }
 
   /**
-   * 删除账号。
+   * Xóa tài khoản.
    *
-   * `account_tokens` 与 `account_health` 是 ON DELETE CASCADE，会自己跟着走；
-   * 但 `responses.account_id` 与 `conversation_bindings.account_id` 只是普通外键，
-   * 账号一旦服务过请求就会把它钉死在库里——直接 DELETE 会撞 FOREIGN KEY constraint。
+   * `account_tokens` và `account_health` có cấu hình ON DELETE CASCADE nên sẽ tự động bị xóa theo;
+   * Tuy nhiên `responses.account_id` và `conversation_bindings.account_id` chỉ là foreign key thông thường,
+   * một khi tài khoản đã từng phục vụ request thì sẽ gắn chặt trong DB — lệnh DELETE trực tiếp sẽ đụng FOREIGN KEY constraint.
    *
-   * 两张表的处置不同，因为语义不同：
-   * - `responses` 是历史记录，**留下来**，只把 account_id 置空（这条请求确实发生过，
-   *   只是不再知道由哪个账号承担；列本来就可空）；
-   * - `conversation_bindings` 是「Response ↔ 账号 ↔ 上游会话」的粘性绑定，
-   *   账号没了绑定就没有意义，**直接删掉**，免得留下指向空账号的僵尸行。
+   * Cách xử lý ở 2 bảng khác nhau do ngữ nghĩa khác nhau:
+   * - `responses` là lịch sử request, **được giữ lại**, chỉ gán account_id thành null (request này thực sự đã diễn ra,
+   *   chỉ là không còn biết tài khoản nào đảm nhận; cột này vốn đã nullable);
+   * - `conversation_bindings` là liên kết dính "Response ↔ Tài khoản ↔ Phiên upstream",
+   *   khi tài khoản mất đi thì liên kết này không còn ý nghĩa, **xóa trực tiếp**, tránh để lại dòng ma trỏ tới tài khoản rỗng.
    */
   remove(accountId: string): boolean {
     this.#db.exec('BEGIN IMMEDIATE');

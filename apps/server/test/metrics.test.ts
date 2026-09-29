@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Metrics } from '../src/observability/metrics.js';
 
 /**
- * 指标：格式正确、可累加，且**不把用户内容带出去**（§17 明确要求
- * Metrics 默认不含邮箱、提示词、输出正文或 Token）。
+ * Metrics: Định dạng chuẩn, có thể tích lũy và **không đưa nội dung người dùng ra ngoài** (§17 yêu cầu rõ ràng
+ * Metrics mặc định không chứa email, prompt, văn bản đầu ra hoặc Token).
  */
 
 describe('计数器', () => {
@@ -37,7 +37,7 @@ describe('直方图', () => {
 describe('隐私', () => {
   it('标签值里的用户内容被清洗，不会原样出现在指标里', () => {
     const m = new Metrics();
-    // 故意塞入不该出现的东西：邮箱、提示词、Token 形态
+    // Cố ý đưa vào những thứ không được phép xuất hiện: email, prompt, dạng Token
     m.upstreamErrors.inc({ account: 'someone@contoso.example.invalid' });
     m.requests.inc({ endpoint: '帮我写一段代码 with spaces' });
     m.tokenRefresh.inc({ result: 'eyJhbGciOiJIUzI1NiJ9.payload.sig' });

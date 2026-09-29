@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * 往数据库里放一个**假的** Microsoft 账号，只用于对着模拟上游做端到端验收。
+ * Đưa một tài khoản Microsoft **giả** vào cơ sở dữ liệu, chỉ dùng để nghiệm thu end-to-end với mock upstream.
  *
- * 为什么需要它：账号只能经 PKCE 授权流程添加（这是有意的安全约束），而 PKCE 需要
- * 真实 Microsoft 登录。要在没有真实账号的情况下验证网关本身（Responses/SSE/工具循环/
- * 附件），就得有一条可被调度器选中的账号记录。
+ * Lý do cần script này: Tài khoản chỉ có thể được thêm qua luồng ủy quyền PKCE (đây là ràng buộc bảo mật có chủ đích), mà PKCE yêu cầu
+ * đăng nhập Microsoft thật. Để xác minh bản thân gateway (Responses/SSE/vòng lặp công cụ/
+ * file đính kèm) khi không có tài khoản thật, cần có một bản ghi tài khoản để bộ điều phối (dispatcher) có thể chọn.
  *
- * 安全说明：写进去的 access/refresh token 是明摆着的假串（`mock-*`），对真实 Microsoft
- * 服务毫无意义；必须配合 UPSTREAM_WS_BASE 指向模拟上游使用。**不要在生产库上运行。**
+ * Lưu ý bảo mật: access/refresh token ghi vào đây hoàn toàn là chuỗi giả (`mock-*`), vô nghĩa đối với dịch vụ Microsoft
+ * thật; bắt buộc phải dùng kèm UPSTREAM_WS_BASE trỏ tới mock upstream. **Không chạy trên DB production.**
  *
- * 用法（本地，先 npm run build）：
+ * Cách dùng (cục bộ, cần chạy npm run build trước):
  *   M365_CODEX_MASTER_KEY=... node dev/seed-mock-account.mjs --db ./data/m365-codex.db
- * 用法（容器内）：
+ * Cách dùng (trong container):
  *   node /app/dev/seed-mock-account.mjs --db /data/m365-codex.db --dist /app/apps/server/dist
  */
 

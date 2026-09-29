@@ -10,11 +10,11 @@ import { SETTING_GROUPS, type SettingGroup } from '../settings/service.js';
 import { APP_VERSION } from '../version.js';
 
 /**
- * M7 新增的管理端接口（对应 `docs/管理端API契约.md` §二）：概览、请求记录、设置、
- * 出口代理池、Codex 配置生成、文件管理视角、能力矩阵。
+ * Các API quản trị bổ sung trong M7 (tương ứng `docs/Hop-dong-API-quan-tri.md` §2): Tổng quan, lịch sử yêu cầu, cài đặt,
+ * pool proxy đầu ra, sinh cấu hình Codex, góc nhìn quản lý tệp, ma trận năng lực.
  *
- * 字段名与语义严格照契约文档实现；契约没写死具体字段的地方（结算分组的字段名、
- * 代理批量导入的返回明细），由服务端定下后在里程碑报告里列清单，供 WebUI 对齐。
+ * Tên trường và ngữ nghĩa được triển khai nghiêm ngặt theo tài liệu hợp đồng; những điểm hợp đồng chưa cố định trường cụ thể (tên trường nhóm thanh toán,
+ * chi tiết kết quả import proxy hàng loạt), do server quy định và liệt kê trong báo cáo mốc để WebUI đồng bộ.
  */
 
 function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
@@ -36,7 +36,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   const adminGuard = createAdminGuard(context);
 
   // ---------------------------------------------------------------------
-  // 2.1 概览
+  // 2.1 Tổng quan
   // ---------------------------------------------------------------------
   app.get('/admin/overview', { preHandler: adminGuard }, async () => {
     const now = Date.now();
@@ -61,7 +61,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
     const rejectedCount = validationsByResult.rejected ?? 0;
     const tools = {
       calls_last_hour: context.toolCalls.countCreatedSince(lastHour),
-      // 自进程启动以来的通过率（内存计数，重启会归零；见 observability/metrics.ts）
+      // Tỷ lệ hợp lệ kể từ khi tiến trình khởi động (bộ đếm bộ nhớ, về 0 khi khởi động lại; xem observability/metrics.ts)
       arg_pass_rate: passCount + rejectedCount === 0 ? 1 : passCount / (passCount + rejectedCount),
     };
 
@@ -91,7 +91,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   });
 
   // ---------------------------------------------------------------------
-  // 2.2 请求记录
+  // 2.2 Lịch sử yêu cầu
   // ---------------------------------------------------------------------
   app.get<{ Querystring: { limit?: string; status?: string; api_key_id?: string } }>(
     '/admin/requests',
@@ -152,7 +152,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   });
 
   // ---------------------------------------------------------------------
-  // 2.3 设置
+  // 2.3 Cài đặt
   // ---------------------------------------------------------------------
   app.get('/admin/settings', { preHandler: adminGuard }, async () => context.settings.getAll());
 
@@ -177,7 +177,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   });
 
   // ---------------------------------------------------------------------
-  // 2.4 出口代理池
+  // 2.4 Pool proxy đầu ra
   // ---------------------------------------------------------------------
   const createProxySchema = z.object({
     name: z.string().min(1).max(100),
@@ -228,7 +228,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
       const commaIndex = line.indexOf(',');
       const name = commaIndex > 0 ? line.slice(0, commaIndex).trim() : `导入节点 ${index + 1}`;
       const url = commaIndex > 0 ? line.slice(commaIndex + 1).trim() : line;
-      // 校验 URL 合法性，避免把明显打不开的字符串加密存进库
+      // Kiểm tra tính hợp lệ của URL, tránh việc mã hóa và lưu vào DB chuỗi rõ ràng không mở được
       if (!isValidUrl(url)) {
         results.push({ line, ok: false, error: 'url 不是合法的 URL' });
         failed += 1;
@@ -293,7 +293,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   );
 
   // ---------------------------------------------------------------------
-  // 2.5 Codex 配置生成
+  // 2.5 Sinh cấu hình Codex
   // ---------------------------------------------------------------------
   app.get<{ Querystring: { api_key_env?: string } }>(
     '/admin/codex-config',
@@ -325,7 +325,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   );
 
   // ---------------------------------------------------------------------
-  // 2.6 文件（管理视角）
+  // 2.6 Tệp (góc nhìn quản trị)
   // ---------------------------------------------------------------------
   app.get<{ Querystring: { api_key_id?: string; limit?: string } }>(
     '/admin/files',
@@ -380,7 +380,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   });
 
   // ---------------------------------------------------------------------
-  // 2.7 模型与能力矩阵
+  // 2.7 Model và ma trận năng lực
   // ---------------------------------------------------------------------
   app.get('/admin/capabilities', { preHandler: adminGuard }, async () => {
     const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, '模型目录降级')).data.map(
@@ -404,7 +404,7 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-/** 数据库文件大小（供 /admin/overview 的 storage.db_bytes）；查不到就给 0，不让这一项拖垮整个概览。 */
+/** Kích thước tệp cơ sở dữ liệu (phục vụ storage.db_bytes của /admin/overview); nếu không truy vấn được trả về 0, không để mục này làm hỏng toàn bộ tổng quan. */
 function readDbBytes(context: AppContext): number {
   try {
     const row = context.db
@@ -416,7 +416,7 @@ function readDbBytes(context: AppContext): number {
   }
 }
 
-/** 系统状态（契约 §2.1）：迁移未完成优先报 migration_failed；账号全不可用报 upstream_unavailable。 */
+/** Trạng thái hệ thống (hợp đồng §2.1): migration chưa hoàn thành ưu tiên báo migration_failed; tài khoản hoàn toàn không khả dụng báo upstream_unavailable. */
 function computeSystemStatus(
   context: AppContext,
 ): 'normal' | 'degraded' | 'maintenance' | 'upstream_unavailable' | 'migration_failed' {
@@ -428,9 +428,9 @@ function computeSystemStatus(
 }
 
 /**
- * 能力矩阵（契约 §2.7、实施计划 §24）。**未经 M0 真实探针确认的一律标
- * `upstream_decided` 或 `unsupported`，不得标 `native`**——本项目至今没有跑过
- * 真实上游的 M0 探针，因此这里没有任何一行是 `native`。
+ * Ma trận năng lực (hợp đồng §2.7, kế hoạch triển khai §24). **Chưa qua probe thực tế M0 xác nhận thì toàn bộ đánh dấu
+ * `upstream_decided` hoặc `unsupported`, không được đánh dấu `native`** — dự án đến nay chưa từng chạy
+ * probe M0 trên upstream thực tế, do đó ở đây không có bất kỳ dòng nào là `native`.
  */
 function buildCapabilityMatrix(context: AppContext): { feature: string; status: string; detail: string }[] {
   const local = (feature: string, detail: string): { feature: string; status: string; detail: string } => ({
@@ -450,7 +450,7 @@ function buildCapabilityMatrix(context: AppContext): { feature: string; status: 
   });
 
   return [
-    // §24.1 本地执行或走 Responses 协议的骨架已实现，但端到端是否真跑通取决于未跑过的 M0
+    // §24.1 Khung thực thi cục bộ hoặc theo giao thức Responses đã hoàn thành, nhưng end-to-end có thực sự thông suốt hay không phụ thuộc vào M0 chưa chạy
     upstream('文本对话/代码生成', '走 /v1/responses，转发到 Copilot 上游，尚未经真实上游验收'),
     upstream('流式输出（SSE）', '事件序列已实现，真实上游的分片行为待 M0 校准'),
     upstream('多轮上下文（previous_response_id）', '续接机制已实现，真实上游会话保持能力待验证'),
@@ -468,7 +468,7 @@ function buildCapabilityMatrix(context: AppContext): { feature: string; status: 
       status: 'experimental',
       detail: '未确认上游原生支持时的兜底方案，命中率门槛需 M0 真实账号测得（§3.5）',
     },
-    // §24.2 取决于上游探测
+    // §24.2 Phụ thuộc vào việc thăm dò upstream
     context.config.upstreamImageInput
       ? upstream('图片输入（input_image）', '当前已放行转发给上游，真实支持程度未经 M0 确认')
       : unsupported('图片输入（input_image）', 'UPSTREAM_IMAGE_INPUT=false，明确返回 unsupported_feature，不假装支持'),
@@ -480,7 +480,7 @@ function buildCapabilityMatrix(context: AppContext): { feature: string; status: 
     upstream('精确 Token 用量', '当前 usage 为 null，上游可能只给估算值'),
     upstream('引用/来源信息', '已映射 Copilot citation 结构，来源数据真实性取决于上游'),
     upstream('请求取消及时性', '取决于上游 WebSocket 取消行为'),
-    // §24.3 不能实现
+    // §24.3 Không thể thực hiện
     unsupported('Codex Cloud / 云端任务委派', '云端执行环境由 OpenAI 后端提供'),
     unsupported('云端代码审查 / 云端 GitHub 集成', '依赖 OpenAI 云服务；本地命令行 review 可用'),
     unsupported('OpenAI 托管内置工具（web_search/file_search/code_interpreter/computer_use/image_generation）', '需 OpenAI 托管后端执行'),

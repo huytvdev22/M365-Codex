@@ -5,7 +5,7 @@ import type { CapabilityResult, ProbeContext } from '../types.js';
 
 const USAGE_TEXT = '请用一句话解释什么是 WebSocket 协议。';
 
-/** #18 Token 使用量或可估算使用量：原始帧里是否有用量相关字段。 */
+/** #18 Lượng Token sử dụng hoặc ước tính: Frame gốc có các trường liên quan đến lượng sử dụng không. */
 export async function caseTokenUsageEstimate(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, USAGE_TEXT);
@@ -29,7 +29,7 @@ export async function caseTokenUsageEstimate(ctx: ProbeContext): Promise<Capabil
 
 const CITATION_PROMPT = '最近有哪些值得关注的科技行业动态？如果参考了外部来源，请说明来源。';
 
-/** #19 引用与来源信息：Copilot 常见的 citation 字段是否出现。 */
+/** #19 Thông tin trích dẫn và nguồn: Các trường citation thường gặp của Copilot có xuất hiện không. */
 export async function caseCitationsSources(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, CITATION_PROMPT);
@@ -53,7 +53,7 @@ export async function caseCitationsSources(ctx: ProbeContext): Promise<Capabilit
 const MODEL_QUESTION = '请如实说明你现在实际运行的模型名称或版本标识，不要编造。';
 const MODEL_NAME_HINTS = ['gpt', 'o1', 'o3', 'copilot', 'bing', 'sydney', 'phi'];
 
-/** #20 模型名称选择：客户端在 passthrough 里指定的模型字段是否被上游接受/不报错。 */
+/** #20 Lựa chọn tên mô hình: Trường mô hình do client chỉ định trong passthrough có được upstream chấp nhận / không báo lỗi không. */
 export async function caseModelSelection(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const requestedModel = 'gpt-4.1-probe-test';
@@ -81,7 +81,7 @@ export async function caseModelSelection(ctx: ProbeContext): Promise<CapabilityR
   });
 }
 
-/** #21 上游返回的实际模型信息：原始帧结构里是否带模型字段，回复文本是否提到可识别的模型名。 */
+/** #21 Thông tin mô hình thực tế do upstream trả về: Cấu trúc frame gốc có mang trường mô hình không, văn bản phản hồi có đề cập tên mô hình nhận diện được không. */
 export async function caseReportedUpstreamModel(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const outcome = await runText(ctx, MODEL_QUESTION);

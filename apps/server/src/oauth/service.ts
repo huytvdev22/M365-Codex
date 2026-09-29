@@ -7,11 +7,11 @@ import { extractIdentity, type OAuthClient } from './client.js';
 import { createPkcePair } from './pkce.js';
 
 /**
- * 授权流程编排。
+ * Điều phối luồng cấp quyền OAuth.
  *
- * 采用与用户现有「M365 Native 本地 PKCE 授权助手」相同的交互形态：
- * 服务生成授权链接 → 用户在浏览器登录 → 把 nativeclient 回调地址粘回来。
- * 这样不需要本服务对外暴露回调端点，也就不需要公网可达。
+ * Áp dụng hình thức tương tác tương tự như công cụ hỗ trợ ủy quyền PKCE Native M365 cục bộ hiện tại của người dùng:
+ * Dịch vụ sinh liên kết ủy quyền → người dùng đăng nhập trên trình duyệt → dán URL callback nativeclient quay lại.
+ * Bằng cách này dịch vụ không cần mở cổng callback ra ngoài, do đó không cần khả năng truy cập qua mạng công cộng.
  */
 
 export interface AuthorizationStart {
@@ -22,7 +22,7 @@ export interface AuthorizationStart {
 
 export interface AuthorizationResult {
   account: AccountView;
-  /** 该账号此前是否已在池中 */
+  /** Tài khoản này trước đó đã có trong pool hay chưa */
   existing: boolean;
 }
 
@@ -41,8 +41,8 @@ export class OAuthService {
   }
 
   /**
-   * 开启一次授权。每次调用生成独立的 verifier/state 会话，
-   * 因此可以同时为多个账号并行授权，互不干扰。
+   * Bắt đầu một lượt cấp quyền. Mỗi lần gọi sẽ tạo một phiên verifier/state độc lập,
+   * do đó có thể cấp quyền song song cho nhiều tài khoản cùng lúc mà không ảnh hưởng lẫn nhau.
    */
   start(now = Date.now()): AuthorizationStart {
     const pkce = createPkcePair();
@@ -66,8 +66,8 @@ export class OAuthService {
   }
 
   /**
-   * 用回调地址（或裸的 `code=…&state=…`）完成授权。
-   * state 严格匹配到具体会话，授权码只消费一次。
+   * Dùng URL callback (hoặc chuỗi truy vấn trần `code=…&state=…`) để hoàn tất cấp quyền.
+   * state phải khớp chính xác với phiên cụ thể, mã cấp quyền chỉ được tiêu thụ 1 lần.
    */
   async complete(callback: string, now = Date.now()): Promise<AuthorizationResult> {
     const { code, state } = parseCallback(callback);
@@ -119,13 +119,13 @@ export class OAuthService {
   }
 }
 
-/** `expires_in`（秒）转成毫秒 epoch；缺省按 1 小时算，与 Microsoft 默认一致。 */
+/** Chuyển `expires_in` (giây) sang epoch mili-giây; mặc định tính 1 giờ, khớp với mặc định của Microsoft. */
 export function computeExpiry(expiresIn: number | undefined, now: number): number {
   const seconds = typeof expiresIn === 'number' && Number.isFinite(expiresIn) ? expiresIn : 3600;
   return now + seconds * 1000;
 }
 
-/** 从完整回调 URL 或裸查询串中取出 code 与 state。 */
+/** Lấy code và state từ URL callback hoàn chỉnh hoặc query string trần. */
 export function parseCallback(input: string): { code: string; state: string } {
   const text = input.trim();
   if (text === '') {
@@ -147,7 +147,7 @@ export function parseCallback(input: string): { code: string; state: string } {
   const first = (value: string | string[] | undefined): string =>
     Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 
-  // Microsoft 在用户取消或出错时也会回调，此时带的是 error 而不是 code
+  // Microsoft cũng callback khi người dùng hủy hoặc phát sinh lỗi, lúc này mang error thay vì code
   const oauthError = first(parsed.error);
   if (oauthError !== '') {
     const description = first(parsed.error_description).split('\n')[0] ?? '';

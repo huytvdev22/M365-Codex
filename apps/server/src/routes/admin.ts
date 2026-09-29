@@ -6,7 +6,7 @@ import { verifyPassword } from '../crypto/password.js';
 import { clientIpFor, createAdminGuard, extractBearerToken, LoginThrottle } from '../gateway/auth.js';
 import { maskIp } from '../observability/logger.js';
 
-/** 管理端接口：登录、会话、API Key 管理、审计日志查询。 */
+/** API quản trị: Đăng nhập, phiên làm việc, quản lý API Key, tra cứu nhật ký kiểm toán. */
 
 const loginSchema = z.object({
   password: z.string().min(1, '密码不能为空'),
@@ -15,7 +15,7 @@ const loginSchema = z.object({
 const timestamp = z.number().int().nonnegative().nullable().optional();
 const positiveInt = z.number().int().positive().nullable().optional();
 const stringList = z.array(z.string().min(1)).nullable().optional();
-// 备注纯展示用，给个宽松上限防止管理界面被灌入超长文本
+// Ghi chú chỉ dùng để hiển thị, đặt giới hạn trên nới lỏng để tránh việc giao diện quản trị bị chèn văn bản quá dài
 const note = z.string().max(500, '备注过长').nullable().optional();
 
 const createKeySchema = z.object({
@@ -28,9 +28,9 @@ const createKeySchema = z.object({
   allowed_endpoints: stringList,
   allowed_models: stringList,
   note,
-  // §10.1：按 Key 收紧的工具调用次数上限 / 单文件大小上限；不得突破全局天花板
-  // 这条铁律不在这里校验（写时允许任意正数），生效时由 gateway/auth.ts 用
-  // clampToCeiling 统一裁剪，与既有 rpm_limit/daily_limit 的做法保持一致
+  // §10.1: Giới hạn trên số lượt gọi công cụ / kích thước tệp đơn lẻ siết chặt theo Key; không được vượt trần toàn cục.
+  // Quy tắc nghiêm ngặt này không kiểm tra ở đây (khi ghi cho phép số dương bất kỳ), khi có hiệu lực sẽ do gateway/auth.ts
+  // dùng clampToCeiling cắt gọt đồng bộ, duy trì cách làm nhất quán với rpm_limit/daily_limit hiện có.
   max_tool_calls: positiveInt,
   max_file_bytes: positiveInt,
 });
@@ -147,7 +147,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AppContext): 
     });
 
     reply.code(201);
-    // 明文 key 只在此处出现一次，服务端不保存
+    // Key dạng plain text chỉ xuất hiện một lần duy nhất tại đây, máy chủ không lưu trữ
     return created;
   });
 

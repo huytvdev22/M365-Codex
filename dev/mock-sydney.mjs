@@ -1,33 +1,33 @@
 #!/usr/bin/env node
 /**
- * 独立的模拟 Sydney / BizChat 上游（开发与验收用，不参与生产镜像）。
+ * Mock upstream Sydney / BizChat độc lập (dùng cho phát triển và nghiệm thu, không tham gia image production).
  *
- * 用途：在没有真实 Microsoft 365 Copilot 账号时，把网关的完整链路跑起来——
- * Codex ──Responses──> M365-Codex ──WebSocket──> 本脚本。
- * 这样可以验证协议层、SSE、工具代理循环、附件注入等一切与 Microsoft 无关的行为。
+ * Mục đích: Khi không có tài khoản Microsoft 365 Copilot thật, cho phép chạy thông toàn bộ luồng của gateway —
+ * Codex ──Responses──> M365-Codex ──WebSocket──> script này.
+ * Nhờ đó có thể xác minh tầng giao thức, SSE, vòng lặp agent công cụ, chèn file đính kèm v.v. mà không phụ thuộc Microsoft.
  *
- * 说话方式与 apps/server/test/helpers/mockSydneyServer.ts 一致：
- * SignalR JSON 帧 + 0x1e 分隔，握手 ack，若干 STREAM_ITEM，最后 COMPLETION。
+ * Cách giao tiếp giống như apps/server/test/helpers/mockSydneyServer.ts:
+ * SignalR JSON frame + phân tách 0x1e, ack bắt tay, một số STREAM_ITEM, cuối cùng là COMPLETION.
  *
- * 它是一个「假模型」，行为由简单规则决定：
- *   - invocation 带 toolResults  → 回一段引用了工具结果的最终答复；
- *   - invocation 带 tools 且用户文本命中触发词 → 回一个工具调用；
- *   - 其余情况 → 流式回一段文本，并回显收到的上下文长度，便于确认附件确实到达。
+ * Đây là một "mô hình giả", hành vi được quyết định bởi các quy tắc đơn giản:
+ *   - invocation có toolResults  → trả về câu trả lời cuối trích dẫn kết quả công cụ;
+ *   - invocation có tools và text của người dùng chứa từ khóa kích hoạt → trả về gọi công cụ;
+ *   - các trường hợp còn lại → stream một đoạn text và phản hồi lại độ dài ngữ cảnh nhận được để kiểm tra file đính kèm.
  *
- * 用法：node dev/mock-sydney.mjs [--port 4300]
+ * Cách dùng: node dev/mock-sydney.mjs [--port 4300]
  */
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 
-const RECORD_SEPARATOR = '';
+const RECORD_SEPARATOR = ' ';
 const TYPE = { INVOCATION: 1, STREAM_ITEM: 2, COMPLETION: 3, STREAM_INVOCATION: 4, CANCEL: 5, PING: 6 };
 
 const portArg = process.argv.indexOf('--port');
 const PORT = portArg > 0 ? Number(process.argv[portArg + 1]) : 4300;
 
-/** 命中其中任意一个词就认为「用户想让模型动手做事」，从而触发工具调用。 */
+/** Khớp bất kỳ từ nào trong số này được coi là "người dùng muốn mô hình thực hiện thao tác", từ đó kích hoạt gọi công cụ. */
 const TOOL_TRIGGERS = ['运行', '执行', '跑一下', '看看目录', 'run ', 'execute', 'list files', 'shell'];
 
 function frame(payload) {
@@ -54,12 +54,12 @@ function sendToolCall(ws, invocationId, callId, name, args) {
   );
 }
 
-/** 给已声明的工具编一组像样的参数：认识的工具按其语义填，不认识的给空对象。 */
+/** Tự bịa một bộ tham số hợp lý cho công cụ đã khai báo: công cụ quen thuộc điền theo ngữ nghĩa, lạ thì để object rỗng. */
 function inventArguments(tool) {
   const name = tool?.name ?? '';
   const props = tool?.parameters?.properties ?? {};
   if ('command' in props) {
-    // Codex 的 shell 工具：command 可能是字符串数组，也可能是字符串
+    // Công cụ shell của Codex: command có thể là mảng string hoặc string
     const isArray = props.command?.type === 'array';
     return JSON.stringify({ command: isArray ? ['echo', 'hello-from-mock-upstream'] : 'echo hello' });
   }
@@ -129,7 +129,7 @@ wss.on('connection', (ws) => {
         `[mock] #${invocations} 文本 ${userText.length} 字符，工具 ${tools.length} 个，工具结果 ${toolResults.length} 条`,
       );
 
-      // 1) 带工具结果回来：给出最终答复，并把结果内容带进去，证明整条回路通了
+      // 1) Mang kết quả công cụ quay lại: đưa ra câu trả lời cuối cùng và chèn nội dung kết quả vào, chứng minh cả chu trình đã thông suốt
       if (toolResults.length > 0) {
         const joined = toolResults.map((r) => String(r.output ?? '').trim()).join(' | ');
         sendText(ws, invocationId, '工具已执行完毕。');
@@ -138,7 +138,7 @@ wss.on('connection', (ws) => {
         continue;
       }
 
-      // 2) 声明了工具且用户像是要动手做事：发起一次工具调用
+      // 2) Đã khai báo công cụ và người dùng muốn thực hiện thao tác: khởi tạo một lệnh gọi công cụ
       const wantsTool = TOOL_TRIGGERS.some((t) => userText.toLowerCase().includes(t.toLowerCase()));
       if (tools.length > 0 && wantsTool) {
         const tool = tools.find((t) => t.name === 'shell') ?? tools[0];
@@ -149,7 +149,7 @@ wss.on('connection', (ws) => {
         continue;
       }
 
-      // 3) 普通问答：分几帧流式返回，并回显上下文规模，便于确认附件已注入
+      // 3) Hỏi đáp thông thường: stream trả về qua vài frame và phản hồi lại quy mô ngữ cảnh để xác nhận file đính kèm đã được chèn
       const reply = [
         '这是模拟上游的回答。',
         `我收到了 ${userText.length} 个字符的上下文`,

@@ -168,7 +168,7 @@ describe('DELETE /admin/accounts/:id', () => {
       headers: auth(token),
     });
     expect(audit.body).toContain('account.delete');
-    // 审计里只有脱敏邮箱
+    // Trong kiểm toán chỉ có email đã khử nhạy cảm
     expect(audit.body).toContain('us***@office.example.invalid');
   });
 });

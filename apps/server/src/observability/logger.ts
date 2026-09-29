@@ -2,12 +2,12 @@ import { pino, type Logger, type LoggerOptions } from 'pino';
 import type { LogPrivacyMode } from '@m365-codex/shared';
 
 /**
- * 日志与隐私模式（对应实施计划 §1.1、§3）。
+ * Log và chế độ riêng tư (tương ứng kế hoạch triển khai §1.1, §3).
  *
- * 三档隐私模式：
- * - `strict`（默认）：不记录请求体、提示词、上游内容；IP 只记录网段；
- * - `metadata`：额外记录模型名、长度、耗时等元数据，仍不记录正文；
- * - `debug`：记录更多结构化细节，仅供本地排障；凭据字段任何模式下都脱敏。
+ * Ba mức độ chế độ riêng tư:
+ * - `strict` (mặc định): không ghi lại request body, prompt, nội dung upstream; IP chỉ ghi lại dải mạng;
+ * - `metadata`: ghi thêm metadata như tên mô hình, độ dài, thời gian tiêu tốn, vẫn không ghi lại văn bản nội dung;
+ * - `debug`: ghi lại nhiều chi tiết có cấu trúc hơn, chỉ dùng để điều tra sự cố cục bộ; các trường thông tin xác thực luôn được làm mờ trong mọi chế độ.
  */
 
 const REDACT_PATHS = [
@@ -44,9 +44,9 @@ const REDACT_CENSOR = '[已脱敏]';
 export interface CreateLoggerOptions {
   level: string;
   privacyMode: LogPrivacyMode;
-  /** 开发环境启用彩色输出，容器内保持 JSON */
+  /** Môi trường phát triển bật output có màu, trong container giữ JSON */
   pretty?: boolean;
-  /** 测试中重定向输出 */
+  /** Chuyển hướng output trong test */
   destination?: NodeJS.WritableStream;
 }
 
@@ -79,8 +79,8 @@ export function createLogger(options: CreateLoggerOptions): Logger {
 }
 
 /**
- * 按隐私模式处理客户端 IP：
- * strict 只保留网段（IPv4 /24、IPv6 /48），其余模式保留完整地址。
+ * Xử lý IP của client theo chế độ riêng tư:
+ * strict chỉ giữ lại dải mạng (IPv4 /24, IPv6 /48), các chế độ khác giữ nguyên địa chỉ đầy đủ.
  */
 export function maskIp(ip: string | undefined, mode: LogPrivacyMode): string | null {
   if (ip === undefined || ip === '') return null;
@@ -95,7 +95,7 @@ export function maskIp(ip: string | undefined, mode: LogPrivacyMode): string | n
   return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;
 }
 
-/** strict 模式下只允许记录长度等派生信息，禁止原文。 */
+/** Chế độ strict chỉ cho phép ghi lại thông tin phái sinh như độ dài, nghiêm cấm ghi nguyên văn. */
 export function describeText(text: string | undefined, mode: LogPrivacyMode): Record<string, unknown> {
   if (text === undefined) return { present: false };
   if (mode === 'debug') return { present: true, length: text.length, sample: text.slice(0, 200) };

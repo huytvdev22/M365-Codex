@@ -2,17 +2,17 @@ import { ApiError } from '@m365-codex/shared';
 import { z } from 'zod';
 
 /**
- * Responses 请求校验（对应实施计划 §4.2）。
+ * Kiểm tra xác thực yêu cầu Responses (tương ứng kế hoạch triển khai §4.2).
  *
- * 护栏要点：
- * - `model` 与 `reasoning.effort` 只透传、不枚举取值、不改写；
- * - 影响语义又无法实现的内容必须返回清晰错误，不得静默伪装生效：
- *   `input_file` 按 file_id 取本网关已提取的文本；`input_image` 是否放行取决于
- *   `UPSTREAM_IMAGE_INPUT`（真实上游能力要等 M0 探针校准，默认不假装支持）。
- * - Codex 等 `store:false` 的客户端每轮会把**整段对话历史**塞进 `input`（见
- *   `extractInputText` 顶部的详细说明），因此 `input` 里除了 message /
- *   function_call_output，还会出现 function_call、reasoning 等历史回放项，
- *   以及未来版本可能新增的、我们还不认识的项类型——都不应该让整轮请求 400。
+ * Các điểm trọng yếu về rào chắn:
+ * - `model` và `reasoning.effort` chỉ truyền nguyên dạng, không enum hóa giá trị, không viết lại;
+ * - Nội dung ảnh hưởng đến ngữ nghĩa mà không thể thực hiện thì bắt buộc phải trả về lỗi rõ ràng, không được âm thầm giả vờ có hiệu lực:
+ *   `input_file` lấy văn bản đã trích xuất của gateway này theo file_id; `input_image` có cho qua hay không phụ thuộc vào
+ *   `UPSTREAM_IMAGE_INPUT` (năng lực upstream thực tế cần probe M0 hiệu chuẩn, mặc định không giả vờ hỗ trợ).
+ * - Các client đặt `store:false` như Codex ở mỗi lượt sẽ nhét **toàn bộ lịch sử đối thoại** vào `input` (xem
+ *   giải thích chi tiết ở đầu `extractInputText`), do đó trong `input` ngoài message /
+ *   function_call_output, còn xuất hiện các mục phát lại lịch sử như function_call, reasoning,
+ *   cũng như các loại mục mới trong tương lai mà chúng ta chưa nhận diện được — đều không nên khiến cả lượt yêu cầu bị lỗi 400.
  */
 
 const inputTextPart = z.object({
@@ -20,7 +20,7 @@ const inputTextPart = z.object({
   text: z.string(),
 });
 
-// assistant 历史消息用 output_text 承载文本（区别于用户侧的 input_text）。
+// Tin nhắn lịch sử của assistant dùng output_text để chứa văn bản (khác với input_text phía user).
 const outputTextPart = z.object({ type: z.literal('output_text'), text: z.string() }).passthrough();
 
 const inputImagePart = z
@@ -39,8 +39,8 @@ const inputFilePart = z
   })
   .passthrough();
 
-// 未识别的内容片段类型：客户端会演进出新的 part 形态，认不出就跳过该片段，
-// 不能让整轮请求因为多了一个陌生的 content part 就失败。
+// Loại đoạn nội dung chưa nhận diện: client sẽ phát triển thêm các dạng part mới, nếu không nhận ra thì bỏ qua part đó,
+// không để cả lượt yêu cầu thất bại chỉ vì có thêm một content part lạ lẫm.
 const unknownContentPart = z.object({ type: z.string() }).passthrough();
 
 const contentPart = z.union([inputTextPart, outputTextPart, inputImagePart, inputFilePart, unknownContentPart]);
@@ -58,9 +58,9 @@ const functionCallOutput = z.object({
 });
 
 /**
- * 模型上一轮工具调用的回放（`store:false` 时 Codex 会把整段历史随每轮重发）。
- * 真实抓包只带 type/call_id/name/arguments 四个键、没有 id/status；这里仍标成
- * 可选，避免未来版本增减字段就解析失败。
+ * Phát lại lệnh gọi công cụ của mô hình ở vòng trước (khi `store:false`, Codex sẽ gửi lại toàn bộ lịch sử theo từng vòng).
+ * Bắt gói tin thực tế chỉ mang 4 key type/call_id/name/arguments, không có id/status; ở đây vẫn đánh dấu là
+ * optional, tránh việc các phiên bản tương lai thêm bớt trường làm lỗi parse.
  */
 const functionCallReplay = z
   .object({
@@ -71,22 +71,22 @@ const functionCallReplay = z
   })
   .passthrough();
 
-/** 思考摘要回放；summary/encrypted_content 对上游不透明，只识别，不进入重建的上下文文本。 */
+/** Phát lại tóm tắt suy nghĩ; summary/encrypted_content là mờ đối với upstream, chỉ nhận diện, không đưa vào văn bản ngữ cảnh tái dựng. */
 const reasoningReplay = z.object({ type: z.literal('reasoning') }).passthrough();
 
 /**
- * 真正认不出的历史项类型：Codex 等客户端会持续演进，不能因为多了一个没见过的
- * 类型就把整轮请求判 400。跳过并记录类型交给上层（持有 logger）记一条 warn；
- * 用户可见内容类型（input_text/input_image/input_file）不受影响，该报的错照样报。
+ * Loại mục lịch sử thực sự chưa nhận diện được: Các client như Codex liên tục cải tiến, không thể vì có thêm một
+ * loại chưa từng thấy mà đánh 400 cả lượt yêu cầu. Bỏ qua và ghi lại loại này giao cho tầng trên (nơi giữ logger) ghi 1 dòng warn;
+ * Các loại nội dung người dùng thấy được (input_text/input_image/input_file) không bị ảnh hưởng, lỗi nào cần báo vẫn báo bình thường.
  */
 const unknownItem = z.object({ type: z.string() }).passthrough();
 
-/** input 项：消息、工具输出、或历史回放/未知项。 */
+/** Mục input: Tin nhắn, output công cụ, hoặc mục phát lại lịch sử/chưa nhận diện. */
 const inputItem = z.union([inputMessage, functionCallOutput, functionCallReplay, reasoningReplay, unknownItem]);
 
 const reasoningSchema = z
   .object({
-    // effort 合法值随模型而定（none/minimal/low/medium/high/xhigh/max…），不在此枚举
+    // Giá trị hợp lệ của effort tùy thuộc vào mô hình (none/minimal/low/medium/high/xhigh/max…), không enum tại đây
     effort: z.string().optional(),
     summary: z.string().optional(),
   })
@@ -108,8 +108,8 @@ export const responsesRequestSchema = z
     reasoning: reasoningSchema.optional(),
     store: z.boolean().optional(),
   })
-  // include / prompt_cache_key / client_metadata 等 Codex 会发的字段没有专门建模，
-  // 全靠这里的 passthrough 放行——只记录、不解释、不因为不认识就拒绝请求。
+  // Các trường như include / prompt_cache_key / client_metadata mà Codex có thể gửi không được mô hình hóa riêng,
+  // hoàn toàn dựa vào passthrough ở đây để cho qua — chỉ ghi nhận, không diễn giải, không từ chối yêu cầu chỉ vì không nhận biết.
   .passthrough();
 
 export type ResponsesRequest = z.infer<typeof responsesRequestSchema>;
@@ -128,48 +128,48 @@ export interface ToolResult {
   output: string;
 }
 
-/** input_image 收集到的图片，透传给上游前的中间形态（对应实施计划 §M6）。 */
+/** Hình ảnh thu thập được từ input_image, hình thái trung gian trước khi chuyển tiếp lên upstream (tương ứng kế hoạch triển khai §M6). */
 export interface ExtractedImage {
-  /** URL 或 data URL（file_id 引用会在这里解析成 data URL） */
+  /** URL hoặc data URL (tham chiếu file_id sẽ được giải mã thành data URL tại đây) */
   url: string;
   detail: string | null;
 }
 
 export interface ExtractedInput {
-  /** 按对话顺序重建出的、带角色标注的完整上下文文本（见下方大段说明） */
+  /** Văn bản ngữ cảnh hoàn chỉnh có gắn nhãn vai trò, được tái dựng theo thứ tự đối thoại (xem giải thích dài bên dưới) */
   text: string;
-  /** instructions（系统指令），若有；已经作为开头的系统段落合入 text */
+  /** instructions (chỉ thị hệ thống), nếu có; đã được gộp vào text làm đoạn hệ thống mở đầu */
   instructions: string | null;
-  /** 工具执行结果回传（M5，续接时携带） */
+  /** Kết quả thực thi công cụ gửi về (M5, mang theo khi tiếp tục nối chuỗi) */
   toolResults: ToolResult[];
-  /** 图片输入（仅 UPSTREAM_IMAGE_INPUT=true 时才会非空，见 §M6） */
+  /** Ảnh đầu vào (chỉ không rỗng khi UPSTREAM_IMAGE_INPUT=true, xem §M6) */
   images: ExtractedImage[];
-  /** 因版本演进等原因被跳过的历史项类型（去重后），供调用方记一条 warn 日志 */
+  /** Loại mục lịch sử bị bỏ qua do cải tiến phiên bản... (sau khi khử trùng lặp), để bên gọi ghi log warn */
   skippedItemTypes: string[];
-  /** 因超过上下文字符上限、从最旧历史截断掉的字符数；0 表示未截断 */
+  /** Số ký tự bị cắt bớt từ lịch sử cũ nhất do vượt trần ký tự ngữ cảnh; 0 biểu thị không bị cắt */
   truncatedChars: number;
 }
 
-/** `input_file` / `input_image` 里 `file_id` 引用的解析接口，由 Files 子系统实现。 */
+/** Interface phân giải tham chiếu `file_id` trong `input_file` / `input_image`, do subsystem Files hiện thực. */
 export interface FilesLookup {
-  /** 按 file-id 取已提取的文本；不存在/不属于当前 Key/未提取到文本一律返回 null。 */
+  /** Lấy văn bản đã trích xuất theo file-id; không tồn tại/không thuộc Key hiện tại/chưa trích xuất được văn bản đều trả về null. */
   resolveText(fileId: string): { filename: string; text: string } | null;
-  /** 按 file-id 取原始内容并转成 data URL；不存在/不属于当前 Key/非图片一律返回 null。 */
+  /** Lấy nội dung gốc theo file-id và đổi thành data URL; không tồn tại/không thuộc Key hiện tại/không phải ảnh đều trả về null. */
   resolveImageDataUrl(fileId: string): { dataUrl: string; filename: string } | null;
 }
 
 export interface ExtractInputDeps {
   files?: FilesLookup;
-  /** 上游是否真支持图片输入，来自 UPSTREAM_IMAGE_INPUT（默认 false，见 §M6） */
+  /** Upstream có thực sự hỗ trợ ảnh đầu vào không, lấy từ UPSTREAM_IMAGE_INPUT (mặc định false, xem §M6) */
   imageInputEnabled?: boolean;
-  /** 重建出的上下文文本超过多少字符就从最旧历史开始截断；默认给一个宽松值 */
+  /** Văn bản ngữ cảnh tái dựng vượt quá bao nhiêu ký tự thì bắt đầu cắt bớt từ lịch sử cũ nhất; mặc định đặt giá trị nới lỏng */
   contextMaxChars?: number;
 }
 
-/** 宽松默认值：留足空间给 Codex 这类会发几万字符系统指令的客户端。 */
+/** Giá trị mặc định nới lỏng: Dành đủ không gian cho các client như Codex vốn gửi chỉ thị hệ thống hàng vạn ký tự. */
 export const DEFAULT_CONTEXT_MAX_CHARS = 400_000;
 
-/** 一段重建出的对话轮次：角色/工具标签 + 该轮文本。 */
+/** Một lượt đối thoại được tái dựng: nhãn vai trò/công cụ + văn bản của lượt đó. */
 export interface ConversationTurn {
   label: string;
   text: string;
@@ -177,18 +177,18 @@ export interface ConversationTurn {
 
 export interface BuildConversationTextResult {
   text: string;
-  /** 因超限被丢弃的字符数；0 表示未截断 */
+  /** Số ký tự bị loại bỏ do vượt giới hạn; 0 biểu thị không bị cắt */
   truncatedChars: number;
 }
 
 const TURN_SEPARATOR = '\n\n';
 
 /**
- * 把「系统指令 + 若干对话轮次」拼成一段文本，超出 `maxChars` 时从最旧的历史
- * （数组靠前的轮次）开始丢弃，直到放得下为止；系统段永远保留，且至少保留
- * 最后一轮（否则本轮真正要处理的内容会被截没）。
+ * Ghép "chỉ thị hệ thống + các lượt đối thoại" thành một đoạn văn bản, khi vượt quá `maxChars` sẽ bắt đầu loại bỏ
+ * từ lịch sử cũ nhất (các lượt ở đầu mảng) cho đến khi vừa vặn; đoạn hệ thống luôn được giữ lại, và tối thiểu giữ lại
+ * lượt cuối cùng (nếu không nội dung thực sự cần xử lý ở lượt này sẽ bị cắt mất).
  *
- * 单独成一个纯函数是为了方便直接单测截断边界，不用每次都拼一个完整请求。
+ * Tách thành hàm thuần túy để thuận tiện unit test trực tiếp biên cắt bớt, không cần lần nào cũng dựng một request hoàn chỉnh.
  */
 export function buildConversationText(
   instructionsText: string | null,
@@ -205,7 +205,7 @@ export function buildConversationText(
   const originalLength = full.length;
 
   while (full.length > maxChars && kept.length > 1) {
-    kept = kept.slice(1); // 丢最旧的一轮（数组靠前 = 更早发生）
+    kept = kept.slice(1); // Bỏ lượt cũ nhất (đầu mảng = diễn ra sớm hơn)
     full = assemble([...head, ...kept]);
   }
 
@@ -230,7 +230,7 @@ interface MessageLike {
   content: string | { type: string; [key: string]: unknown }[];
 }
 
-/** 从一条消息里抽出纯文本（多个 content part 用换行拼接）与图片。 */
+/** Rút trích văn bản thuần từ một tin nhắn (nhiều content part nối lại bằng dấu xuống dòng) cùng với hình ảnh. */
 function extractMessageContent(
   message: MessageLike,
   deps: ExtractInputDeps,
@@ -253,35 +253,35 @@ function extractMessageContent(
       );
       if (image !== null) images.push(image);
     }
-    // 其余未识别的 part 类型：跳过，不参与文本拼装，不整轮报错
+    // Các loại part chưa nhận diện khác: bỏ qua, không tham gia ghép văn bản, không báo lỗi cả lượt
   }
   return { text: fragments.join('\n'), images };
 }
 
 /**
- * 从 input 重建完整对话上下文（对应实施计划 §M3「切账号用本地内容重建上下文」
- * 的自然延伸，见 §M6 补充需求）。
+ * Tái dựng ngữ cảnh đối thoại hoàn chỉnh từ input (phần mở rộng tự nhiên của việc
+ * "chuyển tài khoản dùng nội dung cục bộ tái dựng ngữ cảnh" trong kế hoạch triển khai §M3, xem yêu cầu bổ sung §M6).
  *
- * **为什么要重建整段历史，而不是只取本轮新增文本**：Codex 等客户端在
- * `store:false` 时不带 `previous_response_id`，每轮都把整段对话历史随
- * `input` 重发；本网关这一侧若只挑出"新增的用户文本"发给上游，等于每轮都是
- * 一次全新、失忆的对话——多轮完全不可用。因此这里按 input 数组顺序，把
- * developer/system 指令、user 发言、assistant 回复、工具调用与工具结果全部
- * 转成带角色标注的文本轮次，`instructions` 作为开头的系统段落，一并拼成发给
- * 上游的正文。
+ * **Tại sao phải tái dựng toàn bộ lịch sử, thay vì chỉ lấy văn bản mới thêm ở lượt này**: Các client như Codex khi
+ * `store:false` không gửi kèm `previous_response_id`, mỗi lượt đều gửi lại toàn bộ lịch sử đối thoại kèm
+ * theo `input`; phía gateway này nếu chỉ chọn lọc "văn bản user mới thêm" để gửi lên upstream, đồng nghĩa với việc mỗi lượt đều là
+ * một cuộc trò chuyện hoàn toàn mới và mất trí nhớ — việc trò chuyện nhiều lượt hoàn toàn tê liệt. Do đó ở đây dựa theo thứ tự mảng input, chuyển đổi
+ * toàn bộ chỉ thị developer/system, lời nhắn user, phản hồi assistant, lệnh gọi công cụ và kết quả công cụ
+ * thành các lượt văn bản có gắn nhãn vai trò, `instructions` làm đoạn hệ thống mở đầu, ghép lại thành nội dung
+ * gửi lên upstream.
  *
- * **各类 item 的处理**：
- * - `function_call_output`：既计入 `toolResults`（供 M5 工具循环走结构化通道），
- *   也作为一轮"【工具结果】"文本进上下文，保证上游即使不认那条结构化通道也能
- *   从文本里看到结果；
- * - `function_call`：模型上一轮的工具调用意图回放，转成"【工具 X 的调用】"；
- * - `reasoning`：思考摘要回放，内容对上游不透明或无意义，不进入上下文文本
- *   （静默跳过，不是"静默伪装"——伪装指假装做了某事但其实没做，这里只是准确
- *   地判定它不代表可用文本）；
- * - 无法识别的 item 类型：不整轮 400，跳过并记录类型，交给调用方（持有
- *   logger）记一条 warn；用户可见内容类型该报错的仍然报错。
+ * **Xử lý các loại item**:
+ * - `function_call_output`: Vừa tính vào `toolResults` (dành cho vòng lặp công cụ M5 đi qua kênh cấu trúc),
+ *   vừa xem là một lượt văn bản "【Kết quả công cụ】" đưa vào ngữ cảnh, đảm bảo upstream dù không nhận biết kênh cấu trúc đó thì
+ *   vẫn nhìn thấy kết quả từ trong văn bản;
+ * - `function_call`: Phát lại ý định gọi công cụ của mô hình ở vòng trước, chuyển thành "【Lần gọi công cụ X】";
+ * - `reasoning`: Phát lại tóm tắt suy nghĩ, nội dung mờ hoặc vô nghĩa đối với upstream, không đưa vào văn bản ngữ cảnh
+ *   (bỏ qua trong im lặng, không phải là "âm thầm giả vờ" — giả vờ là làm bộ đã làm nhưng thực tế không làm, ở đây chỉ là xác định
+ *   chính xác rằng nó không đại diện cho văn bản khả dụng);
+ * - Loại item không thể nhận diện: Không báo lỗi 400 cả lượt, bỏ qua và ghi nhận loại, giao cho bên gọi (nơi giữ
+ *   logger) ghi 1 dòng log warn; Loại nội dung người dùng thấy được vẫn báo lỗi bình thường khi có lỗi.
  *
- * 超过 `contextMaxChars` 时从最旧历史开始截断，见 `buildConversationText`。
+ * Khi vượt quá `contextMaxChars` sẽ bắt đầu cắt bớt từ lịch sử cũ nhất, xem `buildConversationText`.
  */
 export function extractInputText(request: ResponsesRequest, deps: ExtractInputDeps = {}): ExtractedInput {
   const instructions = request.instructions ?? null;
@@ -299,10 +299,10 @@ export function extractInputText(request: ResponsesRequest, deps: ExtractInputDe
   const turns: ConversationTurn[] = [];
 
   for (const item of request.input) {
-    // 注：`unknownItem` 分支的 `type` 字段类型是通用 `string`（不是字面量），
-    // 会让 TS 没法仅凭 `item.type === '字面量'` 排除掉它，导致同名字段被推断成
-    // `unknown`。运行时判断已经足够可靠（zod 已校验过整体形状），这里按确认过
-    // 的具体形状显式转换，而不是放宽字段类型让错误悄悄溜过去。
+    // Chú ý: Nhánh `unknownItem` có kiểu trường `type` là `string` chung (không phải literal),
+    // khiến TS không thể chỉ dựa vào `item.type === 'literal'` để loại trừ nó, dẫn đến trường cùng tên bị suy đoán thành
+    // `unknown`. Phán đoán ở runtime đã đủ tin cậy (zod đã kiểm tra hình dạng tổng thể), ở đây ép kiểu tường minh theo
+    // hình dạng cụ thể đã xác nhận, thay vì nới lỏng kiểu trường để lỗi lọt qua âm thầm.
     if ('type' in item && item.type === 'function_call_output') {
       const output = item as z.infer<typeof functionCallOutput>;
       toolResults.push({ callId: output.call_id, output: output.output });
@@ -318,11 +318,11 @@ export function extractInputText(request: ResponsesRequest, deps: ExtractInputDe
     }
 
     if ('type' in item && item.type === 'reasoning') {
-      continue; // 思考摘要回放：不进入重建的上下文文本
+      continue; // Phát lại tóm tắt suy nghĩ: không đưa vào văn bản ngữ cảnh tái dựng
     }
 
     if ('type' in item && item.type !== 'message') {
-      // 走到这里必是未识别的历史项类型：不是我们认识的任何一种，也不是隐式 message
+      // Đến được đây chắc chắn là loại mục lịch sử chưa nhận diện: không phải bất kỳ loại nào ta biết, cũng không phải message ẩn
       skippedItemTypes.push(String(item.type));
       continue;
     }
@@ -393,8 +393,8 @@ function resolveInputImage(
 }
 
 /**
- * 组装透传给上游的参数。
- * model 与 reasoning 原样带上，绝不改写、不枚举、不造别名。
+ * Lắp ráp các tham số chuyển tiếp nguyên bản lên upstream.
+ * model và reasoning mang theo nguyên dạng, tuyệt đối không viết lại, không enum hóa, không tạo bí danh.
  */
 export function buildPassthrough(request: ResponsesRequest): Record<string, unknown> {
   const passthrough: Record<string, unknown> = { model: request.model };
@@ -404,7 +404,7 @@ export function buildPassthrough(request: ResponsesRequest): Record<string, unkn
   return passthrough;
 }
 
-/** 取出 reasoning.effort 用于记录（不改写、不校验取值）。 */
+/** Lấy reasoning.effort phục vụ ghi nhận (không viết lại, không kiểm tra giá trị). */
 export function extractReasoningEffort(request: ResponsesRequest): string | null {
   const effort = request.reasoning?.effort;
   return typeof effort === 'string' ? effort : null;

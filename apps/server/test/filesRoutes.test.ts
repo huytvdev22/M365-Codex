@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 
 /**
- * `/v1/files` `/v1/uploads` 全链路集成测试（对应实施计划 §11、§M6）。
- * 用真实临时目录做磁盘存储（DATA_DIR 不能是 :memory:），每个用例结束后清理。
+ * Test tích hợp toàn trình `/v1/files` `/v1/uploads` (tương ứng kế hoạch triển khai §11, §M6).
+ * Dùng thư mục tạm thật làm bộ lưu trữ đĩa (DATA_DIR không thể là :memory:), dọn dẹp sau mỗi case.
  */
 
 let harness: TestHarness | undefined;
@@ -34,7 +34,7 @@ function auth(key: string): Record<string, string> {
   return { authorization: `Bearer ${key}` };
 }
 
-/** 手写一份 multipart/form-data 请求体，避免额外引入 form-data 包做测试。 */
+/** Tự viết thủ công một body multipart/form-data, tránh import thêm package form-data để test. */
 function multipartBody(
   fields: Record<string, string>,
   file: { field: string; filename: string; contentType: string; content: Buffer },
@@ -295,11 +295,11 @@ describe('大小与配额限制', () => {
 
     it('Key 设置的值比全局更松时被裁剪到全局上限，不允许突破', async () => {
       harness = await createTestHarness({ DATA_DIR: dataDir, FILES_MAX_FILE_BYTES: '1024' });
-      // Key 自己设置成 10MB（远比全局 1024 字节宽松），有效上限必须仍是全局的 1024。
-      // 内容取 1025 字节：刚好在 Fastify multipart 插件自身的 fileSize 上限
-      // （全局 maxFileBytes + 1 = 1025，见 app.ts 的 multipart 注册）之内，
-      // 这样能确认是本服务自己的 assertFileSize 拒绝了它，而不是被
-      // multipart 插件更早的、独立的一道检查拦下来
+      // Key tự đặt 10MB (rộng rãi hơn nhiều so với 1024 byte toàn cục), giới hạn hiệu lực vẫn phải là 1024 byte toàn cục.
+      // Nội dung lấy 1025 byte: Vừa đúng nằm trong giới hạn fileSize của plugin Fastify multipart
+      // (maxFileBytes toàn cục + 1 = 1025, xem đăng ký multipart trong app.ts),
+      // nhờ đó xác nhận được chính assertFileSize của dịch vụ từ chối nó, chứ không phải bị
+      // kiểm tra độc lập sớm hơn của plugin multipart chặn lại
       const key = harness.context.apiKeys.create({ name: '想突破全局上限', maxFileBytes: 10 * 1024 * 1024 });
       const { body, contentType } = multipartBody(
         {},

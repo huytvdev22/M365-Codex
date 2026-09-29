@@ -1,22 +1,22 @@
 import type { Logger } from 'pino';
 
 /**
- * 定时维护任务调度（对应实施计划 §18 的「定时清理」）。
+ * Lập lịch tác vụ bảo trì định kỳ (tương ứng "dọn dẹp định kỳ" trong kế hoạch triển khai §18).
  *
- * 只做三件事：按间隔跑、单任务失败不影响其它任务、记录上次结果供管理界面显示。
- * 不引 cron 库：这里的任务都是「每隔 N 分钟跑一次」，不需要 cron 表达式。
+ * Chỉ làm 3 việc: chạy theo chu kỳ, một tác vụ thất bại không ảnh hưởng tới tác vụ khác, ghi nhận kết quả lần trước phục vụ hiển thị trên giao diện quản trị.
+ * Không sử dụng thư viện cron: các tác vụ ở đây đều là "chạy mỗi N phút một lần", không cần biểu thức cron.
  *
- * 设计取舍：
- * - 任务串行执行。清理任务都在同一个 SQLite 上写，并发跑只会互相抢锁；
- * - 首轮延迟一小段时间再跑，避免刚启动就和迁移、预热抢 I/O；
- * - `unref()` 定时器，让进程能正常退出，不被清理任务吊住。
+ * Đánh đổi thiết kế:
+ * - Các tác vụ thực thi tuần tự. Các tác vụ dọn dẹp đều ghi vào cùng một SQLite, chạy đồng thời chỉ tranh chấp khóa (lock);
+ * - Vòng đầu tiên trì hoãn một khoảng thời gian ngắn rồi mới chạy, tránh tranh chấp I/O với migration và làm ấm (warm-up) ngay khi vừa khởi động;
+ * - `unref()` bộ định thời, để tiến trình có thể thoát bình thường, không bị tác vụ dọn dẹp giữ treo.
  */
 
 export interface MaintenanceJob {
   name: string;
-  /** 运行间隔（毫秒） */
+  /** Chu kỳ chạy (mili-giây) */
   intervalMs: number;
-  /** 返回处理条数，用于日志与管理界面展示 */
+  /** Trả về số bản ghi được xử lý, dùng cho log và hiển thị trên giao diện quản trị */
   run: () => number | Promise<number>;
 }
 
@@ -53,7 +53,7 @@ export class MaintenanceScheduler {
     });
   }
 
-  /** 立即执行一个任务（管理界面的「立即清理」按钮走这里）。 */
+  /** Thực thi ngay lập tức một tác vụ (nút "Dọn dẹp ngay" trên giao diện quản trị đi qua đây). */
   async runNow(name: string): Promise<JobStatus> {
     const job = this.#jobs.find((j) => j.name === name);
     if (job === undefined) throw new Error(`没有名为 ${name} 的维护任务`);
@@ -61,7 +61,7 @@ export class MaintenanceScheduler {
     return this.#status.get(name) as JobStatus;
   }
 
-  /** 全部跑一遍，返回各任务状态。 */
+  /** Chạy toàn bộ một lượt, trả về trạng thái từng tác vụ. */
   async runAll(): Promise<JobStatus[]> {
     for (const job of this.#jobs) {
       await this.#execute(job);
@@ -111,7 +111,7 @@ export class MaintenanceScheduler {
         this.#logger.info({ job: job.name, affected }, '维护任务清理了记录');
       }
     } catch (error) {
-      // 单个任务炸掉不能影响其它任务，也不能把进程带走
+      // Một tác vụ nổ không được làm ảnh hưởng tới các tác vụ khác, cũng không được đánh sập tiến trình
       status.lastError = (error as Error).message;
       status.lastAffected = null;
       this.#logger.warn({ job: job.name, err_msg: status.lastError }, '维护任务执行失败');

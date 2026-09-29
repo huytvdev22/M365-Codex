@@ -4,17 +4,17 @@ export function OAuthSettingsPage() {
   return (
     <SettingsGroupPage
       title="OAuth"
-      subtitle="Microsoft OAuth 客户端与端点设置（对应 /admin/settings 的 oauth 分组）"
+      subtitle="Cấu hình Client ID và endpoint Microsoft OAuth (tương ứng nhóm oauth trong /admin/settings)"
       groups={[
         {
           group: 'oauth',
-          heading: 'OAuth 端点',
+          heading: 'Endpoint OAuth',
           fields: [
-            { key: 'client_id', label: '客户端 ID', kind: 'string' },
-            { key: 'redirect_uri', label: '回调地址', kind: 'string', hint: '回调落在 Microsoft 自己的页面上，本服务不需要公网可达。' },
-            { key: 'authorize_url', label: '授权端点', kind: 'string' },
-            { key: 'token_url', label: 'Token 端点', kind: 'string' },
-            { key: 'scopes', label: 'Scope（空格分隔）', kind: 'string_list' },
+            { key: 'client_id', label: 'Client ID', kind: 'string' },
+            { key: 'redirect_uri', label: 'Địa chỉ Redirect URI (Callback)', kind: 'string', hint: 'Callback chuyển về trang nội bộ của Microsoft, dịch vụ này không cần mở ra Internet.' },
+            { key: 'authorize_url', label: 'Endpoint Ủy quyền (Authorize URL)', kind: 'string' },
+            { key: 'token_url', label: 'Endpoint Token (Token URL)', kind: 'string' },
+            { key: 'scopes', label: 'Scope (Phân tách bằng dấu cách)', kind: 'string_list' },
           ],
         },
       ]}

@@ -1,27 +1,27 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 /**
- * PKCE（RFC 7636）参数生成。
+ * Sinh tham số PKCE (RFC 7636).
  *
- * 只用 S256，不提供 plain 降级——plain 等于没有防护。
+ * Chỉ dùng S256, không hỗ trợ hạ cấp về plain — plain đồng nghĩa với không có bảo vệ.
  */
 
-/** Base64URL 编码，去掉填充符。 */
+/** Mã hóa Base64URL, loại bỏ ký tự padding. */
 export function base64Url(data: Buffer): string {
   return data.toString('base64url');
 }
 
-/** code_verifier：48 字节随机数编码后 64 字符，落在 RFC 要求的 43-128 区间内。 */
+/** code_verifier: 48 byte số ngẫu nhiên sau khi encode thành 64 ký tự, nằm trong khoảng 43-128 theo yêu cầu của RFC. */
 export function generateCodeVerifier(): string {
   return base64Url(randomBytes(48));
 }
 
-/** code_challenge = BASE64URL(SHA256(code_verifier))。 */
+/** code_challenge = BASE64URL(SHA256(code_verifier)). */
 export function deriveCodeChallenge(verifier: string): string {
   return base64Url(createHash('sha256').update(verifier, 'ascii').digest());
 }
 
-/** state：防 CSRF，同时作为授权会话的主键。 */
+/** state: chống CSRF, đồng thời làm khóa chính của phiên ủy quyền. */
 export function generateState(): string {
   return base64Url(randomBytes(24));
 }
@@ -41,7 +41,7 @@ export function createPkcePair(): PkcePair {
   };
 }
 
-/** RFC 7636 §4.1 对 code_verifier 的字符集与长度要求。 */
+/** Yêu cầu về bộ ký tự và độ dài của code_verifier theo RFC 7636 §4.1. */
 export function isValidCodeVerifier(verifier: string): boolean {
   return /^[A-Za-z0-9\-._~]{43,128}$/.test(verifier);
 }

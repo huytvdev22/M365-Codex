@@ -2,10 +2,11 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 /**
- * ESLint 扁平配置。
+ * Cấu hình phẳng ESLint.
  *
- * 类型感知规则只对 `src` 生效（它们在 tsconfig 项目内）；测试文件走非类型感知规则，
- * 其类型正确性由 `npm run typecheck` 中的 tsconfig.test.json 单独保证。
+ * Các quy tắc nhận biết kiểu dữ liệu (type-aware) chỉ áp dụng cho `src` (nằm trong dự án tsconfig);
+ * các tệp kiểm thử dùng quy tắc không nhận biết kiểu, tính đúng đắn về kiểu được đảm bảo riêng bởi
+ * tsconfig.test.json trong `npm run typecheck`.
  */
 export default tseslint.config(
   {
@@ -28,21 +29,21 @@ export default tseslint.config(
       ],
       'no-console': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
-      // Fastify 的 handler / hook 契约就是「返回 Promise」，大量处理器天然没有 await，
-      // 强制它们改写成同步函数只会让路由风格割裂
+      // Hợp đồng handler / hook của Fastify là "trả về Promise", rất nhiều handler vốn không có await,
+      // ép buộc viết lại thành hàm đồng bộ chỉ làm phong cách routing bị phân mảnh
       '@typescript-eslint/require-await': 'off',
     },
   },
   {
-    // dev/ 下是开发与验收用的独立脚本（模拟上游、播种假账号），不进生产镜像，
-    // 也不在任何 tsconfig 项目里；用非类型感知规则检查即可
+    // Dưới dev/ là các script độc lập dùng cho phát triển và nghiệm thu (mock upstream, seed tài khoản giả),
+    // không đưa vào image production, cũng không nằm trong bất kỳ dự án tsconfig nào; chỉ cần kiểm tra bằng quy tắc không nhận biết kiểu
     files: ['dev/**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {
-      // 这些 .mjs 不属于任何 tsconfig 项目，必须关掉 projectService，
-      // 否则解析器会因为「找不到所属项目」直接报解析错误
+      // Các file .mjs này không thuộc bất kỳ dự án tsconfig nào, bắt buộc phải tắt projectService,
+      // nếu không parser sẽ báo lỗi cú pháp do "không tìm thấy dự án trực thuộc"
       parserOptions: { projectService: false, project: false },
-      // 这里不引 globals 包，只声明这几个脚本实际用到的 Node 全局
+      // Ở đây không import gói globals, chỉ khai báo các biến toàn cục Node thực tế được dùng trong các script này
       globals: {
         process: 'readonly',
         console: 'readonly',
@@ -50,7 +51,7 @@ export default tseslint.config(
         URL: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
-        // Node 18+ 内置的 fetch 及其配套类型，验收脚本用来发请求
+        // fetch tích hợp sẵn của Node 18+ và các kiểu đi kèm, script nghiệm thu dùng để gửi yêu cầu
         fetch: 'readonly',
         FormData: 'readonly',
         Blob: 'readonly',
@@ -59,7 +60,7 @@ export default tseslint.config(
     },
     rules: {
       ...tseslint.configs.disableTypeChecked.rules,
-      // 这些脚本就是命令行工具，输出全靠 console
+      // Các script này là công cụ dòng lệnh, xuất dữ liệu hoàn toàn bằng console
       'no-console': 'off',
     },
   },
@@ -67,12 +68,12 @@ export default tseslint.config(
     files: ['**/test/**/*.ts', '**/test/**/*.tsx', '**/*.config.ts', 'eslint.config.js'],
     ...tseslint.configs.disableTypeChecked,
     rules: {
-      // 展开 disableTypeChecked 自带的规则关闭项，再叠加本项目的放宽项，
-      // 直接写 rules 会整体覆盖上面的展开结果
+      // Trải các quy tắc tắt mặc định của disableTypeChecked, sau đó chồng thêm các quy tắc nới lỏng của dự án,
+      // viết trực tiếp rules sẽ ghi đè toàn bộ kết quả trải ở trên
       ...tseslint.configs.disableTypeChecked.rules,
       '@typescript-eslint/no-non-null-assertion': 'off',
-      // 测试里 `vi.importActual<typeof import('../api')>()` 是 Vitest 的标准写法，
-      // 这里的内联 import() 类型注解没有等价的 import type 形式，放行
+      // Trong test, `vi.importActual<typeof import('../api')>()` là cách viết chuẩn của Vitest,
+      // chú thích kiểu import() nội dòng ở đây không có dạng import type tương đương, cho phép bỏ qua
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', disallowTypeAnnotations: false },

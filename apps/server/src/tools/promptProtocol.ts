@@ -3,20 +3,20 @@ import type { UpstreamEvent } from '../adapter/protocol.js';
 import type { ParsedTool } from './registry.js';
 
 /**
- * 提示词模拟的工具协议（对应实施计划 §3.5、§7.2 第 3 步）。
+ * Giao thức công cụ mô phỏng qua prompt (tương ứng kế hoạch triển khai §3.5, bước 3 của §7.2).
  *
- * M0 探针尚未确认上游是否支持原生结构化工具调用，因此这里提供第二条路径：
- * 把工具目录与输出格式写进发给上游的文本，再从回流的正文里把
- * `<tool_call>{...}</tool_call>` 解析出来转成归一化事件。
+ * Probe M0 chưa xác nhận liệu upstream có hỗ trợ lệnh gọi công cụ có cấu trúc nguyên bản hay không, do đó cung cấp con đường thứ hai:
+ * Đưa danh mục công cụ và định dạng đầu ra vào văn bản gửi cho upstream, sau đó bóc tách
+ * `<tool_call>{...}</tool_call>` từ nội dung phản hồi để chuyển thành các sự kiện đã chuẩn hóa.
  *
- * 关键约束（§7.3）：**工具 JSON 不得同时作为正文重复输出**——扫描器会把标记
- * 及其内容从文本流里剥离，客户端只会看到 function_call 项，不会再看到一份 JSON。
+ * Ràng buộc then chốt (§7.3): **JSON công cụ không được xuất lặp lại vào nội dung chính** — bộ quét sẽ bóc tách thẻ
+ * và nội dung bên trong khỏi luồng văn bản, client sẽ chỉ thấy mục function_call, không thấy thêm một bản sao JSON.
  */
 
 export const TOOL_CALL_OPEN = '<tool_call>';
 export const TOOL_CALL_CLOSE = '</tool_call>';
 
-/** 构造交给上游的严格工具目录与输出约束。 */
+/** Tạo danh mục công cụ nghiêm ngặt và ràng buộc đầu ra gửi cho upstream. */
 export function buildToolInstruction(tools: readonly ParsedTool[]): string {
   if (tools.length === 0) return '';
   const catalog = tools
@@ -38,28 +38,28 @@ export function buildToolInstruction(tools: readonly ParsedTool[]): string {
   ].join('\n');
 }
 
-/** 生成一个 call_id。上游提示词模拟不会自带 id，由本网关分配（§7.3 唯一性）。 */
+/** Tạo một call_id. Mô phỏng prompt của upstream không tự mang id, do gateway này cấp phát (§7.3 tính duy nhất). */
 function makeCallId(): string {
   return `call_${randomBytes(12).toString('hex')}`;
 }
 
 export interface ScanResult {
-  /** 剥离工具调用后剩下的、可以发给客户端的正文 */
+  /** Nội dung chính còn lại sau khi bóc tách lệnh gọi công cụ, có thể gửi cho client */
   text: string;
-  /** 从正文里解析出的工具调用事件 */
+  /** Sự kiện gọi công cụ được phân tích từ nội dung chính */
   events: UpstreamEvent[];
 }
 
 /**
- * 文本流扫描器：逐段吃进 text_delta，吐出「去掉工具调用后的正文」与工具事件。
+ * Bộ quét luồng văn bản: Nhận từng đoạn text_delta, xuất ra "nội dung chính sau khi loại bỏ gọi công cụ" cùng các sự kiện công cụ.
  *
- * 流式下标记可能被切成两半（`<tool_` / `call>`），所以尾部要留住可能是开标记前缀的
- * 那几个字符，等下一段再判断，避免把半个标记当正文吐出去。
+ * Khi stream, thẻ đánh dấu có thể bị cắt làm đôi (`<tool_` / `call>`), do đó phần đuôi cần giữ lại vài ký tự có thể là tiền tố của thẻ mở,
+ * chờ đoạn tiếp theo rồi mới phán đoán, tránh việc xuất nửa cái thẻ ra làm nội dung chính.
  */
 export class PromptToolScanner {
-  /** 尚未判定的文本（可能是开标记的前缀） */
+  /** Văn bản chưa thể phán đoán (có thể là tiền tố của thẻ mở) */
   #pendingText = '';
-  /** 已进入 <tool_call> 内部时累积的内容 */
+  /** Nội dung tích lũy khi đã đi vào bên trong <tool_call> */
   #inside: string | null = null;
 
   push(chunk: string): ScanResult {
@@ -67,11 +67,11 @@ export class PromptToolScanner {
     return this.#drain(false);
   }
 
-  /** 流结束：把留住的尾巴放出来；未闭合的工具调用按普通文本处理（如实回吐）。 */
+  /** Kết thúc luồng: Xả phần đuôi đã giữ lại; lệnh gọi công cụ chưa đóng được xử lý như văn bản bình thường (xuất trả nguyên vẹn). */
   flush(): ScanResult {
     const result = this.#drain(true);
     if (this.#inside !== null) {
-      // 上游把标记开了没关：不猜测，原样交还正文
+      // Upstream mở thẻ nhưng không đóng: Không suy đoán, trả nguyên vẹn về nội dung chính
       result.text += TOOL_CALL_OPEN + this.#inside;
       this.#inside = null;
     }
@@ -88,7 +88,7 @@ export class PromptToolScanner {
       if (this.#inside !== null) {
         const closeAt = this.#pendingText.indexOf(TOOL_CALL_CLOSE);
         if (closeAt < 0) {
-          // 结束标记同样可能被切成两半，尾部留住可能的前缀再判
+          // Thẻ kết thúc cũng có thể bị cắt đôi, giữ lại tiền tố có thể ở đuôi rồi phán đoán tiếp
           const keep = final ? 0 : partialSuffixLength(this.#pendingText, TOOL_CALL_CLOSE);
           this.#inside += this.#pendingText.slice(0, this.#pendingText.length - keep);
           this.#pendingText = this.#pendingText.slice(this.#pendingText.length - keep);
@@ -99,7 +99,7 @@ export class PromptToolScanner {
         this.#inside = null;
         const parsed = parseToolCallPayload(payload);
         if (parsed === null) {
-          // 解析不出来就不装作有工具调用，原样当正文返回（不静默丢内容）
+          // Không parse được thì không giả vờ là có lệnh gọi công cụ, trả về nguyên dạng làm nội dung chính (không âm thầm mất nội dung)
           text += TOOL_CALL_OPEN + payload + TOOL_CALL_CLOSE;
         } else {
           events.push(...parsed);
@@ -118,7 +118,7 @@ export class PromptToolScanner {
       if (final) {
         break;
       }
-      // 留住可能是开标记前缀的尾巴
+      // Giữ lại phần đuôi có thể là tiền tố của thẻ mở
       const keep = partialSuffixLength(this.#pendingText, TOOL_CALL_OPEN);
       text += this.#pendingText.slice(0, this.#pendingText.length - keep);
       this.#pendingText = this.#pendingText.slice(this.#pendingText.length - keep);
@@ -129,7 +129,7 @@ export class PromptToolScanner {
   }
 }
 
-/** 文本尾部有多少个字符可能是 marker 的前缀（用于跨分片保留半个标记）。 */
+/** Số ký tự ở đuôi văn bản có thể là tiền tố của marker (dùng để giữ nửa cái thẻ qua các phân mảnh stream). */
 function partialSuffixLength(text: string, marker: string): number {
   const max = Math.min(marker.length - 1, text.length);
   for (let len = max; len > 0; len -= 1) {
@@ -138,7 +138,7 @@ function partialSuffixLength(text: string, marker: string): number {
   return 0;
 }
 
-/** 把 `{"name":…,"arguments":…}` 转成 begin + args_delta + end 三个事件。 */
+/** Chuyển `{"name":…,"arguments":…}` thành 3 sự kiện begin + args_delta + end. */
 function parseToolCallPayload(payload: string): UpstreamEvent[] | null {
   let parsed: unknown;
   try {
@@ -154,7 +154,7 @@ function parseToolCallPayload(payload: string): UpstreamEvent[] | null {
 
   const rawArgs = record.arguments ?? record.parameters ?? {};
   const args = typeof rawArgs === 'string' ? rawArgs : JSON.stringify(rawArgs);
-  // 上游自带 id 就沿用，便于同一调用在多帧间对齐；否则由本网关分配
+  // Nếu upstream có sẵn id thì giữ nguyên để thuận tiện đối chiếu nhiều frame; nếu không do gateway cấp phát
   const callId = typeof record.call_id === 'string' && record.call_id !== '' ? record.call_id : makeCallId();
 
   return [

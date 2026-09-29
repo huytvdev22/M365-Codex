@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registerUiRoutes } from '../src/routes/ui.js';
 
 /**
- * 管理界面静态托管：SPA 回落、资源类型、目录逃逸防护、构建产物缺失时的兜底。
+ * Lưu trữ tĩnh giao diện quản lý: Fallback SPA, loại tài nguyên, bảo vệ chống directory traversal, dự phòng khi thiếu build artifact.
  */
 
 let app: FastifyInstance;
@@ -68,7 +68,7 @@ describe('构建产物存在时', () => {
 
   it('目录逃逸被挡下：不会读到 dist 之外的文件', async () => {
     seedDist();
-    // 在 dist 外面放一个"机密"文件，确认拿不到
+    // Đặt một file "bí mật" bên ngoài dist, xác nhận không lấy được
     const outside = join(dist, '..', 'outside-secret.txt');
     writeFileSync(outside, 'TOP-SECRET');
     registerUiRoutes(app, { webDist: dist });

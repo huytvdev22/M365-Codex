@@ -17,7 +17,7 @@ function makeBuilder(overrides: Partial<BuilderInit> = {}): ResponseStreamBuilde
   });
 }
 
-/** 跑完整个生命周期，返回所有 SSE 事件。 */
+/** Chạy hết toàn bộ vòng đời, trả về tất cả sự kiện SSE. */
 function runFull(events: UpstreamEvent[], init?: Partial<BuilderInit>): SseEvent[] {
   const builder = makeBuilder(init);
   const out: SseEvent[] = [...builder.begin()];
@@ -52,8 +52,8 @@ describe('sequence_number 单调', () => {
     expect(events.every((e) => e.data.response_id === 'resp_test')).toBe(true);
   });
 
-  // 真实客户端（codex-cli 实测）只解析 data 里的 JSON、按其中的 type 分发，
-  // 不看 SSE 的 event: 行。少了这个字段，客户端会一直等不到 response.completed。
+  // Client thật (thực nghiệm với codex-cli) chỉ phân tích JSON trong data, dispatch theo type bên trong,
+  // không nhìn dòng event: của SSE. Thiếu trường này, client sẽ đợi mãi mà không nhận được response.completed.
   it('每个事件的 data 里都有与事件名一致的 type', () => {
     const events = runFull([
       { kind: 'reasoning_delta', text: '想一下' },
@@ -93,12 +93,12 @@ describe('事件顺序', () => {
       { kind: 'text_delta', text: '答案' },
     ]);
     const n = names(events);
-    // reasoning item added 在 message item added 之前
+    // reasoning item added đứng trước message item added
     const reasoningAddedIdx = n.indexOf(SSE_EVENTS.OUTPUT_ITEM_ADDED);
     const reasoningDoneIdx = n.indexOf(SSE_EVENTS.OUTPUT_ITEM_DONE);
     const messageAddedIdx = n.lastIndexOf(SSE_EVENTS.OUTPUT_ITEM_ADDED);
     expect(reasoningAddedIdx).toBeLessThan(messageAddedIdx);
-    // reasoning 先 done 再开 message
+    // reasoning hoàn thành trước rồi mới mở message
     expect(reasoningDoneIdx).toBeLessThan(messageAddedIdx);
     expect(n).toContain(SSE_EVENTS.REASONING_SUMMARY_DELTA);
     expect(n).toContain(SSE_EVENTS.REASONING_SUMMARY_DONE);

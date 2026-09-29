@@ -1,10 +1,10 @@
 import { ApiRequestError, type ApiErrorBody } from './types';
 
 /**
- * 极简 fetch 封装：统一带 Authorization、统一解析错误体、401 时通知上层回登录页。
+ * Bao bọc fetch tối giản: tự động đính kèm Authorization, phân tích body lỗi thống nhất, thông báo chuyển về trang đăng nhập khi nhận mã 401.
  *
- * 令牌只保存在这个模块的内存变量里（外加 AuthContext 同步写 sessionStorage 做刷新恢复），
- * 绝不写 localStorage、绝不出现在任何 console.* 调用里。
+ * Token chỉ được lưu trữ trong biến bộ nhớ của module này (kết hợp AuthContext ghi vào sessionStorage để phục hồi khi tải lại trang),
+ * tuyệt đối không ghi vào localStorage và không bao giờ xuất hiện trong console.*.
  */
 
 let authToken: string | null = null;
@@ -14,7 +14,7 @@ export function setAuthToken(token: string | null): void {
   authToken = token;
 }
 
-/** AuthContext 在挂载时注册：收到 401 就清空会话、跳转登录页。 */
+/** AuthContext đăng ký khi gắn kết: nhận 401 sẽ xóa phiên làm việc và chuyển đến trang đăng nhập. */
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
@@ -65,7 +65,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       body,
     });
   } catch {
-    throw new ApiRequestError(0, buildFallbackError(0, '无法连接到服务端，请检查网络或服务是否在运行'));
+    throw new ApiRequestError(0, buildFallbackError(0, 'Không thể kết nối đến máy chủ, vui lòng kiểm tra mạng hoặc dịch vụ có đang chạy không'));
   }
 
   if (res.status === 204) {
@@ -78,7 +78,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (!res.ok) {
     const errorBody = isApiErrorBody(payload)
       ? payload
-      : buildFallbackError(res.status, `请求失败（HTTP ${res.status}）`);
+      : buildFallbackError(res.status, `Yêu cầu thất bại (HTTP ${res.status})`);
     if (res.status === 401) {
       unauthorizedHandler?.();
     }
@@ -89,8 +89,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 }
 
 /**
- * 二进制下载（备份包 `.tar.gz`）。和 `request` 走同一份鉴权头，
- * 但响应体不是 JSON，失败时才尝试按错误体解析。
+ * Tải xuống tệp nhị phân (gói sao lưu `.tar.gz`). Dùng chung header xác thực với `request`,
+ * nhưng body phản hồi không phải JSON, chỉ parse body lỗi khi request thất bại.
  */
 export async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
   const headers: Record<string, string> = {};
@@ -102,7 +102,7 @@ export async function requestBlob(path: string, options: RequestOptions = {}): P
   try {
     res = await fetch(`${path}${buildQuery(options.query)}`, { method: options.method ?? 'GET', headers });
   } catch {
-    throw new ApiRequestError(0, buildFallbackError(0, '无法连接到服务端，请检查网络或服务是否在运行'));
+    throw new ApiRequestError(0, buildFallbackError(0, 'Không thể kết nối đến máy chủ, vui lòng kiểm tra mạng hoặc dịch vụ có đang chạy không'));
   }
 
   if (!res.ok) {
@@ -110,7 +110,7 @@ export async function requestBlob(path: string, options: RequestOptions = {}): P
     const payload: unknown = text.length > 0 ? safeJsonParse(text) : undefined;
     const errorBody = isApiErrorBody(payload)
       ? payload
-      : buildFallbackError(res.status, `请求失败（HTTP ${res.status}）`);
+      : buildFallbackError(res.status, `Yêu cầu thất bại (HTTP ${res.status})`);
     if (res.status === 401) {
       unauthorizedHandler?.();
     }
@@ -121,8 +121,8 @@ export async function requestBlob(path: string, options: RequestOptions = {}): P
 }
 
 /**
- * multipart/form-data 上传（备份恢复）。不手动设置 Content-Type——
- * 交给浏览器按 FormData 自动带上正确的 boundary，手动设反而会丢 boundary 导致服务端解析失败。
+ * Tải lên dạng multipart/form-data (phục hồi sao lưu). Không thiết lập thủ công Content-Type —
+ * để trình duyệt tự động bổ sung boundary chính xác từ FormData, thiết lập thủ công sẽ làm mất boundary khiến máy chủ không phân tích cú pháp được.
  */
 export async function requestMultipart<T>(path: string, fieldName: string, file: File): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
@@ -136,7 +136,7 @@ export async function requestMultipart<T>(path: string, fieldName: string, file:
   try {
     res = await fetch(path, { method: 'POST', headers, body: form });
   } catch {
-    throw new ApiRequestError(0, buildFallbackError(0, '无法连接到服务端，请检查网络或服务是否在运行'));
+    throw new ApiRequestError(0, buildFallbackError(0, 'Không thể kết nối đến máy chủ, vui lòng kiểm tra mạng hoặc dịch vụ có đang chạy không'));
   }
 
   const text = await res.text();
@@ -145,7 +145,7 @@ export async function requestMultipart<T>(path: string, fieldName: string, file:
   if (!res.ok) {
     const errorBody = isApiErrorBody(payload)
       ? payload
-      : buildFallbackError(res.status, `请求失败（HTTP ${res.status}）`);
+      : buildFallbackError(res.status, `Yêu cầu thất bại (HTTP ${res.status})`);
     if (res.status === 401) {
       unauthorizedHandler?.();
     }

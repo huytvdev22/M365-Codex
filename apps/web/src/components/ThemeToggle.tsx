@@ -18,7 +18,7 @@ function initial(): Preference {
   return stored === 'light' || stored === 'dark' ? stored : 'system';
 }
 
-/** 纯展示偏好，不是凭据，存 sessionStorage 即可；默认跟随系统。 */
+/** Tùy chọn giao diện cá nhân, lưu trong sessionStorage; mặc định theo hệ thống. */
 export function ThemeToggle() {
   const [pref, setPref] = useState<Preference>(initial);
 
@@ -34,11 +34,11 @@ export function ThemeToggle() {
       type="button"
       className="theme-toggle"
       onClick={() => setPref(next())}
-      title="切换深浅色（跟随系统 / 浅色 / 深色）"
+      title="Chuyển đổi giao diện (Theo hệ thống / Sáng / Tối)"
     >
       {pref === 'dark' ? <IconMoon /> : <IconSun />}
       {' '}
-      {pref === 'system' ? '跟随系统' : pref === 'light' ? '浅色' : '深色'}
+      {pref === 'system' ? 'Theo hệ thống' : pref === 'light' ? 'Giao diện sáng' : 'Giao diện tối'}
     </button>
   );
 }

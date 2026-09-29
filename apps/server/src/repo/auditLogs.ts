@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { asRows, type Database } from '../db/index.js';
 
 /**
- * 审计日志：记录「谁在什么时候做了什么」。
- * detail 只允许写入非敏感的结构化摘要，严禁写入 Token、密码、明文 API Key。
+ * Nhật ký kiểm toán: ghi lại "ai đã làm gì vào lúc nào".
+ * detail chỉ cho phép ghi tóm tắt có cấu trúc không nhạy cảm, nghiêm cấm ghi Token, mật khẩu, API Key dạng văn bản rõ.
  */
 
 export interface AuditLogRow {
@@ -54,7 +54,7 @@ export class AuditLogRepository {
     );
   }
 
-  /** 清理早于 cutoff 的审计日志（对应实施计划 §18 定时清理）。 */
+  /** Dọn dẹp nhật ký kiểm toán cũ hơn mốc cutoff (tương ứng dọn dẹp định kỳ trong kế hoạch triển khai §18). */
   purgeOlderThan(cutoff: number): number {
     const result = this.#db.prepare('DELETE FROM audit_logs WHERE created_at < ?').run(cutoff);
     return Number(result.changes);

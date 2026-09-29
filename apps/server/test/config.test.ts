@@ -142,7 +142,7 @@ describe('loadConfig', () => {
     expect(files.maxTotalBytesPerKey).toBeGreaterThan(files.maxFileBytes);
     expect(files.retentionMs).toBeGreaterThan(0);
     expect(files.uploadTtlMs).toBeGreaterThan(0);
-    // 默认不假装支持图片输入：真实能力要等 M0 探针校准
+    // Mặc định không giả vờ hỗ trợ nhập ảnh: Năng lực thật phải đợi probe M0 hiệu chuẩn
     expect(upstreamImageInput).toBe(false);
   });
 

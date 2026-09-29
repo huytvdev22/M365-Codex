@@ -9,56 +9,54 @@ import {
 } from './protocol.js';
 
 /**
- * Sydney JSON 协议 v1 编解码。
+ * Mã hóa / giải mã giao thức Sydney JSON v1.
  *
- * 帧分隔与 SignalR 消息类型是既定规范，可靠。**消息内部字段的语义已在
- * 2026-07-27 用真实 M365 Copilot 账号（真实 WebSocket 握手 + 真实 access token）
- * 跑通校准**，结论如下（详见 `docs/里程碑进度.md` M0 一节）：
+ * Phân cách frame và các loại message SignalR là quy chuẩn đã định, đáng tin cậy. **Ngữ nghĩa các trường bên trong message đã được
+ * kiểm chuẩn thành công vào ngày 27-07-2026 bằng tài khoản M365 Copilot thật (bắt tay WebSocket thật + access token thật)**,
+ * kết luận như sau (chi tiết xem phần M0 trong `docs/trien-khai-va-nghiem-thu.md`):
  *
- * 1. **请求侧**：`arguments[0]` 是单数 `message` 对象（`{author,inputMethod,text,
- *    messageType}`），不是旧版建模的 `messages` 数组；`participant.id`（账号 oid）、
- *    `conversationId`（续接时才带，首轮不传）、`requestId`、`isStartOfSession`、
- *    `source` 都是 `arguments[0]` 的顶层兄弟字段。这一版本把旧的 `messages: []`
- *    直接改成 `message: {}`，因为旧形态在真实上游前从未跑通过（一律
- *    `InvalidRequest`），保留一个「永远错」的兼容分支没有意义，直接替换更干净。
- * 2. **响应侧**：业务负载在 `type:2` 帧的 `item` 字段里，不是旧版建模的
- *    `arguments[0]`；`item.messages[]` 同时包含回显的用户消息与 bot
- *    消息，`item.result.value`（`Success`/`InvalidRequest`/`ForbiddenRequest`/
- *    `InternalError`/`Throttled`…）是错误通道，`item.result.errorCode`
- *    （如 `InvalidCopilotLicense`）是更细的错误分类；`item.conversationId`
- *    是本轮的会话标识；`type:3` completion 帧只有 `{type:3,invocationId}`，
- *    不带 payload。
- * 3. **`spokenText` 不是推理摘要**：实测同一条 bot 消息里 `spokenText` 与 `text`
- *    内容完全一致，只是语音合成友好版本（例如去掉部分标点/格式），旧实现把它
- *    映射成 `reasoning_delta` 是猜错了——继续这样做会把最终答案的内容重复一份
- *    伪装成"思考过程"发给客户端。现予以移除；真正的推理/思维链字段本轮未能
- *    验证（测试账号的 Copilot 许可证/配额问题导致没能拿到一次成功生成，见下）。
- * 4. **测试账号本身未能验证到成功生成**：请求被完整接受、正常解析、正常计费
- *    （`throttling.metering` 正常返回配额），但最终结果稳定停在
- *    `ForbiddenRequest`/`InvalidCopilotLicense`（`conversationId` 用默认值/省略
- *    走的分支）或 `InternalError`（`conversationId` 显式传空字符串 `''` 走的
- *    分支，绕过了前一个检查但止步于此）。这是账号自身的许可证/配额问题（此前
- *    已观察到这个账号的登录也会被安全策略拦截，是同一类账号侧限制），不是
- *    请求格式问题——两条路径的响应都是结构完整的业务对象而不是
- *    `InvalidRequest`，证明协议格式已被上游正确解析。因此这里
- *    按"首轮不传 conversationId，续接时才带"这个更自然、更可能是官方预期的
- *    形态实现（即前一条分支），而不是照抄"传空字符串"这个疑似意外生效的绕过
- *    写法。工具调用、图片输入、真实的推理字段仍待一个有完整许可证的账号验证。
+ * 1. **Phía request**: `arguments[0]` là một đối tượng số ít `message` (`{author,inputMethod,text,
+ *    messageType}`), không phải mảng `messages` như mô hình cũ; `participant.id` (oid tài khoản),
+ *    `conversationId` (chỉ mang theo khi tiếp tục phiên, lượt đầu không gửi), `requestId`, `isStartOfSession`,
+ *    `source` đều là các trường ngang hàng cấp cao nhất của `arguments[0]`. Phiên bản này đổi thẳng `messages: []`
+ *    cũ thành `message: {}`, vì cấu trúc cũ chưa bao giờ chạy lọt qua upstream thật (luôn trả về
+ *    `InvalidRequest`), việc giữ lại một nhánh tương thích "luôn sai" là vô nghĩa, thay thế trực tiếp sẽ gọn ghẽ hơn.
+ * 2. **Phía response**: Payload nghiệp vụ nằm trong trường `item` của frame `type:2`, không phải `arguments[0]`
+ *    như mô hình cũ; `item.messages[]` đồng thời chứa cả tin nhắn người dùng phản hồi lại và tin nhắn của bot,
+ *    `item.result.value` (`Success`/`InvalidRequest`/`ForbiddenRequest`/`InternalError`/`Throttled`...) là kênh lỗi,
+ *    `item.result.errorCode` (như `InvalidCopilotLicense`) là phân loại lỗi chi tiết hơn; `item.conversationId`
+ *    là định danh phiên làm việc của lượt này; frame completion `type:3` chỉ có `{type:3,invocationId}`,
+ *    không mang payload.
+ * 3. **`spokenText` không phải là tóm tắt suy luận**: Đo đạc thực tế trong cùng một tin nhắn của bot cho thấy `spokenText` và `text`
+ *    có nội dung hoàn toàn giống nhau, chỉ là phiên bản thân thiện với tổng hợp giọng nói (ví dụ lược bỏ một số dấu câu/định dạng), implementation
+ *    cũ ánh xạ nó thành `reasoning_delta` là đoán sai — tiếp tục làm vậy sẽ lặp lại nội dung câu trả lời cuối cùng và
+ *    giả dạng thành "quá trình suy nghĩ" gửi cho client. Hiện đã loại bỏ; trường suy luận/chuỗi tư duy thật sự chưa thể kiểm chứng
+ *    trong đợt này (vấn đề giấy phép/hạn ngạch Copilot của tài khoản test khiến chưa có một lần sinh thành công, xem bên dưới).
+ * 4. **Bản thân tài khoản test chưa kiểm chứng được phản hồi sinh thành công**: Yêu cầu được tiếp nhận đầy đủ, phân tích bình thường, tính phí
+ *    bình thường (`throttling.metering` trả về hạn ngạch bình thường), nhưng kết quả cuối cùng dừng lại ổn định ở
+ *    `ForbiddenRequest`/`InvalidCopilotLicense` (nhánh khi `conversationId` dùng giá trị mặc định/bỏ qua)
+ *    hoặc `InternalError` (nhánh khi `conversationId` truyền chuỗi rỗng `''`, vượt qua bước kiểm tra trước nhưng dừng lại ở đây).
+ *    Đây là vấn đề hạn ngạch/giấy phép của chính tài khoản (trước đó đã quan sát thấy việc đăng nhập tài khoản này cũng bị chặn bởi chính sách bảo mật,
+ *    thuộc cùng một nhóm giới hạn từ phía tài khoản), không phải lỗi định dạng yêu cầu — phản hồi của cả hai luồng đều là đối tượng nghiệp vụ có cấu trúc
+ *    hoàn chỉnh chứ không phải `InvalidRequest`, chứng minh định dạng giao thức đã được upstream phân tích chính xác. Vì vậy ở đây
+ *    triển khai theo hình thái tự nhiên hơn và nhiều khả năng là chính thức được mong đợi: "lượt đầu không gửi conversationId, tiếp tục phiên mới mang theo"
+ *    (tức nhánh đầu tiên), thay vì sao chép cách viết "truyền chuỗi rỗng" nghi là một mẹo lách bất ngờ có hiệu lực. Gọi công cụ, hình ảnh đầu vào
+ *    và các trường suy luận thực tế vẫn cần một tài khoản có giấy phép đầy đủ để kiểm chứng.
  */
 
 interface SydneyToolCall {
   callId?: string;
   id?: string;
   name?: string;
-  /** 已完整的参数（JSON 字符串或对象） */
+  /** Đối số đã hoàn chỉnh (chuỗi JSON hoặc object) */
   arguments?: string | Record<string, unknown>;
-  /** 参数增量（流式） */
+  /** Phần gia tăng đối số (dạng stream) */
   argumentsDelta?: string;
-  /** 阶段：begin / delta / end */
+  /** Giai đoạn: begin / delta / end */
   phase?: 'begin' | 'delta' | 'end';
 }
 
-/** 请求侧的单条消息（真实字段：单数对象，不是数组）。 */
+/** Tin nhắn đơn lẻ phía request (trường thực tế: object số ít, không phải mảng). */
 interface SydneyOutboundMessage {
   author: string;
   inputMethod: string;
@@ -67,7 +65,7 @@ interface SydneyOutboundMessage {
   [key: string]: unknown;
 }
 
-/** 发给上游的 invocation 参数（`arguments[0]`）。 */
+/** Tham số invocation gửi tới upstream (`arguments[0]`). */
 interface SydneyInvocationArgument {
   source?: string;
   isStartOfSession?: boolean;
@@ -75,29 +73,29 @@ interface SydneyInvocationArgument {
   participant?: { id: string };
   conversationId?: string;
   requestId?: string;
-  /** 工具声明/结果、图片：真实放置位置未经账号许可证限制验证，沿用兄弟字段的约定 */
+  /** Khai báo/kết quả công cụ, hình ảnh: vị trí đặt thực tế chưa được kiểm chứng do giới hạn bản quyền tài khoản, tạm áp dụng quy ước trường ngang hàng */
   images?: ImageInputDescriptor[];
   [key: string]: unknown;
 }
 
-/** 响应侧 `item.messages[]` 里的一条消息（用户回显或 bot 回复）。 */
+/** Một tin nhắn trong `item.messages[]` phía response (echo từ người dùng hoặc phản hồi từ bot). */
 interface SydneyResponseMessage {
   text?: string;
   author?: string;
   messageType?: string;
   contentOrigin?: string;
-  /** 语音合成友好版本，内容与 text 一致，不是推理摘要（见文件头注释第 3 条） */
+  /** Phiên bản thân thiện với bộ đọc giọng nói, nội dung trùng với text, không phải bản tóm tắt suy luận (xem chú thích đầu file mục 3) */
   spokenText?: string;
-  /** 观察到的失败标记；权威错误信息在 item.result 里，这里不单独据此判定 */
+  /** Cờ đánh dấu thất bại quan sát được; thông tin lỗi chính xác nằm trong item.result, không phán đoán đơn độc dựa vào đây */
   turnState?: string;
   adaptiveCards?: unknown[];
   sourceAttributions?: { seeMoreUrl?: string; providerDisplayName?: string }[];
-  /** 工具调用（M5，真实形态未经验证，沿用既有建模） */
+  /** Gọi công cụ (M5, hình thái thực tế chưa kiểm chứng, dùng mô hình sẵn có) */
   toolCalls?: SydneyToolCall[];
   [key: string]: unknown;
 }
 
-/** 响应侧的错误/结果通道。 */
+/** Kênh lỗi/kết quả phía response. */
 interface SydneyResultBlock {
   value?: string;
   message?: string;
@@ -105,7 +103,7 @@ interface SydneyResultBlock {
   serviceVersion?: string;
 }
 
-/** 响应侧 `type:2` 帧的 `item` 字段（真实位置，不是 `arguments[0]`）。 */
+/** Trường `item` trong frame `type:2` phía response (vị trí thực tế, không phải `arguments[0]`). */
 interface SydneyResponseItem {
   messages?: SydneyResponseMessage[];
   conversationId?: string;
@@ -134,7 +132,7 @@ export class SydneyCodecV1 implements ProtocolCodec {
     if (trimmed === '' || trimmed === '{}') return true;
     try {
       const parsed = JSON.parse(trimmed) as { error?: unknown; type?: unknown };
-      // 握手 ack 是空对象或不含 error 的对象；带 error 说明握手失败
+      // Ack bắt tay là đối tượng rỗng hoặc đối tượng không chứa error; có error nghĩa là bắt tay thất bại
       return parsed.error === undefined && parsed.type === undefined;
     } catch {
       return false;
@@ -143,11 +141,11 @@ export class SydneyCodecV1 implements ProtocolCodec {
 
   encodeInvocation(input: InvocationInput): string {
     const argument: SydneyInvocationArgument = {
-      // 与握手的 X-Scenario 头同源；M0 实测确认这个值下请求能被完整解析。
+      // Cùng nguồn với header X-Scenario khi bắt tay; đo thực tế M0 xác nhận giá trị này giúp request được phân tích đầy đủ.
       source: 'officeweb',
       requestId: input.invocationId,
-      // 首轮（没有 conversationRef）不传 conversationId，让上游分配新会话；
-      // 续接时带上一轮拿到的会话标识。
+      // Lượt đầu (không có conversationRef) không truyền conversationId, để upstream tạo phiên mới;
+      // Khi tiếp tục thì mang theo ID phiên nhận được từ lượt trước.
       isStartOfSession: input.conversationRef === undefined,
       message: {
         author: 'user',
@@ -184,14 +182,14 @@ export class SydneyCodecV1 implements ProtocolCodec {
   }
 
   mapMessageToEvents(message: RawMessage): UpstreamEvent[] {
-    // 心跳与关闭帧不产生业务事件
+    // Frame nhịp tim và đóng kết nối không sinh ra sự kiện nghiệp vụ
     if (message.type === MESSAGE_TYPE.PING || message.type === MESSAGE_TYPE.CLOSE) {
       return [];
     }
 
-    // completion：真实上游的 completion 帧只有 {type:3,invocationId}，不带
-    // payload（错误已经在前面的 STREAM_ITEM 帧里通过 item.result 发出）；
-    // 这里保留 error 字段的兼容判断，以防某些异常路径确实把错误放在这一帧上。
+    // completion: Frame completion thực tế của upstream chỉ có {type:3,invocationId}, không mang
+    // payload (lỗi đã được phát trước đó trong frame STREAM_ITEM qua item.result);
+    // Ở đây giữ lại kiểm tra tương thích cho trường error, đề phòng một số nhánh ngoại lệ đặt lỗi tại frame này.
     if (message.type === MESSAGE_TYPE.COMPLETION) {
       if (typeof message.error === 'string' && message.error !== '') {
         return [{ kind: 'upstream_error', message: message.error, retryable: false }];
@@ -199,13 +197,13 @@ export class SydneyCodecV1 implements ProtocolCodec {
       return [{ kind: 'completed', stopReason: null }];
     }
 
-    // stream item：业务负载在 item 里（M0 实测确认，不是 arguments[0]）
+    // stream item: Payload nghiệp vụ nằm trong item (M0 xác nhận thực tế, không phải arguments[0])
     const item = isRecord(message.item) ? (message.item as SydneyResponseItem) : undefined;
     if (item === undefined) return [];
 
-    // 错误通道优先判定：result.value 非 'Success' 时，messages 里那条 bot
-    // 消息本身就是这条错误的说明文案（例如 InvalidCopilotLicense/InternalError
-    // 场景下 bot 会回一句道歉语），不能把它当成真实回答的正文下发。
+    // Ưu tiên xác định kênh lỗi: khi result.value khác 'Success', tin nhắn bot trong
+    // messages chính là văn bản giải thích lỗi (ví dụ trong kịch bản InvalidCopilotLicense / InternalError
+    // bot sẽ phản hồi một câu xin lỗi), không được chuyển tiếp nó như nội dung trả lời thật sự.
     const result = item.result;
     if (
       result !== undefined &&
@@ -217,7 +215,7 @@ export class SydneyCodecV1 implements ProtocolCodec {
         {
           kind: 'upstream_error',
           message: result.message ?? result.errorCode ?? result.value,
-          // Throttled / 服务侧临时错误可重试
+          // Throttled / lỗi tạm thời phía server có thể thử lại
           retryable: result.value === 'Throttled' || result.value === 'InternalServerError',
         },
       ];
@@ -226,7 +224,7 @@ export class SydneyCodecV1 implements ProtocolCodec {
     const events: UpstreamEvent[] = [];
     const sydneyMessages = Array.isArray(item.messages) ? item.messages : [];
     for (const msg of sydneyMessages) {
-      if (msg.author === 'user') continue; // 回显的用户消息跳过
+      if (msg.author === 'user') continue; // Bỏ qua tin nhắn echo của người dùng
 
       if (typeof msg.text === 'string' && msg.text !== '') {
         events.push({ kind: 'text_delta', text: msg.text });
@@ -249,17 +247,17 @@ export class SydneyCodecV1 implements ProtocolCodec {
 }
 
 /**
- * 把上游工具调用消息映射为归一化事件。
- * 支持两种上游形态：一次性给出完整参数，或分 begin/delta/end 流式。
+ * Ánh xạ message gọi công cụ từ upstream thành các sự kiện đã chuẩn hóa.
+ * Hỗ trợ hai hình thái upstream: cung cấp toàn bộ đối số cùng lúc, hoặc phân đoạn stream begin/delta/end.
  *
- * ⚠️ 待校准：本轮账号的许可证/配额限制导致没能触发一次真实的工具调用，
- * 这里沿用此前基于通用 SignalR 逆向经验的建模，字段名与分段方式未经真实验证。
+ * ⚠️ Chờ kiểm chuẩn: Giới hạn giấy phép/hạn ngạch tài khoản đợt này khiến chưa kích hoạt được một lệnh gọi công cụ thật,
+ * ở đây dùng tiếp mô hình dựa trên kinh nghiệm dịch ngược SignalR trước đó, tên trường và cách phân mảnh chưa được xác minh thực tế.
  */
 function mapToolCall(call: SydneyToolCall): UpstreamEvent[] {
   const callId = call.callId ?? call.id;
   if (callId === undefined || callId === '') return [];
 
-  // 流式：按 phase 分发
+  // Dạng stream: phân phối theo phase
   if (call.phase === 'begin') {
     return [{ kind: 'tool_call_begin', callId, name: call.name ?? '' }];
   }
@@ -272,7 +270,7 @@ function mapToolCall(call: SydneyToolCall): UpstreamEvent[] {
     return [{ kind: 'tool_call_end', callId }];
   }
 
-  // 一次性完整形态：拆成 begin + 一段 args_delta + end
+  // Dạng hoàn chỉnh một lần: tách thành begin + một đoạn args_delta + end
   const argsString =
     typeof call.arguments === 'string'
       ? call.arguments
@@ -286,13 +284,13 @@ function mapToolCall(call: SydneyToolCall): UpstreamEvent[] {
   ];
 }
 
-/** 按协议版本选择 codec。上游协议再次漂移时在此追加新版本。 */
+/** Lựa chọn codec theo phiên bản giao thức. Khi giao thức upstream trôi dạt tiếp thì thêm phiên bản mới tại đây. */
 export function selectCodec(version: string): ProtocolCodec {
   switch (version) {
     case 'sydney-json-v1':
       return new SydneyCodecV1();
     default:
-      // 未知版本回退到 v1，并在连接层记录告警
+      // Phiên bản không xác định lùi về v1 và ghi log cảnh báo ở tầng kết nối
       return new SydneyCodecV1();
   }
 }

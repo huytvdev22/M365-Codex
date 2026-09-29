@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * 对着一个**已部署**的实例跑一遍验收清单（对应 docs/部署与验收.md 第二节）。
+ * Chạy danh sách kiểm tra nghiệm thu trên một phiên bản **đã triển khai** (tương ứng docs/trien-khai-va-nghiem-thu.md mục 2).
  *
- * 它只用公开接口，不碰数据库、不读文件，所以对任何部署都能跑——本机、容器、远程主机。
- * 会创建少量测试资源（一个 API Key、一个上传文件），用完自己删掉。
+ * Chỉ dùng API công khai, không chạm vào database, không đọc file, nên có thể chạy trên mọi triển khai — máy cục bộ, container, máy chủ từ xa.
+ * Sẽ tạo một lượng nhỏ tài nguyên thử nghiệm (một API Key, một file upload), dùng xong tự dọn dẹp.
  *
- * 用法：
- *   node dev/acceptance.mjs --base http://127.0.0.1:8080 --password <管理密码>
+ * Cách dùng:
+ *   node dev/acceptance.mjs --base http://127.0.0.1:8080 --password <mat_khau_admin>
  *   node dev/acceptance.mjs --base http://192.168.0.5:18080 --password xxx --skip-upstream
  *
- * `--skip-upstream` 跳过需要真正打上游的用例（没有可用账号时用）。
+ * `--skip-upstream` bỏ qua các ca kiểm thử cần gọi upstream thật (dùng khi không có tài khoản khả dụng).
  */
 
 import { Buffer } from 'node:buffer';
@@ -173,14 +173,14 @@ await check('备份可生成并下载', async () => {
   const downloaded = await fetch(`${BASE}/admin/backup/${id}/download`, admin());
   expect(downloaded.status === 200, `下载状态 ${downloaded.status}`);
   const bytes = Buffer.from(await downloaded.arrayBuffer());
-  // gzip 魔数
+  // Magic number của gzip
   expect(bytes[0] === 0x1f && bytes[1] === 0x8b, '下载的不是 gzip 包');
   return `${bytes.length} 字节`;
 });
 
 console.log('\nAPI Key 与限额');
 await check('创建 API Key（明文只此一次）', async () => {
-  // 主 Key 不设限额：后面的功能用例都用它，别让限额把功能验证挤掉
+  // Key chính không đặt hạn ngạch: các ca kiểm thử tính năng phía sau đều dùng nó, tránh hạn ngạch làm ảnh hưởng kiểm tra tính năng
   const r = await req('/admin/api-keys', admin(json({ name: 'acceptance-check' })));
   expect(r.status === 200 || r.status === 201, `状态 ${r.status}`);
   expect(typeof r.json.key === 'string' && r.json.key.startsWith('sk-'), '没有返回 sk- 明文');

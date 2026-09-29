@@ -9,11 +9,11 @@ import { useAsync } from '../hooks/useAsync';
 import { formatDateTime, formatRelative } from '../util/format';
 
 const NEXT_STATUS: Partial<Record<AccountStatus, { label: string; next: AccountStatus }>> = {
-  disabled: { label: '启用', next: 'probing' },
-  online: { label: '停用', next: 'disabled' },
-  busy: { label: '停用', next: 'disabled' },
-  cooldown: { label: '停用', next: 'disabled' },
-  error: { label: '停用', next: 'disabled' },
+  disabled: { label: 'Bật', next: 'probing' },
+  online: { label: 'Tắt', next: 'disabled' },
+  busy: { label: 'Tắt', next: 'disabled' },
+  cooldown: { label: 'Tắt', next: 'disabled' },
+  error: { label: 'Tắt', next: 'disabled' },
 };
 
 export function AccountsPage() {
@@ -31,7 +31,7 @@ export function AccountsPage() {
   };
 
   const handleDelete = (account: AccountView) => {
-    if (!window.confirm(`确认删除账号「${account.display_name ?? account.email ?? account.id}」？此操作不可撤销。`)) {
+    if (!window.confirm(`Xác nhận xóa tài khoản "${account.display_name ?? account.email ?? account.id}"? Thao tác này không thể hoàn tác.`)) {
       return;
     }
     setBusyId(account.id);
@@ -43,14 +43,14 @@ export function AccountsPage() {
   };
 
   return (
-    <Layout title="Microsoft 账号" subtitle="账号池状态与生命周期管理">
+    <Layout title="Tài khoản Microsoft" subtitle="Quản lý trạng thái và vòng đời nhóm tài khoản">
       <div className="flex-between" style={{ marginBottom: 12 }}>
         <span className="text-muted">
-          共 {data?.length ?? 0} 个账号。新增账号请前往{' '}
-          <Link to="/accounts/add">添加账号</Link>。
+          Tổng cộng {data?.length ?? 0} tài khoản. Để thêm mới, vui lòng vào{' '}
+          <Link to="/accounts/add">Thêm tài khoản</Link>.
         </span>
         <button type="button" className="btn btn-sm" onClick={reload}>
-          刷新
+          Làm mới
         </button>
       </div>
       <AsyncSection
@@ -59,22 +59,22 @@ export function AccountsPage() {
         data={data}
         onRetry={reload}
         isEmpty={(list) => list.length === 0}
-        emptyTitle="还没有任何账号"
-        emptyHint="前往「添加账号」发起 PKCE 授权流程。"
+        emptyTitle="Chưa có tài khoản nào"
+        emptyHint="Vào mục «Thêm tài khoản» để bắt đầu quy trình ủy quyền PKCE."
       >
         {(accounts) => (
           <div className="card table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>账号</th>
-                  <th>状态</th>
-                  <th>刷新凭据</th>
-                  <th>最近成功</th>
-                  <th>连续失败</th>
-                  <th>Token 过期</th>
-                  <th>代理绑定</th>
-                  <th>操作</th>
+                  <th>Tài khoản</th>
+                  <th>Trạng thái</th>
+                  <th>Refresh Token</th>
+                  <th>Thành công gần nhất</th>
+                  <th>Thất bại liên tiếp</th>
+                  <th>Token hết hạn</th>
+                  <th>Proxy gán kèm</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,21 +83,21 @@ export function AccountsPage() {
                   return (
                     <tr key={account.id}>
                       <td>
-                        <div>{account.display_name ?? '（未命名）'}</div>
+                        <div>{account.display_name ?? '(Chưa đặt tên)'}</div>
                         <div className="text-faint mono">{account.email ?? account.id}</div>
                       </td>
                       <td>
                         <AccountStatusBadge status={account.status} />
                       </td>
                       <td>
-                        <BoolBadge value={account.has_refresh_token} trueLabel="有效" falseLabel="缺失" />
+                        <BoolBadge value={account.has_refresh_token} trueLabel="Hợp lệ" falseLabel="Thiếu" />
                       </td>
                       <td>{formatRelative(account.last_ok_at)}</td>
                       <td>{account.consecutive_failures}</td>
                       <td title={formatDateTime(account.token_expires_at)}>
                         {formatRelative(account.token_expires_at)}
                       </td>
-                      <td>{account.proxy_id ?? <span className="text-faint">未绑定</span>}</td>
+                      <td>{account.proxy_id ?? <span className="text-faint">Chưa gán</span>}</td>
                       <td>
                         <div className="flex gap-8">
                           <button
@@ -106,7 +106,7 @@ export function AccountsPage() {
                             disabled={busyId === account.id}
                             onClick={() => runAction(account.id, () => api.refreshAccount(account.id))}
                           >
-                            刷新 Token
+                            Làm mới Token
                           </button>
                           {action !== undefined && (
                             <button
@@ -124,7 +124,7 @@ export function AccountsPage() {
                             disabled={busyId === account.id}
                             onClick={() => handleDelete(account)}
                           >
-                            删除
+                            Xóa
                           </button>
                         </div>
                         {rowError?.id === account.id && (

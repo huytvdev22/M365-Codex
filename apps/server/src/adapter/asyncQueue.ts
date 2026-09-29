@@ -1,8 +1,8 @@
 /**
- * 单生产者 / 单消费者的异步队列。
+ * Hàng đợi bất đồng bộ đơn nhà sản xuất / đơn người tiêu dùng (Single-producer / single-consumer).
  *
- * 用来把事件驱动的 WebSocket（'message' 回调）桥接成拉取式的 async 迭代：
- * 生产者 push 事件，消费者 await next()。支持正常结束与异常结束。
+ * Dùng để cầu nối WebSocket hướng sự kiện (callback 'message') thành duyệt async dạng kéo (pull-based):
+ * Producer đẩy (push) sự kiện, consumer chờ (await) next(). Hỗ trợ kết thúc bình thường và kết thúc bất thường.
  */
 export class AsyncQueue<T> {
   readonly #items: T[] = [];
@@ -22,18 +22,17 @@ export class AsyncQueue<T> {
     this.#items.push(item);
   }
 
-  /** 正常结束：消费者取完剩余项后收到 done。 */
+  /** Kết thúc bình thường: Consumer sau khi lấy hết các mục còn lại sẽ nhận được done. */
   end(): void {
     if (this.#ended) return;
     this.#ended = true;
     if (this.#waiting !== null && this.#items.length === 0) {
       const waiter = this.#waiting;
-      this.#waiting = null;
       waiter.resolve({ value: undefined, done: true });
     }
   }
 
-  /** 异常结束：消费者取完剩余项后收到 reject。 */
+  /** Kết thúc bất thường: Consumer sau khi lấy hết các mục còn lại sẽ nhận được reject. */
   fail(error: unknown): void {
     if (this.#ended) return;
     this.#ended = true;
@@ -51,7 +50,7 @@ export class AsyncQueue<T> {
       return Promise.resolve({ value, done: false });
     }
     if (this.#ended) {
-      // this.#error 是任意上游错误（可能不是 Error 实例），用 async 包装如实透传
+      // this.#error là lỗi upstream bất kỳ (có thể không phải instance của Error), bọc async để truyền nguyên bản
       if (this.#error !== null) return this.#rejected();
       return Promise.resolve({ value: undefined, done: true });
     }
@@ -60,7 +59,7 @@ export class AsyncQueue<T> {
     });
   }
 
-  // 用 async 函数抛出而不是 Promise.reject，以透传非 Error 类型的上游失败原因
+  // Dùng hàm async để throw thay vì Promise.reject nhằm truyền nguyên vẹn nguyên nhân lỗi upstream không phải Error
   async #rejected(): Promise<IteratorResult<T>> {
     throw this.#error;
   }

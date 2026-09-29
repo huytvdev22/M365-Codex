@@ -1,13 +1,13 @@
 import type { AccountStatus } from '@m365-codex/shared';
 
 /**
- * 诊断包（对应实施计划 §17）。
+ * Gói chẩn đoán hệ thống (tương ứng kế hoạch triển khai §17).
  *
- * 目的：用户报障时能一次性交出「足以定位问题」的信息，且**交出去不会泄露任何东西**。
- * 因此这里是纯函数 + 显式白名单：只汇总结构化的计数与配置摘要，
- * 绝不接触提示词、输出正文、邮箱、Token、文件名。
+ * Mục đích: khi người dùng báo sự cố có thể cung cấp 1 lần thông tin "đủ để xác định vấn đề", và **khi cung cấp ra ngoài sẽ không làm lộ bất cứ thứ gì**.
+ * Do đó ở đây là pure function + whitelist rõ ràng: chỉ tổng hợp các bộ đếm có cấu trúc và tóm tắt cấu hình,
+ * tuyệt đối không chạm vào prompt, nội dung output, email, token, tên file.
  *
- * 判断某项该不该进诊断包的标准很简单：把它贴到公开的 issue 里会不会后悔。
+ * Tiêu chuẩn đánh giá một mục có nên đưa vào gói chẩn đoán hay không rất đơn giản: dán nó vào một issue công khai có gây hối hận hay không.
  */
 
 export type SystemStatus =
@@ -23,12 +23,12 @@ export interface DiagnosticsInput {
   expectedSchemaVersion: number;
   startedAt: number;
   now: number;
-  /** 各状态的账号数量，不含任何账号标识 */
+  /** Số lượng tài khoản theo từng trạng thái, không chứa bất kỳ định danh tài khoản nào */
   accountsByStatus: Record<AccountStatus, number>;
-  /** 最近一段时间内按错误分类计数，不含错误消息原文 */
+  /** Đếm lỗi theo loại trong khoảng thời gian gần đây, không chứa nội dung thông điệp lỗi gốc */
   recentErrorsByType: Record<string, number>;
   inFlightRequests: number;
-  /** 配置摘要，必须已经脱敏（summarizeConfig 的输出） */
+  /** Tóm tắt cấu hình, bắt buộc đã làm mờ/khử nhạy cảm (kết quả của summarizeConfig) */
   configSummary: Record<string, unknown>;
   storage: { dbBytes: number; filesBytes: number; fileCount: number };
   maintenanceJobs: { name: string; lastRunAt: number | null; lastError: string | null }[];
@@ -52,12 +52,12 @@ export interface DiagnosticsReport {
   notes: string[];
 }
 
-/** 能被调度器选中的状态。其余状态（冷却、需重新授权、停用…）不算可用。 */
+/** Trạng thái có thể được scheduler lựa chọn. Các trạng thái khác (cooldown, cần cấp quyền lại, vô hiệu...) không tính là khả dụng. */
 const USABLE_STATUSES: AccountStatus[] = ['online', 'busy'];
 
 /**
- * 判定系统状态（§17 的状态枚举）。
- * 顺序有意为之：迁移失败最严重，其次是完全没有可用账号，再次是「有但不健康」。
+ * Phán đoán trạng thái hệ thống (enum trạng thái theo §17).
+ * Thứ tự được sắp xếp có chủ đích: migration thất bại là nghiêm trọng nhất, kế đến là hoàn toàn không có tài khoản khả dụng, sau đó là "có nhưng không khỏe".
  */
 export function deriveSystemStatus(input: {
   schemaOk: boolean;
@@ -67,7 +67,7 @@ export function deriveSystemStatus(input: {
 }): SystemStatus {
   if (!input.schemaOk) return 'migration_failed';
   if (!input.readinessOk) return 'degraded';
-  // 一个账号都没添加过，属于「还没配置完」，不是上游挂了
+  // Chưa từng thêm tài khoản nào, thuộc về "chưa cấu hình xong", không phải upstream bị sập
   if (input.totalAccounts > 0 && input.usableAccounts === 0) return 'upstream_unavailable';
   if (input.totalAccounts === 0) return 'degraded';
   return 'normal';

@@ -22,31 +22,31 @@ import {
 
 const NAV = [
   {
-    section: '监控与管理',
+    section: 'Giám sát & Quản lý',
     items: [
-      { to: '/overview', label: '概览', icon: IconOverview },
-      { to: '/accounts', label: 'Microsoft 账号', icon: IconAccounts },
-      { to: '/accounts/add', label: '添加账号', icon: IconAddAccount },
-      { to: '/requests', label: '请求', icon: IconRequests },
+      { to: '/overview', label: 'Tổng quan', icon: IconOverview },
+      { to: '/accounts', label: 'Tài khoản Microsoft', icon: IconAccounts },
+      { to: '/accounts/add', label: 'Thêm tài khoản', icon: IconAddAccount },
+      { to: '/requests', label: 'Nhật ký yêu cầu', icon: IconRequests },
       { to: '/api-keys', label: 'API Key', icon: IconApiKey },
-      { to: '/capabilities', label: '模型与能力', icon: IconCapabilities },
-      { to: '/files', label: '文件', icon: IconFiles },
-      { to: '/proxies', label: '代理池', icon: IconProxies },
+      { to: '/capabilities', label: 'Mô hình & Năng lực', icon: IconCapabilities },
+      { to: '/files', label: 'Quản lý tệp', icon: IconFiles },
+      { to: '/proxies', label: 'Nhóm Proxy', icon: IconProxies },
     ],
   },
   {
-    section: '配置',
+    section: 'Cấu hình',
     items: [
       { to: '/settings/oauth', label: 'OAuth', icon: IconOAuth },
-      { to: '/settings/scheduler', label: '调度', icon: IconScheduler },
-      { to: '/settings/logging', label: '日志', icon: IconLogs },
-      { to: '/settings/system', label: '系统设置', icon: IconSettings },
-      { to: '/codex-config', label: 'Codex 配置', icon: IconCodex },
+      { to: '/settings/scheduler', label: 'Lập lịch điều phối', icon: IconScheduler },
+      { to: '/settings/logging', label: 'Nhật ký log', icon: IconLogs },
+      { to: '/settings/system', label: 'Cài đặt hệ thống', icon: IconSettings },
+      { to: '/codex-config', label: 'Cấu hình Codex', icon: IconCodex },
     ],
   },
   {
-    section: '运维',
-    items: [{ to: '/backup', label: '备份与恢复', icon: IconBackup }],
+    section: 'Vận hành & Bảo trì',
+    items: [{ to: '/backup', label: 'Sao lưu & Phục hồi', icon: IconBackup }],
   },
 ];
 
@@ -86,7 +86,7 @@ export function Layout({ children, title, subtitle }: { children: ReactNode; tit
             <ThemeToggle />
             <button type="button" className="btn btn-sm" onClick={logout}>
               <IconLogout />
-              退出登录
+              Đăng xuất
             </button>
           </div>
         </div>

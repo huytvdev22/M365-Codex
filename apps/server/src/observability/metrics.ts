@@ -1,33 +1,33 @@
 /**
- * 运行指标（对应实施计划 §17）。
+ * Số liệu vận hành (tương ứng kế hoạch triển khai §17).
  *
- * 自己实现一个极小的 Prometheus 文本格式注册表，不引 prom-client：需要的只有
- * 计数器与直方图两种，且指标集是固定的，一个依赖换四十行不划算。
+ * Tự hiện thực một registry định dạng Prometheus text tối giản, không dùng thư viện prom-client: chỉ cần
+ * 2 loại là counter và histogram, bộ số liệu là cố định, thêm 1 dependency chỉ để bớt 40 dòng mã là không kinh tế.
  *
- * **隐私红线**：指标里绝不出现邮箱、提示词、输出正文、Token、文件名。
- * 标签取值必须是有限的枚举（模型名、错误分类、账号 ID 这类），否则会把时间序列
- * 打爆，也容易把用户内容带出去。因此这里对标签值做白名单式的清洗。
+ * **Ranh giới đỏ về riêng tư**: Trong metric tuyệt đối không xuất hiện email, prompt, nội dung output, token, tên file.
+ * Giá trị của label bắt buộc phải là enum hữu hạn (tên model, phân loại lỗi, account ID...), nếu không sẽ làm
+ * bùng nổ chuỗi thời gian (cardinality explosion), cũng như dễ mang nội dung người dùng ra ngoài. Vì vậy ở đây thực hiện lọc label theo kiểu whitelist.
  */
 
 export type Labels = Record<string, string>;
 
 /**
- * JWT / Bearer Token 形态：三段 base64url 用点分隔，或以 `eyJ`（`{"` 的 base64）开头。
- * 门槛放得比真实 JWT 宽——误判的代价只是某个标签值变成 redacted，
- * 漏判的代价是把凭据写进了指标，两者不对称。
+ * Hình thái JWT / Bearer Token: 3 phần base64url phân tách bởi dấu chấm, hoặc bắt đầu bằng `eyJ` (base64 của `{"`).
+ * Ngưỡng nhận diện mở rộng hơn JWT thực tế — cái giá của việc nhận nhầm chỉ là giá trị label bị biến thành redacted,
+ * còn cái giá của việc bỏ sót là ghi thông tin xác thực vào metric, hai rủi ro này bất đối xứng.
  */
 const TOKEN_SHAPE = /^(eyJ[A-Za-z0-9_-]{4,}|[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{2,})/;
-/** `sk-` 开头的对外 API Key 形态。 */
+/** Dạng API Key đối ngoại bắt đầu bằng `sk-`. */
 const API_KEY_SHAPE = /^sk-[A-Za-z0-9]{8,}$/;
 
 /**
- * 清洗标签值。
+ * Làm sạch giá trị nhãn (label).
  *
- * 两层防护：
- * 1. 字符白名单——把中文提示词、邮箱的 `@` 这类内容变成下划线，顺带限制长度，
- *    避免高基数标签把时间序列打爆；
- * 2. 形态识别——JWT 与 `sk-` Key 全由白名单字符组成，charset 拦不住，
- *    所以按形态整体替换。调用方本来就不该把凭据当标签，这里是兜底。
+ * Hai lớp bảo vệ:
+ * 1. Whitelist ký tự — chuyển prompt tiếng Trung, ký tự `@` của email thành dấu gạch dưới, đồng thời giới hạn độ dài,
+ *    tránh nhãn có độ biến thiên cao làm nổ chuỗi thời gian;
+ * 2. Nhận diện hình thái — JWT và Key `sk-` đều gồm các ký tự nằm trong whitelist nên charset không chặn được,
+ *    vì vậy thay thế toàn bộ theo hình thái. Vốn dĩ bên gọi không được đưa thông tin xác thực vào nhãn, đây là lớp phòng thủ cuối.
  */
 function sanitizeLabelValue(value: string): string {
   if (TOKEN_SHAPE.test(value) || API_KEY_SHAPE.test(value)) return 'redacted';
@@ -76,9 +76,9 @@ class Counter {
   }
 
   /**
-   * 按某个标签的取值汇总计数（进程生命周期内累计，重启归零）。
-   * 供 `/admin/overview`（工具通过率）与 `/admin/diagnostics`（错误分类统计）
-   * 这类「已经在打点、不必为了一个概览数字再加一张表」的场景复用。
+   * Tổng hợp bộ đếm theo giá trị của một nhãn cụ thể (tích lũy trong vòng đời tiến trình, khởi động lại về 0).
+   * Dành cho các kịch bản như `/admin/overview` (tỷ lệ pass của công cụ) và `/admin/diagnostics` (thống kê phân loại lỗi)
+   * tái sử dụng lại số liệu đã đo đạc sẵn mà không cần thêm bảng mới chỉ để hiển thị một con số tổng quan.
    */
   sumByLabel(labelName: string): Record<string, number> {
     const out: Record<string, number> = {};
@@ -135,7 +135,7 @@ class Histogram {
 }
 
 /**
- * 指标注册表。指标名与含义在此集中定义，调用方只管打点。
+ * Registry số liệu. Tên metric và ý nghĩa được định nghĩa tập trung tại đây, bên gọi chỉ việc gọi ghi nhận.
  */
 export class Metrics {
   readonly requests = new Counter('m365codex_requests_total', '按端点与状态分类的请求数');
@@ -155,20 +155,20 @@ export class Metrics {
   );
   readonly tokenRefresh = new Counter('m365codex_token_refresh_total', 'Token 刷新结果');
   readonly accountStates = new Counter('m365codex_account_state_transitions_total', '账号状态迁移');
-  /** API Key 级限额命中次数，按原因分类（rpm/daily/concurrency/endpoint/model），对应 §10 */
+  /** Số lần chạm giới hạn cấp API Key, phân loại theo lý do (rpm/daily/concurrency/endpoint/model), tương ứng §10 */
   readonly rateLimitRejections = new Counter(
     'm365codex_rate_limit_rejections_total',
     'API Key 级限额拒绝次数（按原因分类）',
   );
 
-  /** 由外部在抓取时填充的即时值（账号数、文件占用等）。 */
+  /** Giá trị tức thời được phía ngoài điền vào khi scrape (số lượng tài khoản, dung lượng file...). */
   #gauges = new Map<string, { help: string; value: number; labels: string }>();
 
   setGauge(name: string, help: string, value: number, labels: Labels = {}): void {
     this.#gauges.set(`${name}|${labelsKey(labels)}`, { help, value, labels: labelsKey(labels) });
   }
 
-  /** 渲染成 Prometheus 文本格式。 */
+  /** Render thành định dạng Prometheus text. */
   render(): string {
     const lines: string[] = [];
     for (const metric of [

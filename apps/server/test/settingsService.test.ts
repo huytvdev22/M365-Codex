@@ -10,11 +10,11 @@ import { buildEnvOverridesFromSettings, SettingsService } from '../src/settings/
 import { testEnv } from './helpers/testApp.js';
 
 /**
- * 设置读写（契约 §2.3）：环境变量显式设置过的项 source=env、editable=false；
- * 其余项存进 settings 表，requires_restart 为真的项进 pending_restart；
- * `logging.log_level` 与 `logging.log_privacy_mode` 是真正热生效的两项——后者是
- * 为了让 debug 自动过期（§15.3）能立刻收紧回 strict，而不必等到不知道什么
- * 时候的下次重启。
+ * Đọc ghi cài đặt (hợp đồng §2.3): Mục được đặt rõ ràng qua biến môi trường có source=env, editable=false;
+ * các mục còn lại lưu vào bảng settings, mục có requires_restart=true vào pending_restart;
+ * `logging.log_level` và `logging.log_privacy_mode` là hai mục có hiệu lực nóng thực sự — mục sau là
+ * để debug tự động hết hạn (§15.3) có thể siết chặt ngay về strict mà không cần đợi
+ * đến lần khởi động lại tiếp theo.
  */
 
 let db: Database;
@@ -120,7 +120,7 @@ describe('buildEnvOverridesFromSettings', () => {
   });
 
   it('env 已显式设置的项不会被覆盖', () => {
-    // testEnv 默认设置了 LOG_LEVEL，即便 db 里有 logging.log_level 也不应出现在 overrides
+    // testEnv mặc định đã đặt LOG_LEVEL, cho dù trong DB có logging.log_level cũng không được xuất hiện trong overrides
     const overrides = buildEnvOverridesFromSettings(repo, config.envKeysPresent);
     expect(overrides.LOG_LEVEL).toBeUndefined();
   });
@@ -162,7 +162,7 @@ describe('debug 自动过期（§15.3）', () => {
     expect(typeof view.debug_expires_at?.value).toBe('number');
 
     const expiresAt = view.debug_expires_at?.value as number;
-    expect(expiresAt).toBeGreaterThan(now); // Date.now() 在测试运行时刻，只要求大于一个早期锚点
+    expect(expiresAt).toBeGreaterThan(now); // Date.now() tại thời điểm chạy test, chỉ yêu cầu lớn hơn một mốc sớm
     expect(expiresAt - Date.now()).toBeLessThanOrEqual(config.logPrivacyDebugTtlMs + 5_000);
   });
 
@@ -189,7 +189,7 @@ describe('debug 自动过期（§15.3）', () => {
     const svc = makeService({ privacyMode, auditLogs });
 
     svc.patchGroup('logging', { log_privacy_mode: 'debug' });
-    privacyMode.set('debug'); // 模拟 patchGroup 触发的热切换已经生效
+    privacyMode.set('debug'); // Mô phỏng chuyển đổi nóng do patchGroup kích hoạt đã có hiệu lực
     const expiresAt = svc.getGroup('logging').debug_expires_at?.value as number;
 
     const affected = svc.enforceDebugExpiry(expiresAt + 1);

@@ -6,8 +6,8 @@ import { createApiKeyGuard, LoginThrottle } from '../src/gateway/auth.js';
 import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 
 /**
- * API Key 网关守卫的直接测试。
- * 这里自建一个最小 Fastify 实例挂载守卫，避免为了测试在生产路由表里加临时端点。
+ * Test trực tiếp guard của gateway API Key.
+ * Ở đây tự dựng một instance Fastify tối thiểu gắn guard, tránh việc thêm endpoint tạm vào bảng định tuyến production chỉ để test.
  */
 
 let harness: TestHarness | undefined;

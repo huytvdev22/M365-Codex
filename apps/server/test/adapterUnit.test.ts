@@ -177,12 +177,12 @@ describe('SydneyCodecV1', () => {
     const parsed = JSON.parse(raw.replace(RECORD_SEPARATOR, ''));
     expect(parsed.invocationId).toBe('inv1');
     const arg = parsed.arguments[0];
-    // 真实字段：单数 message 对象，不是 messages 数组（M0 实测确认）
+    // Trường thật: Đối tượng message số ít, không phải mảng messages (xác nhận thực tế qua M0)
     expect(arg.message).toEqual({ author: 'user', inputMethod: 'Keyboard', text: '你好', messageType: 'Chat' });
     expect(arg.participant).toEqual({ id: 'oid-1' });
     expect(arg.isStartOfSession).toBe(true);
     expect(arg.conversationId).toBeUndefined();
-    // 透传参数原样带上，不改写
+    // Giữ nguyên tham số passthrough, không viết lại
     expect(arg.model).toBe('gpt-5-codex');
     expect(arg.reasoning).toEqual({ effort: 'high' });
   });

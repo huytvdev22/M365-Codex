@@ -11,22 +11,21 @@ export interface SettingFieldMeta {
   kind: 'boolean' | 'number' | 'string' | 'select' | 'datetime' | 'string_list';
   options?: { value: string; label: string }[];
   hint?: string;
-  /** 数字字段的展示单位：'ms' 时在输入框旁附带「N 毫秒（X 天/小时/分钟）」的人话展示，提交值仍是毫秒数。 */
+  /** Đơn vị hiển thị trường số: 'ms' thì bên cạnh ô nhập có thêm hiển thị dạng dễ đọc 'N ms (X ngày/giờ/phút)', giá trị gửi lên vẫn là mili-giây. */
   unit?: 'ms';
   min?: number;
   max?: number;
 }
 
 const SOURCE_LABEL: Record<string, string> = {
-  env: '环境变量',
-  db: '数据库',
-  default: '默认值',
+  env: 'Biến môi trường',
+  db: 'Cơ sở dữ liệu',
+  default: 'Mặc định',
 };
 
 /**
- * 把设置项的值渲染成输入框里能看的文本。这里是给人看的展示值，不是给机器看的序列化——
- * 按值的真实类型分别处理，不用 JSON.stringify 或裸 String() 一刀切，
- * 避免普通对象被渲染成没有信息量的 `[object Object]`。
+ * Chuyển giá trị của mục cài đặt thành văn bản hiển thị trong ô nhập.
+ * Xử lý riêng biệt theo từng kiểu dữ liệu thực tế thay vì dùng JSON.stringify một cách thô bạo.
  */
 function formatSettingValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -37,11 +36,8 @@ function formatSettingValue(value: unknown): string {
 }
 
 /**
- * 设置分组的通用渲染器：一个分组一个卡片，字段元数据由调用方传入（服务端只返回
- * {value, source, editable, requires_restart}，不返回展示用的标签，所以标签维护在前端）。
- *
- * 规则完全照 docs/管理端API契约.md §2.3：`source="env"` 的项 `editable=false`，
- * UI 上禁用输入并给出「由环境变量固定」的提示，不允许悄悄覆盖容器编排的真源。
+ * Trình render nhóm cài đặt chung: mỗi nhóm một thẻ card, metadata các trường do bên gọi truyền vào.
+ * Quy tắc: mục có `source="env"` thì `editable=false`, vô hiệu hóa ô nhập trên UI và kèm thông báo cố định bởi biến môi trường.
  */
 export function SettingsGroupPage({
   title,
@@ -140,11 +136,11 @@ function SettingsGroupCard({
     <div className="card">
       <div className="flex-between" style={{ marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>{heading}</h2>
-        {savedAt !== null && <span className="text-faint">已保存于 {formatDateTime(savedAt)}</span>}
+        {savedAt !== null && <span className="text-faint">Đã lưu lúc {formatDateTime(savedAt)}</span>}
       </div>
       {savedAt !== null && restartNeeded && (
         <div className="field-hint" style={{ marginBottom: 12 }}>
-          <span className="badge badge-warn">重启后生效</span> 本次改动含需要重启的配置项，重启进程前仍按旧值运行。
+          <span className="badge badge-warn">Cần khởi động lại</span> Thay đổi bao gồm mục cần khởi động lại, dịch vụ vẫn chạy theo giá trị cũ cho đến khi khởi động lại.
         </div>
       )}
       {fields.map((f) => {
@@ -159,7 +155,7 @@ function SettingsGroupCard({
               </span>
               {meta?.requires_restart === true && (
                 <span className="badge badge-warn" style={{ marginLeft: 6 }}>
-                  需重启生效
+                  Cần restart
                 </span>
               )}
             </label>
@@ -174,8 +170,8 @@ function SettingsGroupCard({
             {!editable && (
               <span className="field-hint">
                 {meta?.source === 'env'
-                  ? '由环境变量固定，改这里不会生效。'
-                  : '当前不可在界面修改。'}
+                  ? 'Được cố định bởi biến môi trường, sửa tại đây sẽ không có hiệu lực.'
+                  : 'Hiện tại không thể sửa đổi trên giao diện.'}
               </span>
             )}
             {f.hint !== undefined && <span className="field-hint">{f.hint}</span>}
@@ -188,7 +184,7 @@ function SettingsGroupCard({
         </div>
       )}
       <button type="button" className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-        {saving ? '保存中…' : '保存'}
+        {saving ? 'Đang lưu…' : 'Lưu cài đặt'}
       </button>
     </div>
   );
@@ -217,7 +213,7 @@ function SettingInput({
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
-        {value === true ? '已启用' : '已关闭'}
+        {value === true ? 'Đã bật' : 'Đã tắt'}
       </label>
     );
   }
@@ -260,7 +256,7 @@ function SettingInput({
     );
   }
   if (meta.kind === 'string_list') {
-    // 服务端类型是字符串数组，界面按空格分隔的单行文本编辑，提交前再切回数组。
+    // Phía server là mảng chuỗi, giao diện hiển thị chỉnh sửa một dòng phân tách bằng dấu cách, chuyển lại thành mảng trước khi gửi.
     const text = Array.isArray(value) ? value.join(' ') : '';
     return (
       <input

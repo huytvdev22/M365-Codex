@@ -7,9 +7,9 @@ import { createTestHarness, type TestHarness } from './helpers/testApp.js';
 import { startMockSydneyServer, type MockSydneyServer } from './helpers/mockSydneyServer.js';
 
 /**
- * 优雅关闭（§19）：关闭时要主动中止在途请求的上游连接，并把仍处于
- * in_progress 的 Response 落库为 incomplete——处置与 `recovery.ts` 的重启
- * 恢复一致，不写两套语义；绝不自动重放任何有副作用的操作。
+ * Đóng an toàn (§19): Khi đóng phải chủ động hủy kết nối upstream của các yêu cầu đang xử lý, và đưa các Response
+ * còn đang in_progress vào DB với trạng thái incomplete — cách xử lý nhất quán với phục hồi khi khởi động lại của `recovery.ts`,
+ * không viết hai bộ ngữ nghĩa; tuyệt đối không tự động phát lại bất kỳ thao tác nào có tác dụng phụ.
  */
 
 let harness: TestHarness | undefined;
@@ -68,9 +68,9 @@ describe('gracefulShutdown', () => {
     });
     const key = harness.context.apiKeys.create({ name: 'k' });
 
-    // 捕获稍后仍要用到的引用：gracefulShutdown 会把 db 关掉，但这次测试
-    // 想在关闭流程跑完之后再检查数据库状态，所以给它一个「不真正关闭」的
-    // 代理——真正的 db.close() 放到本测试末尾自己调用
+    // Nắm giữ tham chiếu sẽ dùng sau: gracefulShutdown sẽ đóng db, nhưng bài test này
+    // muốn kiểm tra trạng thái database sau khi quy trình đóng chạy xong, vì vậy đưa cho nó một proxy "không thực sự đóng" —
+    // db.close() thật sẽ tự gọi ở cuối bài test này
     const { app, db, context } = harness;
     const dbNoClose = new Proxy(db, {
       get(target, prop, receiver) {
@@ -86,18 +86,18 @@ describe('gracefulShutdown', () => {
       payload: { model: 'gpt-5-codex', input: '在吗' },
     });
 
-    // 上游是 'idle'（握手后什么都不发），请求会一直卡在 in_progress，
-    // 直到被登记进 inFlight——这里等它真正进入这个状态再触发关闭
+    // Upstream là 'idle' (sau khi bắt tay không gửi gì), yêu cầu sẽ kẹt mãi ở in_progress,
+    // cho đến khi được đăng ký vào inFlight — ở đây đợi nó thực sự vào trạng thái này mới kích hoạt đóng
     await waitFor(() => context.inFlight.size > 0);
     expect(context.inFlight.size).toBe(1);
 
     const logger = pino({ level: 'silent' });
     await gracefulShutdown({ context, app, db: dbNoClose, logger }, 'SIGTERM');
-    harness = undefined; // app 已经被 gracefulShutdown 关闭，afterEach 不用再关一次
+    harness = undefined; // app đã được gracefulShutdown đóng, afterEach không cần đóng lại lần nữa
 
     expect(context.inFlight.size).toBe(0);
 
-    // 挂起的请求应当随着 abort 收尾（不抛也不永久挂起）
+    // Yêu cầu đang treo phải kết thúc cùng với abort (không ném lỗi và không treo vĩnh viễn)
     await pending.catch(() => undefined);
 
     const rows = db.prepare('SELECT id, status, body FROM responses').all() as {
@@ -133,8 +133,8 @@ describe('gracefulShutdown', () => {
     await gracefulShutdown({ context, app, db, logger }, 'SIGTERM');
     harness = undefined;
 
-    // stop() 之后再注册应当被允许失败（说明已经真正停下、状态被重置）——
-    // 这里换一种断言方式：直接确认 register 不再抛"调度已启动"的错误
+    // Sau stop() việc đăng ký lại phải được phép thất bại (chứng tỏ đã thực sự dừng, trạng thái được đặt lại) —
+    // ở đây đổi một cách assert khác: trực tiếp xác nhận register không còn ném lỗi "dispatcher đã khởi động"
     expect(() => context.scheduler.register({ name: 'x', intervalMs: 1000, run: () => 0 })).not.toThrow();
   });
 });

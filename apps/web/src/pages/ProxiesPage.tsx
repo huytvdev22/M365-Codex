@@ -8,8 +8,8 @@ import { useAsync } from '../hooks/useAsync';
 import { formatDateTime } from '../util/format';
 
 /**
- * 出口代理池。地址一律以打码形态展示（`url_masked`，用户名密码永不明文出现在 DOM 里）——
- * 创建表单里用户会输入一次完整地址提交给服务端，但提交后本页面只再渲染服务端返回的打码结果。
+ * Pool Proxy Egress. Địa chỉ luôn hiển thị ở dạng che thông tin nhạy cảm (`url_masked`, user/pass không bao giờ ở dạng rõ trong DOM) —
+ * người dùng nhập URL đầy đủ một lần gửi cho server, sau khi lưu xong trang chỉ render kết quả đã được che thông tin do server trả về.
  */
 function CreateProxyForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
@@ -36,14 +36,14 @@ function CreateProxyForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="card">
-      <h2 style={{ marginTop: 0 }}>新增代理节点</h2>
+      <h2 style={{ marginTop: 0 }}>Thêm nút Proxy mới</h2>
       <div className="form-row">
         <div className="field">
-          <label htmlFor="proxy-name">名称</label>
+          <label htmlFor="proxy-name">Tên gợi nhớ</label>
           <input id="proxy-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="field" style={{ flex: '2 1 320px' }}>
-          <label htmlFor="proxy-url">地址</label>
+          <label htmlFor="proxy-url">Địa chỉ Proxy</label>
           <input
             id="proxy-url"
             type="text"
@@ -53,14 +53,14 @@ function CreateProxyForm({ onCreated }: { onCreated: () => void }) {
             autoComplete="off"
             required
           />
-          <span className="field-hint">提交后立即打码展示，明文不会再出现在页面上。</span>
+          <span className="field-hint">Sau khi gửi sẽ che mặt nạ hiển thị ngay, thông tin bản rõ không lưu lại trên trang.</span>
         </div>
         <div className="field">
-          <label htmlFor="proxy-weight">权重</label>
+          <label htmlFor="proxy-weight">Trọng số (Weight)</label>
           <input id="proxy-weight" type="number" min={1} value={weight} onChange={(e) => setWeight(Number(e.target.value) || 1)} />
         </div>
         <div className="field">
-          <label htmlFor="proxy-priority">优先级</label>
+          <label htmlFor="proxy-priority">Độ ưu tiên</label>
           <input id="proxy-priority" type="number" min={1} value={priority} onChange={(e) => setPriority(Number(e.target.value) || 1)} />
         </div>
       </div>
@@ -70,7 +70,7 @@ function CreateProxyForm({ onCreated }: { onCreated: () => void }) {
         </div>
       )}
       <button type="submit" className="btn btn-primary" disabled={submitting || name.trim().length === 0 || url.trim().length === 0}>
-        {submitting ? '创建中…' : '创建'}
+        {submitting ? 'Đang tạo…' : 'Tạo mới'}
       </button>
     </form>
   );
@@ -99,9 +99,9 @@ function BulkImportForm({ onImported }: { onImported: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="card">
-      <h2 style={{ marginTop: 0 }}>多行批量导入</h2>
+      <h2 style={{ marginTop: 0 }}>Nhập hàng loạt nhiều dòng</h2>
       <div className="field">
-        <label htmlFor="proxy-bulk">每行一个地址</label>
+        <label htmlFor="proxy-bulk">Mỗi dòng một địa chỉ URL</label>
         <textarea
           id="proxy-bulk"
           value={urls}
@@ -117,7 +117,7 @@ function BulkImportForm({ onImported }: { onImported: () => void }) {
       {result !== null && (
         <div style={{ marginBottom: 12 }}>
           <div className="text-muted">
-            成功 {result.created} 条，失败 {result.failed} 条
+            Thành công {result.created} mục, thất bại {result.failed} mục
           </div>
           {result.results.some((r) => !r.ok) && (
             <ul style={{ marginTop: 6 }}>
@@ -125,7 +125,7 @@ function BulkImportForm({ onImported }: { onImported: () => void }) {
                 .filter((r) => !r.ok)
                 .map((r, i) => (
                   <li key={`${r.line}-${i}`} className="text-faint">
-                    {r.line || '（空行）'}：{r.error ?? '未知错误'}
+                    {r.line || '(Dòng trống)'}：{r.error ?? 'Lỗi không xác định'}
                   </li>
                 ))}
             </ul>
@@ -133,7 +133,7 @@ function BulkImportForm({ onImported }: { onImported: () => void }) {
         </div>
       )}
       <button type="submit" className="btn" disabled={submitting || urls.trim().length === 0}>
-        {submitting ? '导入中…' : '批量导入'}
+        {submitting ? 'Đang nhập…' : 'Nhập hàng loạt'}
       </button>
     </form>
   );
@@ -170,7 +170,7 @@ export function ProxiesPage() {
   };
 
   const handleDelete = (proxy: ProxyView) => {
-    if (!window.confirm(`确认删除代理节点「${proxy.name}」？`)) return;
+    if (!window.confirm(`Xác nhận xóa nút proxy "${proxy.name}"?`)) return;
     setBusyId(proxy.id);
     setRowError(null);
     api
@@ -181,7 +181,7 @@ export function ProxiesPage() {
   };
 
   return (
-    <Layout title="代理池" subtitle="出口代理节点管理，地址一律打码展示">
+    <Layout title="Nhóm Proxy" subtitle="Quản lý các nút proxy lối ra, địa chỉ luôn được che mặt nạ an toàn">
       <div className="grid grid-cols-2">
         <CreateProxyForm onCreated={reload} />
         <BulkImportForm onImported={reload} />
@@ -193,20 +193,20 @@ export function ProxiesPage() {
         data={data}
         onRetry={reload}
         isEmpty={(list) => list.length === 0}
-        emptyTitle="还没有配置任何代理节点"
+        emptyTitle="Chưa cấu hình nút proxy nào"
       >
         {(proxies) => (
           <div className="card table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>名称</th>
-                  <th>地址（已打码）</th>
-                  <th>状态</th>
-                  <th>权重 / 优先级</th>
-                  <th>延迟</th>
-                  <th>绑定账号</th>
-                  <th>操作</th>
+                  <th>Tên</th>
+                  <th>Địa chỉ (Đã che mặt nạ)</th>
+                  <th>Trạng thái</th>
+                  <th>Trọng số / Ưu tiên</th>
+                  <th>Độ trễ</th>
+                  <th>Tài khoản liên kết</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,20 +216,20 @@ export function ProxiesPage() {
                     <td className="mono">{proxy.url_masked}</td>
                     <td>
                       <ProxyStatusBadge status={proxy.enabled ? proxy.status : 'unknown'} />
-                      {!proxy.enabled && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>已停用</span>}
+                      {!proxy.enabled && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>Đã tắt</span>}
                     </td>
                     <td>
                       {proxy.weight} / {proxy.priority}
                     </td>
                     <td>{proxy.latency_ms !== null ? `${proxy.latency_ms} ms` : '—'}</td>
-                    <td className="text-faint">{proxy.bound_accounts.length > 0 ? proxy.bound_accounts.join(', ') : '未绑定'}</td>
+                    <td className="text-faint">{proxy.bound_accounts.length > 0 ? proxy.bound_accounts.join(', ') : 'Chưa liên kết'}</td>
                     <td>
                       <div className="flex gap-8">
                         <button type="button" className="btn btn-sm" disabled={busyId === proxy.id} onClick={() => handleCheck(proxy)}>
-                          健康检查
+                          Kiểm tra kết nối
                         </button>
                         <button type="button" className="btn btn-sm" disabled={busyId === proxy.id} onClick={() => handleToggle(proxy)}>
-                          {proxy.enabled ? '停用' : '启用'}
+                          {proxy.enabled ? 'Tắt' : 'Bật'}
                         </button>
                         <button
                           type="button"
@@ -237,12 +237,12 @@ export function ProxiesPage() {
                           disabled={busyId === proxy.id}
                           onClick={() => handleDelete(proxy)}
                         >
-                          删除
+                          Xóa
                         </button>
                       </div>
                       {checkResult?.id === proxy.id && (
                         <div className="text-muted" style={{ marginTop: 6 }}>
-                          {checkResult.ok ? '连通正常' : '连通失败'}
+                          {checkResult.ok ? 'Kết nối tốt' : 'Kết nối thất bại'}
                           {checkResult.latency_ms !== null ? ` · ${checkResult.latency_ms} ms` : ''} · {checkResult.detail}
                         </div>
                       )}
@@ -253,7 +253,7 @@ export function ProxiesPage() {
                       )}
                       {proxy.last_check_at !== null && (
                         <div className="text-faint" style={{ marginTop: 4 }}>
-                          上次检查 {formatDateTime(proxy.last_check_at)}
+                          Kiểm tra lần cuối lúc {formatDateTime(proxy.last_check_at)}
                         </div>
                       )}
                     </td>

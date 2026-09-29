@@ -2,11 +2,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * 模型目录。
+ * Danh mục mô hình.
  *
- * model 值原样透传给上游，容器不改写、不造别名（护栏 §1.4）。这份目录只用于
- * `/v1/models` 展示与 Codex 端选择，不参与任何路由决策。
- * 允许通过 MODELS_FILE 覆盖，便于运维更新而不改镜像。
+ * Giá trị model được truyền nguyên bản lên upstream, container không viết lại, không tạo bí danh (rào chắn §1.4). Danh mục này chỉ dùng để
+ * hiển thị cho `/v1/models` và cho phía Codex lựa chọn, không tham gia vào bất kỳ quyết định định tuyến nào.
+ * Cho phép ghi đè qua biến môi trường MODELS_FILE, thuận tiện cho việc vận hành cập nhật mà không cần sửa image.
  */
 
 export interface ModelEntry {
@@ -27,17 +27,17 @@ const FALLBACK: ModelList = {
 };
 
 function defaultModelsPath(): string {
-  // 编译后位于 apps/server/dist/responses/models.js，仓库根的 config 在 ../../../../config
+  // Sau khi build nằm tại apps/server/dist/responses/models.js, file config ở gốc repo tại ../../../../config
   return fileURLToPath(new URL('../../../../config/models.json', import.meta.url));
 }
 
 /**
- * 读取模型目录。
+ * Đọc danh mục mô hình.
  *
- * 读不到时会退到只含一个模型的 FALLBACK，但**必须让调用方知道**——
- * 静默降级会让 `/v1/models` 少列模型而没人察觉（实测踩过：镜像漏拷 config/
- * 目录，线上只返回 1 个模型，而配置文件里有 3 个，排查了很久才发现）。
- * 传 `onFallback` 即可把原因接到日志上。
+ * Khi không đọc được sẽ hạ cấp về FALLBACK chỉ chứa một mô hình, nhưng **bắt buộc phải cho bên gọi biết** —
+ * Việc âm thầm hạ cấp sẽ khiến `/v1/models` liệt kê thiếu mô hình mà không ai hay biết (đã từng gặp trong thực tế: image copy thiếu thư mục config/,
+ * production chỉ trả về 1 model trong khi file cấu hình có 3 cái, mất nhiều thời gian điều tra mới phát hiện).
+ * Truyền `onFallback` để ghi nhận nguyên nhân vào log.
  */
 export function loadModels(
   path = process.env.MODELS_FILE ?? defaultModelsPath(),

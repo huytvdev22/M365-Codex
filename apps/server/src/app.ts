@@ -15,10 +15,10 @@ import { registerMetricsRoutes } from './routes/metrics.js';
 import { registerUiRoutes } from './routes/ui.js';
 import { registerV1Routes } from './routes/v1.js';
 
-/** 组装 Fastify 应用。测试通过 `app.inject()` 直接调用，无需真实监听端口。 */
+/** Khởi dựng ứng dụng Fastify. Trong test gọi trực tiếp qua `app.inject()`, không cần lắng nghe cổng thực tế. */
 
 export interface BuildAppOptions {
-  /** 请求体大小上限，默认 8 MiB */
+  /** Giới hạn dung lượng request body, mặc định 8 MiB */
   bodyLimit?: number;
 }
 
@@ -29,31 +29,23 @@ function generateRequestId(): string {
 export function buildApp(context: AppContext, options: BuildAppOptions = {}): FastifyInstance {
   const logger: FastifyBaseLogger = context.logger;
   const app = Fastify({
-    // 声明为 FastifyBaseLogger，让实例类型保持默认泛型，
-    // 否则各 route 注册函数的 FastifyInstance 参数会因日志泛型不同而不兼容
+    // Khai báo là FastifyBaseLogger để giữ kiểu mặc định generic, tránh xung đột kiểu giữa các route
     loggerInstance: logger,
     trustProxy: context.config.trustProxy,
     genReqId: generateRequestId,
     bodyLimit: options.bodyLimit ?? 8 * 1024 * 1024,
-    // strict 隐私模式下关闭逐请求访问日志，避免 URL、查询串被落盘。
-    // 这个开关只能在构造 Fastify 实例时定一次，不属于 log_privacy_mode 之后
-    // 热切换（含 debug 自动过期）能覆盖到的部分——热切换改的是
-    // context.privacyMode.current，影响 maskIp 等运行时判断；这里仍按启动时
-    // 的初始配置值决定，是已知的、可接受的残余限制（不会因为切到 debug 就
-    // 反而多开出这一路日志，只是切回 strict 后它也不会重新关闭，除非重启）
+    // Ở chế độ strict tắt ghi log truy cập từng request để tránh ghi URL và query string xuống đĩa.
     logController: new LogController({
       disableRequestLogging: context.config.logPrivacyMode === 'strict',
     }),
   });
 
-  // 请求 ID 贯穿响应头与错误体，便于用户报障时定位
+  // Request ID xuyên suốt response header và error body, hỗ trợ định vị khi người dùng báo sự cố
   app.addHook('onRequest', async (request, reply) => {
     reply.header(REQUEST_ID_HEADER, request.id);
   });
 
-  // 请求量与耗时打点（§17）。SSE 响应会 reply.hijack()，hijack 之后 Fastify
-  // 不再管理响应生命周期、onResponse 不会触发——那两条路由自己在流结束时记一次
-  // （见 routes/v1.ts、routes/chat.ts），这里只覆盖未 hijack 的普通请求。
+  // Đo lường số lượng request và thời gian thực thi. Phản hồi SSE dùng reply.hijack(), các route đó tự ghi nhận riêng
   app.addHook('onResponse', async (request, reply) => {
     const endpoint = endpointTagFor(request);
     context.metrics.requests.inc({ endpoint, status: String(reply.statusCode) });
@@ -61,23 +53,18 @@ export function buildApp(context: AppContext, options: BuildAppOptions = {}): Fa
   });
 
   /*
-   * 若干管理端点（登出、生成授权链接、手动触发同步）本来就不需要请求体，
-   * 但不少 HTTP 客户端在 POST 时会自作主张带上 Content-Type——例如 PowerShell 的
-   * Invoke-RestMethod 默认发 application/x-www-form-urlencoded。Fastify 找不到
-   * 对应解析器就会直接回 415，对调用方很莫名其妙。
-   *
-   * 这里兜底：无法识别的 Content-Type 下，空请求体按「没有请求体」处理，
-   * 非空才拒绝，并且用本项目的统一错误体回复。
+   * Một số endpoint quản trị không cần body, nhưng nhiều HTTP client gửi POST tự động thêm Content-Type.
+   * Xử lý dự phòng: với Content-Type không xác định, body rỗng được coi là không có body,
+   * chỉ từ chối khi body không rỗng và trả về cấu trúc lỗi thống nhất.
    */
   app.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body: Buffer, done) => {
     if (body.length === 0) {
       done(null, undefined);
       return;
     }
-    // Fastify 会给解析器抛出的错误补默认 statusCode，这里显式带上 415，
-    // 让它走下面错误处理器的 4xx 分支，输出统一错误体
+    // Fastify sẽ bù statusCode mặc định cho lỗi, thêm 415 rõ ràng để vào nhánh 4xx xuất cấu trúc lỗi thống nhất
     const error = Object.assign(
-      new Error('不支持的 Content-Type，请求体请使用 application/json'),
+      new Error('Content-Type không được hỗ trợ, vui lòng dùng application/json cho request body'),
       { statusCode: 415 },
     );
     done(error, undefined);
@@ -89,13 +76,13 @@ export function buildApp(context: AppContext, options: BuildAppOptions = {}): Fa
     if (error instanceof ApiError) {
       request.log.warn(
         { err_type: error.type, status: error.status, details: error.details },
-        '请求被拒绝',
+        'Yêu cầu bị từ chối',
       );
       reply.code(error.status).send(error.toBody(requestId));
       return;
     }
 
-    // Fastify 内建错误：JSON 解析失败、请求体过大、路由校验失败等
+    // Lỗi nội bộ của Fastify: lỗi parse JSON, body quá lớn, xác thực route thất bại, v.v.
     const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
     if (statusCode >= 400 && statusCode < 500) {
       reply
@@ -106,8 +93,8 @@ export function buildApp(context: AppContext, options: BuildAppOptions = {}): Fa
       return;
     }
 
-    // 未预期错误：日志留完整栈，响应只给通用信息，避免泄露内部细节
-    request.log.error({ err: error }, '未处理的服务端错误');
+    // Lỗi ngoài dự kiến: giữ lại stack trace trong log, chỉ trả thông tin chung để tránh lộ chi tiết nội bộ
+    request.log.error({ err: error }, 'Lỗi máy chủ chưa được xử lý');
     reply
       .code(500)
       .send(buildErrorBody('internal_error', 500, 'Internal server error', { requestId }));
@@ -117,15 +104,13 @@ export function buildApp(context: AppContext, options: BuildAppOptions = {}): Fa
     reply
       .code(404)
       .send(
-        buildErrorBody('not_found_error', 404, `未找到路由 ${request.method} ${request.url}`, {
+        buildErrorBody('not_found_error', 404, `Không tìm thấy route ${request.method} ${request.url}`, {
           requestId: String(request.id),
         }),
       );
   });
 
-  // Files/Uploads 用 multipart/form-data；attachFieldsToBody 让文件字段以
-  // 缓冲区形式挂在 request.body 上，同时保留其它文本字段，路由里统一处理。
-  // 单文件大小上限走配置，具体路由再各自设置更贴合场景的 bodyLimit。
+  // Files/Uploads dùng multipart/form-data; attachFieldsToBody đưa tệp vào Buffer trong request.body.
   void app.register(multipart, {
     attachFieldsToBody: true,
     limits: { fileSize: context.config.files.maxFileBytes + 1, files: 1 },
@@ -140,7 +125,7 @@ export function buildApp(context: AppContext, options: BuildAppOptions = {}): Fa
   registerV1Routes(app, context);
   registerFileRoutes(app, context);
   registerChatRoutes(app, context);
-  // 放在最后注册：/ui/* 是通配路由，前面那些显式路由要先匹配
+  // Đăng ký ở cuối cùng: /ui/* là wildcard route, các route cụ thể phía trước phải khớp trước
   registerUiRoutes(app);
 
   return app;

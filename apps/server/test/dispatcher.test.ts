@@ -15,7 +15,7 @@ import { UpstreamDispatcher } from '../src/scheduler/dispatcher.js';
 import { FakeOAuthClient } from './helpers/fakeOAuth.js';
 import { testEnv } from './helpers/testApp.js';
 
-/** 用脚本化的假连接精确测试失败切换状态机。 */
+/** Dùng kết nối giả dạng script để test chính xác state machine chuyển đổi khi thất bại. */
 
 type Script =
   | { kind: 'success'; chunks: string[] }
@@ -40,7 +40,7 @@ const upstreamConfig: UpstreamConfig = {
   scenario: 'officeweb',
 };
 
-/** 构造一个按脚本队列逐次响应的假连接工厂，记录每次连接用的 URL。 */
+/** Khởi tạo factory kết nối giả phản hồi tuần tự theo hàng đợi script, ghi nhận URL dùng cho mỗi kết nối. */
 function scriptedFactory(scripts: Script[], connectionUrls: string[]) {
   let index = 0;
   return (deps: unknown): SydneyConnection => {
@@ -154,7 +154,7 @@ describe('401 刷新重试', () => {
     const events = await drain(result.events);
     expect(events).toContainEqual({ kind: 'text_delta', text: 'ok' });
     expect(result.accountId).toBe(id);
-    expect(h.client.refreshCount).toBe(1); // 刷新了一次
+    expect(h.client.refreshCount).toBe(1); // Đã refresh một lần
   });
 
   it('刷新后仍失败则不再无限重试', async () => {
@@ -183,7 +183,7 @@ describe('429 限流切换', () => {
       .dispatch({ text: 'hi' });
     const events = await drain(result.events);
     expect(events).toContainEqual({ kind: 'text_delta', text: 'from-b' });
-    // 第一个账号被冷却
+    // Tài khoản thứ nhất bị làm nguội
     const cooledA = h.accounts.getView(a)?.cooldown_until;
     expect(cooledA).not.toBeNull();
     expect(result.accountId).toBe(b);
@@ -256,7 +256,7 @@ describe('致命错误不重试', () => {
       .makeDispatcher([{ kind: 'fail', disposition: 'fatal_client' }, { kind: 'success', chunks: ['x'] }], urls)
       .dispatch({ text: 'hi' });
     await expect(drain(result.events)).rejects.toBeInstanceOf(ApiError);
-    // 只尝试了一次连接，没有切换
+    // Chỉ thử kết nối 1 lần, không chuyển đổi
     expect(urls).toHaveLength(1);
   });
 });
@@ -279,7 +279,7 @@ describe('已吐内容后失败不切换', () => {
         for await (const event of result.events) collected.push(event);
       })(),
     ).rejects.toBeInstanceOf(ApiError);
-    // 已经吐出的内容在，但没有第二个账号的重复内容
+    // Nội dung đã trả về vẫn còn, nhưng không có nội dung lặp lại của tài khoản thứ hai
     expect(collected).toContainEqual({ kind: 'text_delta', text: '部分' });
     expect(collected).not.toContainEqual({ kind: 'text_delta', text: '不应看到' });
   });
@@ -299,7 +299,7 @@ describe('副作用阶段不跨账号重放', () => {
         toolResults: [{ callId: 'call_1', output: '已删除 3 个文件' }],
       });
     await expect(drain(result.events)).rejects.toBeInstanceOf(ApiError);
-    // 同样的 retry_or_switch，非副作用请求会切到 b；副作用请求只连一次
+    // Cùng là retry_or_switch, yêu cầu không có tác dụng phụ sẽ chuyển sang b; yêu cầu có tác dụng phụ chỉ kết nối 1 lần
     expect(urls).toHaveLength(1);
   });
 
@@ -321,7 +321,7 @@ describe('粘性', () => {
     const h = setup();
     seed(h.accounts, 'a');
     const b = seed(h.accounts, 'b');
-    // 让 b 连接数更少本来会被选，但粘性指定 a... 这里验证 prefer 生效：绑定 b
+    // Để b có ít kết nối hơn vốn sẽ được chọn, nhưng tính dính chỉ định a... ở đây xác minh prefer có hiệu lực: gắn kết với b
     const result = h
       .makeDispatcher([{ kind: 'success', chunks: ['ok'] }])
       .dispatch({ text: 'hi', sticky: { accountId: b, conversationRef: 'conv-1' } });
@@ -336,7 +336,7 @@ describe('Token 不可用', () => {
     const a = seed(h.accounts, 'a');
     const b = seed(h.accounts, 'b');
     h.accounts.forceStatus(a, 'reauth_required');
-    // reauth_required 不在可调度状态里，pool 直接不会选 a；这里再确认能选到 b
+    // reauth_required không nằm trong trạng thái có thể điều phối, pool trực tiếp không chọn a; ở đây xác nhận lại có thể chọn được b
     const result = h.makeDispatcher([{ kind: 'success', chunks: ['ok'] }]).dispatch({ text: 'hi' });
     const events = await drain(result.events);
     expect(events).toContainEqual({ kind: 'text_delta', text: 'ok' });

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useAuth } from './AuthContext';
 
-/** 未登录（或会话已过期/被 401 清空）一律回登录页；登录后带回原本想去的路径。 */
+/** Chưa đăng nhập (hoặc phiên hết hạn/bị mã 401 xóa) đều điều hướng về trang đăng nhập; sau khi đăng nhập đưa trở lại đường dẫn trước đó. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const location = useLocation();
@@ -11,7 +11,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     return (
       <div className="state-block" role="status">
         <span className="spinner" aria-hidden="true" />
-        <div style={{ marginTop: 10 }}>正在校验登录状态…</div>
+        <div style={{ marginTop: 10 }}>Đang kiểm tra trạng thái đăng nhập…</div>
       </div>
     );
   }

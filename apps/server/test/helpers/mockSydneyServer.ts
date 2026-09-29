@@ -4,50 +4,50 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { MESSAGE_TYPE, RECORD_SEPARATOR } from '../../src/adapter/protocol.js';
 
 /**
- * 模拟 Sydney / BizChat WebSocket 上游（对应实施计划 §8 的「模拟 Sydney WS 上游」）。
+ * Mock WebSocket upstream Sydney / BizChat (tương ứng kế hoạch triển khai §8 "Mock Sydney WS upstream").
  *
- * 说话方式与真实上游一致：SignalR JSON 帧 + 0x1e 分隔、握手 ack、流式回若干帧、
- * completion 收尾。字段形态对齐 2026-07-27 用真实账号跑通的 M0 校准结果——
- * 请求侧 `arguments[0].message` 是单数对象，响应侧业务负载在 `item` 字段里
- * （`item.messages[]` / `item.result`），不是旧版建模的 `arguments[0].messages[]`
- * （详见 `src/adapter/codecV1.ts` 顶部注释）。可通过 behavior 注入各种异常，
- * 用于测试连接层与调度器的处置。
+ * Cách giao tiếp giống như upstream thật: SignalR JSON frame + phân tách 0x1e, ack bắt tay, stream vài frame,
+ * kết thúc bằng completion. Định dạng trường bám sát kết quả hiệu chuẩn M0 đã thông qua với tài khoản thật ngày 27-07-2026 —
+ * Phía request `arguments[0].message` là đối tượng số ít, payload nghiệp vụ phía response nằm trong trường `item`
+ * (`item.messages[]` / `item.result`), không phải `arguments[0].messages[]` của mô hình cũ
+ * (chi tiết xem chú thích đầu `src/adapter/codecV1.ts`). Có thể qua behavior để inject các ngoại lệ,
+ * dùng để test cách xử lý của tầng kết nối và bộ điều phối.
  *
- * 绝不涉及真实网络或真实凭据。
+ * Tuyệt đối không dính dáng mạng thật hoặc thông tin xác thực thật.
  */
 
 export type MockBehavior =
   | { kind: 'normal'; chunks: string[]; citations?: { url: string; title: string }[] }
-  /** 逐块之间插入延迟，给测试留出「客户端在流未结束前断开」的窗口 */
+  /** Chèn độ trễ giữa các chunk, tạo khoảng thời gian cho test "client ngắt kết nối trước khi stream kết thúc" */
   | { kind: 'slow'; chunks: string[]; delayMs: number }
-  /** WS 升级阶段直接返回指定 HTTP 状态（401/403/429…） */
+  /** Giai đoạn nâng cấp WS trả về trực tiếp HTTP status chỉ định (401/403/429…) */
   | { kind: 'http-status'; status: number; retryAfter?: string }
-  /** 握手后异常关闭 */
+  /** Đóng bất thường sau khi bắt tay */
   | { kind: 'abnormal-close'; code: number; reason?: string }
-  /** 在流中回一个可重试的 Throttled 错误 */
+  /** Trả về lỗi Throttled có thể thử lại trong stream */
   | { kind: 'throttle' }
-  /** 握手后什么都不发，触发空闲超时 */
+  /** Sau khi bắt tay không gửi gì, kích hoạt timeout rảnh rỗi */
   | { kind: 'idle' }
-  /** completion 里带错误 */
+  /** completion có mang theo lỗi */
   | { kind: 'completion-error'; message: string }
-  /** 回一个工具调用 */
+  /** Trả về một lệnh gọi công cụ */
   | { kind: 'tool-call'; callId: string; name: string; arguments: string }
-  /** 一次回多个工具调用（测并行与每轮上限） */
+  /** Trả về nhiều lệnh gọi công cụ cùng lúc (test song song và giới hạn trên mỗi vòng) */
   | { kind: 'tool-calls'; calls: { callId: string; name: string; arguments: string }[] }
-  /** 第一次 invocation 回 badArgs，之后回 goodArgs（测参数修复） */
+  /** Invocation lần 1 trả về badArgs, sau đó trả về goodArgs (test sửa tham số) */
   | { kind: 'tool-call-repair'; callId: string; name: string; badArgs: string; goodArgs: string };
 
 export interface MockSydneyServer {
   url: string;
-  /** 收到的 access_token 查询参数（脱敏测试用） */
+  /** Query param access_token nhận được (dùng cho test khử nhạy cảm) */
   lastAccessToken: string | null;
-  /** 收到的 invocation 文本，按到达顺序 */
+  /** Văn bản invocation nhận được, theo thứ tự đến */
   invocationTexts: string[];
-  /** 建立过的连接数 */
+  /** Số kết nối đã thiết lập */
   connectionCount: number;
-  /** 收到的 invocation 数（跨连接） */
+  /** Số invocation nhận được (qua các kết nối) */
   invocationCount: number;
-  /** 收到的 ping 数 */
+  /** Số lượng ping nhận được */
   pingCount: number;
   setBehavior: (behavior: MockBehavior) => void;
   close: () => Promise<void>;
@@ -78,7 +78,7 @@ export async function startMockSydneyServer(initial: MockBehavior): Promise<Mock
     const url = new URL(req.url ?? '/', 'http://localhost');
     state.lastAccessToken = url.searchParams.get('access_token');
 
-    // http-status 行为：在升级阶段拒绝并返回指定状态码
+    // Hành vi http-status: Từ chối trong giai đoạn nâng cấp và trả về status code chỉ định
     if (behavior.kind === 'http-status') {
       const extra = behavior.retryAfter !== undefined ? `Retry-After: ${behavior.retryAfter}\r\n` : '';
       socket.write(
@@ -107,7 +107,7 @@ export async function startMockSydneyServer(initial: MockBehavior): Promise<Mock
           continue;
         }
 
-        // 握手帧：{"protocol":"json","version":1}
+        // Frame bắt tay: {"protocol":"json","version":1}
         if (!handshakeDone && 'protocol' in msg) {
           handshakeDone = true;
           ws.send(frame({})); // ack
@@ -120,7 +120,7 @@ export async function startMockSydneyServer(initial: MockBehavior): Promise<Mock
         }
 
         if (msg.type === MESSAGE_TYPE.STREAM_INVOCATION || msg.type === MESSAGE_TYPE.INVOCATION) {
-          // 真实请求形态：arguments[0].message 是单数对象，不是 messages 数组
+          // Hình thái request thật: arguments[0].message là đối tượng số ít, không phải mảng messages
           const arg = (msg.arguments?.[0] ?? {}) as { message?: { text?: string; author?: string } };
           state.invocationTexts.push(arg.message?.text ?? '');
           state.invocationCount += 1;
@@ -158,12 +158,12 @@ export async function startMockSydneyServer(initial: MockBehavior): Promise<Mock
         break;
       }
       case 'slow': {
-        // 提前存一份到局部变量：下面的 await 会让 TS 认为可变的外层 `behavior`
-        // 在恢复执行时可能已被 setBehavior 重新赋值，从而丢失窄化
+        // Lưu trước một bản vào biến cục bộ: await phía dưới sẽ khiến TS cho rằng `behavior` lớp ngoài khả biến
+        // có thể đã bị gán lại bởi setBehavior khi khôi phục thực thi, dẫn đến mất type narrowing
         const slow = behavior;
         for (const chunk of slow.chunks) {
           await new Promise((resolve) => setTimeout(resolve, slow.delayMs));
-          if (ws.readyState !== WebSocket.OPEN) return; // 客户端已经断开，别再往关闭的连接上写
+          if (ws.readyState !== WebSocket.OPEN) return; // Client đã ngắt kết nối, không ghi lên kết nối đã đóng nữa
           sendItem(ws, invocationId, { messages: [{ author: 'bot', text: chunk, messageType: 'Chat' }] });
         }
         if (ws.readyState === WebSocket.OPEN) ws.send(frame({ type: MESSAGE_TYPE.COMPLETION, invocationId }));
@@ -201,7 +201,7 @@ export async function startMockSydneyServer(initial: MockBehavior): Promise<Mock
         break;
       }
       case 'idle': {
-        // 故意什么都不发
+        // Cố ý không gửi gì cả
         break;
       }
       default:

@@ -7,9 +7,9 @@ import { Layout } from '../components/Layout';
 import { formatDateTime } from '../util/format';
 
 /**
- * 添加账号只有一种方式：本网关自己的 PKCE 授权流程。
- * 因为回调落在 Microsoft 自己的页面上，本服务不需要公网可达，也不用暴露回调端点——
- * 用户在浏览器完成登录后，把地址栏的完整 URL 贴回来即可。
+ * Thêm tài khoản theo phương thức duy nhất: Quy trình ủy quyền PKCE của chính gateway này.
+ * Vì callback kết thúc tại trang của Microsoft, dịch vụ này không cần IP công khai và không cần mở endpoint callback —
+ * người dùng sau khi đăng nhập xong trên trình duyệt chỉ cần dán URL đầy đủ từ thanh địa chỉ vào đây.
  */
 export function AddAccountPage() {
   const [session, setSession] = useState<AuthorizeUrlResponse | null>(null);
@@ -47,16 +47,16 @@ export function AddAccountPage() {
   };
 
   return (
-    <Layout title="添加账号" subtitle="通过 PKCE 授权流程添加一个 Microsoft 365 Copilot 账号">
+    <Layout title="Thêm tài khoản" subtitle="Thêm tài khoản Microsoft 365 Copilot thông qua quy trình ủy quyền PKCE">
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>第一步：生成授权链接</h2>
+        <h2 style={{ marginTop: 0 }}>Bước 1: Tạo liên kết ủy quyền</h2>
         <p className="text-muted">
-          点击生成后在新标签页打开，选择一个有 Copilot 权限的账号登录。登录完成后 Microsoft 会跳转到它自己的
+          Bấm tạo liên kết và mở trong tab mới, đăng nhập bằng tài khoản có quyền Copilot. Sau khi đăng nhập, Microsoft sẽ chuyển hướng đến trang thông báo
           <code> nativeclient </code>
-          提示页——这一步是正常的，复制那个页面地址栏的完整链接备用。
+          của họ — điều này hoàn toàn bình thường, hãy sao chép toàn bộ đường dẫn URL trên thanh địa chỉ đó để dùng cho bước tiếp theo.
         </p>
         <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={creating}>
-          {creating ? '生成中…' : '生成授权链接'}
+          {creating ? 'Đang tạo…' : 'Tạo liên kết ủy quyền'}
         </button>
         {createError !== null && (
           <div style={{ marginTop: 12 }}>
@@ -71,9 +71,9 @@ export function AddAccountPage() {
               </a>
             </div>
             <div className="flex gap-8" style={{ marginTop: 8 }}>
-              <CopyButton value={session.authorize_url} label="复制链接" />
+              <CopyButton value={session.authorize_url} label="Sao chép liên kết" />
               <span className="text-faint" style={{ alignSelf: 'center' }}>
-                会话 {formatDateTime(session.expires_at)} 后过期，过期需重新生成
+                Phiên hết hạn lúc {formatDateTime(session.expires_at)}, cần tạo lại nếu hết hạn
               </span>
             </div>
           </div>
@@ -81,13 +81,13 @@ export function AddAccountPage() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>第二步：提交回调地址</h2>
+        <h2 style={{ marginTop: 0 }}>Bước 2: Gửi URL chuyển hướng (Callback)</h2>
         <p className="text-muted">
-          把浏览器地址栏复制到的完整 URL 粘贴到这里。授权码只能使用一次，可以同时为多个账号并行授权。
+          Dán toàn bộ URL đã sao chép từ thanh địa chỉ trình duyệt vào đây. Mã ủy quyền chỉ có thể sử dụng một lần, có thể ủy quyền song song cho nhiều tài khoản.
         </p>
         <form onSubmit={handleSubmit}>
           <div className="field">
-            <label htmlFor="callback-url">回调地址</label>
+            <label htmlFor="callback-url">Địa chỉ URL chuyển hướng</label>
             <input
               id="callback-url"
               type="text"
@@ -103,23 +103,21 @@ export function AddAccountPage() {
             </div>
           )}
           <button type="submit" className="btn btn-primary" disabled={submitting || callbackUrl.trim().length === 0}>
-            {submitting ? '提交中…' : '完成授权'}
+            {submitting ? 'Đang gửi…' : 'Hoàn tất ủy quyền'}
           </button>
         </form>
         {result !== null && (
           <div className="error-banner" style={{ marginTop: 14, borderColor: 'var(--ok)', background: 'color-mix(in srgb, var(--ok) 10%, transparent)' }}>
             <div className="error-title" style={{ color: 'var(--ok)' }}>
-              {result.existing ? '账号已重新授权' : '账号已创建'}
+              {result.existing ? 'Tài khoản đã được ủy quyền lại' : 'Tài khoản đã được thêm thành công'}
             </div>
             <div>
-              {result.account.display_name ?? result.account.email ?? result.account.id}（状态：
-              {result.account.status}）
+              {result.account.display_name ?? result.account.email ?? result.account.id} (Trạng thái:{' '}
+              {result.account.status})
             </div>
             <div style={{ marginTop: 10 }}>
-              {/* 纯粹的页面跳转，用声明式的 Link 而不是 onClick 里手动 navigate()——
-                  后者返回 void | Promise<void>，塞进事件处理器还得额外处理这个基本不会拒绝的 Promise。 */}
               <Link to="/accounts" className="btn btn-sm">
-                前往账号列表
+                Đến danh sách tài khoản
               </Link>
             </div>
           </div>

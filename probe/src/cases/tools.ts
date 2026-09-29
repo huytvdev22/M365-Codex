@@ -38,7 +38,7 @@ function statusFromStats(stats: ToolCallStats): CapabilityResult['status'] {
   return meetsGate ? 'adaptable' : callRate >= 0.5 ? 'partial' : 'unstable';
 }
 
-/** #12 工具定义理解：上游是否有原生工具概念，还是只能靠提示词约束。 */
+/** #12 Hiểu định nghĩa công cụ: Upstream có khái niệm công cụ gốc hay chỉ có thể dựa vào prompt ràng buộc. */
 export async function caseToolDefinitionUnderstanding(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const declarations = [TOOL_GET_TIME, TOOL_ECHO];
@@ -74,8 +74,8 @@ export async function caseToolDefinitionUnderstanding(ctx: ProbeContext): Promis
 }
 
 /**
- * #13 单次工具调用（同时是 §3.5 四项统计门槛的采样用例）。
- * 按 `--repeat` 跑多次独立试次，每次试次内允许最多两次参数修复（§7.3）。
+ * #13 Gọi công cụ đơn lẻ (đồng thời là case lấy mẫu cho 4 ngưỡng thống kê §3.5).
+ * Chạy nhiều lần thử nghiệm độc lập theo `--repeat`, mỗi lần thử cho phép tối đa 2 lần sửa tham số (§7.3).
  */
 export async function caseSingleToolCall(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
@@ -108,7 +108,7 @@ export async function caseSingleToolCall(ctx: ProbeContext): Promise<CapabilityR
   });
 }
 
-/** #14 多轮工具调用：同一对话里连续两轮都需要调用工具。 */
+/** #14 Gọi công cụ nhiều vòng: Hai vòng liên tiếp trong cùng một hội thoại đều cần gọi công cụ. */
 export async function caseMultiRoundToolCall(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const declarations = [TOOL_GET_TIME, TOOL_ECHO];
@@ -138,7 +138,7 @@ export async function caseMultiRoundToolCall(ctx: ProbeContext): Promise<Capabil
   });
   const secondDetection = detectToolCall(second, registry);
 
-  // 走到这里 firstDetection.channel 已经排除了 'none'（上面提前 return 了），只需再看第二轮
+  // Đến được đây firstDetection.channel đã loại trừ 'none' (ở trên đã return sớm), chỉ cần xem tiếp vòng hai
   const bothCalled = secondDetection.channel !== 'none';
 
   return makeResult({
@@ -159,7 +159,7 @@ export async function caseMultiRoundToolCall(ctx: ProbeContext): Promise<Capabil
   });
 }
 
-/** #15 并行工具调用：同一轮里能否一次产出多个工具调用。 */
+/** #15 Gọi công cụ song song: Trong cùng một vòng có thể tạo ra nhiều lệnh gọi công cụ cùng lúc không. */
 export async function caseParallelToolCalls(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const declarations = [TOOL_GET_TIME, TOOL_ECHO];
@@ -193,7 +193,7 @@ export async function caseParallelToolCalls(ctx: ProbeContext): Promise<Capabili
 
 const CANNED_RESULT_MARKER = `探针工具结果标记-${randomUUID().slice(0, 8)}`;
 
-/** #16 工具结果回传后继续生成：结构化回传 `function_call_output` 等价物后，上游能否继续推理。 */
+/** #16 Tiếp tục sinh sau khi truyền lại kết quả công cụ: Sau khi truyền lại thứ tương đương `function_call_output` có cấu trúc, upstream có thể tiếp tục suy luận không. */
 export async function caseToolResultContinuation(ctx: ProbeContext): Promise<CapabilityResult> {
   const requestedAt = Date.now();
   const declarations = [TOOL_GET_TIME];

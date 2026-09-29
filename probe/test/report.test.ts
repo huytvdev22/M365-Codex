@@ -54,7 +54,7 @@ describe('report 渲染与脱敏写盘防线', () => {
           label: 'fo***@example.com',
           results: [
             stub('leaky_case', 1, {
-              // 直接把一个「疑似 JWT」字符串塞进证据（模拟实现失误），不应该走到写盘这一步
+              // Nhét trực tiếp một chuỗi "nghi vấn JWT" vào bằng chứng (mô phỏng sai sót triển khai), không nên đi tới bước ghi ra đĩa
               oops: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
             }),
           ],
