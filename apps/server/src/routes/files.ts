@@ -59,7 +59,7 @@ type MultipartBody = Record<string, MultipartFileField | MultipartValueField | u
 
 function asMultipartBody(request: FastifyRequest): MultipartBody {
   if (!request.isMultipart()) {
-    throw ApiError.badRequest('请求必须是 multipart/form-data');
+    throw ApiError.badRequest('Yêu cầu phải là multipart/form-data');
   }
   return (request.body ?? {}) as MultipartBody;
 }
@@ -67,7 +67,7 @@ function asMultipartBody(request: FastifyRequest): MultipartBody {
 function requireFileField(body: MultipartBody, field: string): MultipartFileField {
   const value = body[field];
   if (value === undefined || value.type !== 'file') {
-    throw ApiError.badRequest(`缺少文件字段 ${field}`, field);
+    throw ApiError.badRequest(`Thiếu trường tệp ${field}`, field);
   }
   return value;
 }
@@ -82,21 +82,21 @@ function optionalStringField(body: MultipartBody, field: string, fallback: strin
 }
 
 const createUploadSchema = z.object({
-  filename: z.string().min(1, 'filename 不能为空'),
+  filename: z.string().min(1, 'filename không được để trống'),
   purpose: z.string().min(1).optional(),
   bytes: z.number().int().positive(),
   mime_type: z.string().min(1).optional(),
 });
 
 const completeUploadSchema = z.object({
-  part_ids: z.array(z.string()).min(1, 'part_ids 不能为空'),
+  part_ids: z.array(z.string()).min(1, 'part_ids không được để trống'),
 });
 
 function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
@@ -231,7 +231,7 @@ export function registerFileRoutes(app: FastifyInstance, context: AppContext): v
       const ordered = body.part_ids.map((id) => {
         const part = byId.get(id);
         if (part === undefined) {
-          throw ApiError.badRequest(`part_id ${id} 不属于该 Upload 或不存在`, 'part_ids');
+          throw ApiError.badRequest(`part_id ${id} không thuộc về Upload này hoặc không tồn tại`, 'part_ids');
         }
         return part;
       });
@@ -260,7 +260,7 @@ export function registerFileRoutes(app: FastifyInstance, context: AppContext): v
     async (request) => {
       const apiKeyId = requireApiKeyId(request);
       const upload = context.uploadRepo.findOwned(request.params.id, apiKeyId);
-      if (upload === undefined) throw ApiError.notFound('Upload 不存在');
+      if (upload === undefined) throw ApiError.notFound('Upload không tồn tại');
       context.uploadRepo.markCancelled(upload.id);
       context.fileStorage.deleteUpload(upload.id);
       return toUploadObject({ ...upload, status: 'cancelled' }, null);
@@ -270,9 +270,9 @@ export function registerFileRoutes(app: FastifyInstance, context: AppContext): v
 
 function getOwnedPendingUpload(context: AppContext, id: string, apiKeyId: string) {
   const upload = context.uploadRepo.findOwned(id, apiKeyId);
-  if (upload === undefined) throw ApiError.notFound('Upload 不存在');
+  if (upload === undefined) throw ApiError.notFound('Upload không tồn tại');
   if (upload.status !== 'pending') {
-    throw ApiError.badRequest(`Upload 已处于 ${upload.status} 状态，无法继续操作`);
+    throw ApiError.badRequest(`Upload đã ở trạng thái ${upload.status}, không thể tiếp tục thao tác`);
   }
   return upload;
 }

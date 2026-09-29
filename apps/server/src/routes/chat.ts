@@ -134,7 +134,7 @@ async function streamChatCompletion(
   } catch (error) {
     // Bên trong luồng sự kiện về lý thuyết đã chuyển lỗi thành response.failed (sẽ dịch thành chunk có finish_reason);
     // chạy tới đây là trường hợp ngoài ý muốn, giữ cách xử lý nhất quán với /v1/responses
-    reply.request.log.error({ err: error }, 'Chat Completions SSE 流意外中断');
+    reply.request.log.error({ err: error }, 'Luồng SSE Chat Completions bị gián đoạn bất ngờ');
   } finally {
     if (!reply.raw.writableEnded && !reply.raw.destroyed) reply.raw.end();
   }

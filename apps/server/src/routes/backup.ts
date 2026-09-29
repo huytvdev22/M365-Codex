@@ -24,12 +24,12 @@ type MultipartBody = Record<string, MultipartFileField | { type: 'field'; value:
 
 function requireUploadedFile(request: FastifyRequest): MultipartFileField {
   if (!request.isMultipart()) {
-    throw ApiError.badRequest('请求必须是 multipart/form-data，字段名为 file');
+    throw ApiError.badRequest('Yêu cầu phải là multipart/form-data với tên trường là file');
   }
   const body = (request.body ?? {}) as MultipartBody;
   const field = body.file;
   if (field === undefined || field.type !== 'file') {
-    throw ApiError.badRequest('缺少文件字段 file', 'file');
+    throw ApiError.badRequest('Thiếu trường tệp file', 'file');
   }
   return field;
 }
@@ -37,7 +37,7 @@ function requireUploadedFile(request: FastifyRequest): MultipartFileField {
 const createBackupSchema = z
   .object({
     // Mặc định giữ hành vi ban đầu (bao gồm tệp), không vì bổ sung tham số này mà âm thầm thay đổi ngữ nghĩa mặc định
-    includeFiles: z.boolean({ invalid_type_error: 'includeFiles 必须是布尔值' }).optional(),
+    includeFiles: z.boolean({ invalid_type_error: 'includeFiles phải là kiểu boolean' }).optional(),
   })
   .strict();
 
@@ -46,7 +46,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
@@ -90,7 +90,7 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
     { preHandler: adminGuard },
     async (request, reply) => {
       const content = context.backupStore.read(request.params.id);
-      if (content === undefined) throw ApiError.notFound('备份包不存在');
+      if (content === undefined) throw ApiError.notFound('Gói sao lưu không tồn tại');
       reply.header('content-type', 'application/gzip');
       reply.header('content-disposition', `attachment; filename="${request.params.id}.tar.gz"`);
       return reply.send(content);
@@ -116,7 +116,7 @@ export function registerBackupRoutes(app: FastifyInstance, context: AppContext):
       return {
         restored: true,
         requires_restart: true,
-        message: '备份已校验并写入数据目录，需重启服务后才会生效',
+        message: 'Bản sao lưu đã được xác minh và ghi vào thư mục dữ liệu, cần khởi động lại dịch vụ để có hiệu lực',
         manifest,
       };
     },

@@ -36,13 +36,13 @@ function fillGauges(context: AppContext): void {
     byStatus.set(account.status, (byStatus.get(account.status) ?? 0) + 1);
   }
   for (const [status, count] of byStatus) {
-    context.metrics.setGauge('m365codex_accounts', '各状态账号数', count, { status });
+    context.metrics.setGauge('m365codex_accounts', 'Số tài khoản theo từng trạng thái', count, { status });
   }
 
-  context.metrics.setGauge('m365codex_requests_in_flight', '当前在途请求数', context.inFlight.size);
+  context.metrics.setGauge('m365codex_requests_in_flight', 'Số yêu cầu đang xử lý hiện tại', context.inFlight.size);
 
   const usage = context.backup.usage();
-  context.metrics.setGauge('m365codex_db_bytes', 'SQLite 数据库文件占用字节数', usage.dbBytes);
-  context.metrics.setGauge('m365codex_files_bytes', '已上传文件占用字节数', usage.filesBytes);
-  context.metrics.setGauge('m365codex_files_count', '已上传文件数量', usage.fileCount);
+  context.metrics.setGauge('m365codex_db_bytes', 'Số byte cơ sở dữ liệu SQLite', usage.dbBytes);
+  context.metrics.setGauge('m365codex_files_bytes', 'Số byte các tệp đã tải lên', usage.filesBytes);
+  context.metrics.setGauge('m365codex_files_count', 'Số lượng tệp đã tải lên', usage.fileCount);
 }

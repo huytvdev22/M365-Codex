@@ -480,7 +480,7 @@ describe('GET /admin/capabilities', () => {
     const body = res.json();
     expect(Array.isArray(body.models)).toBe(true);
     expect(body.matrix.some((row: { status: string }) => row.status === 'native')).toBe(false);
-    const imageRow = body.matrix.find((row: { feature: string }) => row.feature.includes('图片输入'));
+    const imageRow = body.matrix.find((row: { feature: string }) => row.feature.includes('input_image'));
     expect(imageRow.status).toBe('unsupported');
   });
 });

@@ -33,7 +33,7 @@ const callbackSchema = z
     }
     ctx.addIssue({
       code: 'custom',
-      message: '请提供 callback、redirect_url，或 code + state',
+      message: 'Vui lòng cung cấp callback, redirect_url, hoặc code + state',
     });
     return z.NEVER;
   });
@@ -48,7 +48,7 @@ const patchAccountSchema = z
   .object({
     status: z.enum(ACCOUNT_STATUSES).optional(),
   })
-  .refine((value) => Object.keys(value).length > 0, { message: '至少需要提供一个待更新字段' });
+  .refine((value) => Object.keys(value).length > 0, { message: 'Cần cung cấp ít nhất một trường để cập nhật' });
 
 const proxyBindingSchema = z.object({
   proxy_id: z.string().min(1).nullable(),
@@ -58,7 +58,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
@@ -71,7 +71,7 @@ function parseTransformedOrThrow<Output>(
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
@@ -115,14 +115,14 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     { preHandler: adminGuard },
     async (request) => {
       const view = context.accounts.getView(request.params.id);
-      if (view === undefined) throw ApiError.notFound('账号不存在');
+      if (view === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
       return view;
     },
   );
 
   function changeStatus(accountId: string, status: (typeof ACCOUNT_STATUSES)[number]): ReturnType<typeof context.accounts.setStatus> {
     const account = context.accounts.findById(accountId);
-    if (account === undefined) throw ApiError.notFound('账号不存在');
+    if (account === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
 
     let view;
     try {
@@ -163,7 +163,7 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
       if (body.status === undefined) {
         // Hiện tại trường duy nhất được hỗ trợ là status; về mặt lý thuyết sẽ không rơi vào đây (schema đã yêu cầu tối thiểu một mục),
         // nhưng báo lỗi rõ ràng sẽ trung thực hơn việc im lặng trả về như cũ
-        throw ApiError.badRequest('当前只支持更新 status 字段', 'status');
+        throw ApiError.badRequest('Hiện tại chỉ hỗ trợ cập nhật trường status', 'status');
       }
       return changeStatus(request.params.id, body.status);
     },
@@ -175,14 +175,14 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     async (request) => {
       const body = parseOrThrow(proxyBindingSchema, request.body);
       const account = context.accounts.findById(request.params.id);
-      if (account === undefined) throw ApiError.notFound('账号不存在');
+      if (account === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
 
       if (body.proxy_id !== null && context.proxyNodes.findById(body.proxy_id) === undefined) {
-        throw ApiError.badRequest('代理节点不存在', 'proxy_id');
+        throw ApiError.badRequest('Node proxy không tồn tại', 'proxy_id');
       }
 
       const view = context.accounts.setProxyNode(request.params.id, body.proxy_id);
-      if (view === undefined) throw ApiError.notFound('账号不存在');
+      if (view === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
 
       context.auditLogs.record({
         actor: 'admin',
@@ -199,7 +199,7 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     { preHandler: adminGuard },
     async (request) => {
       const account = context.accounts.findById(request.params.id);
-      if (account === undefined) throw ApiError.notFound('账号不存在');
+      if (account === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
 
       try {
         await context.tokens.refresh(request.params.id);
@@ -230,7 +230,7 @@ export function registerAccountRoutes(app: FastifyInstance, context: AppContext)
     { preHandler: adminGuard },
     async (request) => {
       const account = context.accounts.findById(request.params.id);
-      if (account === undefined) throw ApiError.notFound('账号不存在');
+      if (account === undefined) throw ApiError.notFound('Tài khoản không tồn tại');
       context.accounts.remove(request.params.id);
       context.auditLogs.record({
         actor: 'admin',

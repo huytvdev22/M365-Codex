@@ -154,7 +154,7 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
       validate: (v) =>
         typeof v === 'string' && (LOG_PRIVACY_MODES as readonly string[]).includes(v)
           ? null
-          : `必须是 ${LOG_PRIVACY_MODES.join('/')} 之一`,
+          : `phải là một trong ${LOG_PRIVACY_MODES.join('/')}`,
     },
   ],
   oauth: [
@@ -201,7 +201,7 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
       type: 'string',
       requiresRestart: true,
       readConfig: (c) => c.tools.mode,
-      validate: (v) => (v === 'native' || v === 'prompt' || v === 'auto' ? null : '必须是 native/prompt/auto 之一'),
+      validate: (v) => (v === 'native' || v === 'prompt' || v === 'auto' ? null : 'phải là một trong native/prompt/auto'),
     },
     {
       field: 'max_calls_per_round',
@@ -241,7 +241,7 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
       validate: (v) =>
         typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= MAX_ARG_REPAIRS_CEILING
           ? null
-          : `必须是 0-${MAX_ARG_REPAIRS_CEILING} 的整数`,
+          : `phải là số nguyên từ 0-${MAX_ARG_REPAIRS_CEILING}`,
     },
     {
       field: 'allow_parallel',
@@ -279,13 +279,13 @@ const FIELD_DEFS: Record<SettingGroup, FieldDef[]> = {
 function validateType(type: SettingValueType, value: unknown): string | null {
   switch (type) {
     case 'string':
-      return typeof value === 'string' ? null : '必须是字符串';
+      return typeof value === 'string' ? null : 'phải là chuỗi ký tự';
     case 'number':
-      return typeof value === 'number' && Number.isFinite(value) ? null : '必须是数字';
+      return typeof value === 'number' && Number.isFinite(value) ? null : 'phải là số hợp lệ';
     case 'boolean':
-      return typeof value === 'boolean' ? null : '必须是布尔值';
+      return typeof value === 'boolean' ? null : 'phải là kiểu boolean';
     case 'string_list':
-      return Array.isArray(value) && value.every((v) => typeof v === 'string') ? null : '必须是字符串数组';
+      return Array.isArray(value) && value.every((v) => typeof v === 'string') ? null : 'phải là mảng chuỗi ký tự';
     default:
       return null;
   }
@@ -351,17 +351,17 @@ export class SettingsService {
   /** Ghi hàng loạt cho một nhóm; bất kỳ mục nào không hợp lệ hoặc chạm vào mục env bị khóa đều từ chối toàn bộ, không để lại cập nhật dở dang. */
   patchGroup(group: SettingGroup, values: Record<string, unknown>): Record<string, SettingFieldView> {
     const defs = FIELD_DEFS[group];
-    if (defs === undefined) throw ApiError.badRequest(`未知的设置分组：${group}`, 'group');
+    if (defs === undefined) throw ApiError.badRequest(`Nhóm cài đặt không xác định: ${group}`, 'group');
     const byField = new Map(defs.map((d) => [d.field, d]));
 
     for (const field of Object.keys(values)) {
       const def = byField.get(field);
       if (def === undefined) {
-        throw ApiError.badRequest(`未知的设置项：${group}.${field}`, field);
+        throw ApiError.badRequest(`Mục cài đặt không xác định: ${group}.${field}`, field);
       }
       if (this.#envKeysPresent.has(def.envVar)) {
         throw ApiError.forbidden(
-          `${group}.${field} 由环境变量 ${def.envVar} 显式设置，容器编排是唯一真源，不能通过管理界面修改`,
+          `${group}.${field} được thiết lập tường minh bởi biến môi trường ${def.envVar}, cấu hình container là nguồn chân lý duy nhất, không thể sửa đổi qua giao diện quản trị`,
         );
       }
       const value = values[field];
@@ -412,10 +412,10 @@ export class SettingsService {
         { actor: 'system', action: 'settings.log_privacy_mode.debug_expired', detail: { restored_to: 'strict' } },
         now,
       );
-      this.#logger.info('debug 日志隐私模式已到期，自动恢复 strict');
+      this.#logger.info('Chế độ nhật ký bảo mật debug đã hết hạn, tự động khôi phục về strict');
     } else {
       this.#logger.warn(
-        'debug 日志隐私模式已到期，但 LOG_PRIVACY_MODE 当前被环境变量锁定，跳过恢复',
+        'Chế độ nhật ký bảo mật debug đã hết hạn, nhưng LOG_PRIVACY_MODE hiện đang bị khóa bởi biến môi trường, bỏ qua việc khôi phục',
       );
     }
     return 1;

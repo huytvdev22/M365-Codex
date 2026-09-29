@@ -9,17 +9,17 @@ import { maskIp } from '../observability/logger.js';
 /** API quản trị: Đăng nhập, phiên làm việc, quản lý API Key, tra cứu nhật ký kiểm toán. */
 
 const loginSchema = z.object({
-  password: z.string().min(1, '密码不能为空'),
+  password: z.string().min(1, 'Mật khẩu không được để trống'),
 });
 
 const timestamp = z.number().int().nonnegative().nullable().optional();
 const positiveInt = z.number().int().positive().nullable().optional();
 const stringList = z.array(z.string().min(1)).nullable().optional();
 // Ghi chú chỉ dùng để hiển thị, đặt giới hạn trên nới lỏng để tránh việc giao diện quản trị bị chèn văn bản quá dài
-const note = z.string().max(500, '备注过长').nullable().optional();
+const note = z.string().max(500, 'Ghi chú quá dài').nullable().optional();
 
 const createKeySchema = z.object({
-  name: z.string().min(1, '名称不能为空').max(100, '名称过长'),
+  name: z.string().min(1, 'Tên không được để trống').max(100, 'Tên quá dài'),
   starts_at: timestamp,
   expires_at: timestamp,
   rpm_limit: positiveInt,
@@ -50,20 +50,20 @@ const updateKeySchema = z
     max_tool_calls: positiveInt,
     max_file_bytes: positiveInt,
   })
-  .refine((value) => Object.keys(value).length > 0, { message: '至少需要提供一个待更新字段' });
+  .refine((value) => Object.keys(value).length > 0, { message: 'Cần cung cấp ít nhất một trường để cập nhật' });
 
 function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
 
 function assertValidWindow(startsAt: number | null | undefined, expiresAt: number | null | undefined): void {
   if (startsAt != null && expiresAt != null && expiresAt <= startsAt) {
-    throw ApiError.badRequest('expires_at 必须晚于 starts_at', 'expires_at');
+    throw ApiError.badRequest('expires_at phải sau starts_at', 'expires_at');
   }
 }
 
@@ -84,7 +84,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AppContext): 
         action: 'admin.login.failed',
         clientIp: maskIp(ip ?? undefined, context.privacyMode.current),
       });
-      throw ApiError.unauthorized('管理端密码错误');
+      throw ApiError.unauthorized('Mật khẩu quản trị không chính xác');
     }
 
     throttle.reset(throttleKey);
@@ -173,7 +173,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AppContext): 
         ...(body.max_file_bytes === undefined ? {} : { maxFileBytes: body.max_file_bytes }),
       });
       if (updated === undefined) {
-        throw ApiError.notFound('API Key 不存在');
+        throw ApiError.notFound('API Key không tồn tại');
       }
 
       context.auditLogs.record({
@@ -192,7 +192,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AppContext): 
     async (request) => {
       const revoked = context.apiKeys.revoke(request.params.id);
       if (revoked === undefined) {
-        throw ApiError.notFound('API Key 不存在');
+        throw ApiError.notFound('API Key không tồn tại');
       }
       context.auditLogs.record({ actor: 'admin', action: 'api_key.revoke', target: revoked.id });
       return revoked;

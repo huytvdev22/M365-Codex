@@ -83,7 +83,7 @@ describe('构建产物缺失时', () => {
     registerUiRoutes(app, { webDist: join(dist, 'not-built') });
     const res = await app.inject({ method: 'GET', url: '/ui/' });
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain('管理界面尚未构建');
+    expect(res.body).toContain('Giao diện quản trị chưa được xây dựng');
     expect(res.body).toContain('npm run build');
   });
 });

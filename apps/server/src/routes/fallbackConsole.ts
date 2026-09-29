@@ -6,16 +6,16 @@
  * chỉ chịu trách nhiệm giải thích rõ: Giao diện quản trị chưa được build, và hướng dẫn cách build.
  */
 export const FALLBACK_CONSOLE_HTML = `<!doctype html>
-<html lang="zh-CN">
+<html lang="vi">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>M365-Codex 管理界面未构建</title>
+<title>M365-Codex Giao diện quản trị chưa được xây dựng</title>
 <style>
   :root { color-scheme: light dark; }
   body {
     margin: 0; min-height: 100vh; display: grid; place-items: center;
-    font: 15px/1.7 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font: 15px/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: Canvas; color: CanvasText;
   }
   main { max-width: 34rem; padding: 2rem; }
@@ -31,11 +31,11 @@ export const FALLBACK_CONSOLE_HTML = `<!doctype html>
 </head>
 <body>
 <main>
-  <h1>管理界面尚未构建</h1>
-  <p>服务本身运行正常，但没有找到前端构建产物 <code>apps/web/dist</code>，所以这里没有页面可以显示。</p>
-  <p>在仓库根目录执行下面的命令重新构建，然后刷新本页：</p>
+  <h1>Giao diện quản trị chưa được xây dựng</h1>
+  <p>Dịch vụ server vẫn đang hoạt động bình thường, nhưng không tìm thấy sản phẩm build frontend tại <code>apps/web/dist</code>, nên không có trang để hiển thị.</p>
+  <p>Vui lòng thực thi lệnh sau tại thư mục gốc của kho lưu trữ để build lại, sau đó tải lại trang này:</p>
   <pre>npm run build</pre>
-  <p class="muted">JSON 管理接口不受影响，仍在 <code>/admin/*</code> 下可用；健康检查见 <code>/healthz</code> 与 <code>/readyz</code>。</p>
+  <p class="muted">Các API quản trị JSON không bị ảnh hưởng, vẫn hoạt động bình thường tại <code>/admin/*</code>; kiểm tra sức khỏe tại <code>/healthz</code> và <code>/readyz</code>.</p>
 </main>
 </body>
 </html>

@@ -15,7 +15,7 @@ import { serializeSse, type SseEvent } from '../responses/types.js';
 export function registerV1Routes(app: FastifyInstance, context: AppContext): void {
   const apiKeyGuard = createApiKeyGuard(context);
   // Khi không đọc được tệp danh mục thì fallback về danh mục đơn lẻ tích hợp sẵn — đây là vấn đề triển khai, bắt buộc phải lưu vết
-  const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, '模型目录降级'));
+  const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, 'Hạ cấp danh mục mô hình'));
 
   app.get('/v1/models', { preHandler: apiKeyGuard }, async () => models);
 
@@ -107,7 +107,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
     { preHandler: apiKeyGuard },
     async (request) => {
       const row = context.responseRepo.findById(request.params.id);
-      if (row === undefined) throw ApiError.notFound('response 不存在');
+      if (row === undefined) throw ApiError.notFound('response không tồn tại');
       assertOwnership(row.api_key_id, request.apiKeyRow?.id ?? null);
       const body = context.responseRepo.readBody(request.params.id);
       if (body === null) {
@@ -123,11 +123,11 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
     { preHandler: apiKeyGuard },
     async (request) => {
       const row = context.responseRepo.findById(request.params.id);
-      if (row === undefined) throw ApiError.notFound('response 不存在');
+      if (row === undefined) throw ApiError.notFound('response không tồn tại');
       assertOwnership(row.api_key_id, request.apiKeyRow?.id ?? null);
       const cancelled = context.inFlight.cancel(request.params.id);
       if (!cancelled && (row.status === 'completed' || row.status === 'failed')) {
-        throw ApiError.badRequest(`response 已处于 ${row.status} 状态，无法取消`);
+        throw ApiError.badRequest(`response đã ở trạng thái ${row.status}, không thể hủy`);
       }
       return { id: row.id, object: 'response', status: 'cancelling' };
     },
@@ -138,7 +138,7 @@ export function registerV1Routes(app: FastifyInstance, context: AppContext): voi
     { preHandler: apiKeyGuard },
     async (request) => {
       const row = context.responseRepo.findById(request.params.id);
-      if (row === undefined) throw ApiError.notFound('response 不存在');
+      if (row === undefined) throw ApiError.notFound('response không tồn tại');
       assertOwnership(row.api_key_id, request.apiKeyRow?.id ?? null);
       context.inFlight.cancel(request.params.id);
       return { id: row.id, object: 'response', deleted: true };
@@ -166,7 +166,7 @@ async function streamResponse(reply: FastifyReply, stream: AsyncGenerator<SseEve
     }
   } catch (error) {
     // Bên trong luồng sự kiện về lý thuyết đã chuyển lỗi thành response.failed; chạy tới đây là ngoài ý muốn
-    reply.request.log.error({ err: error }, 'SSE 流意外中断');
+    reply.request.log.error({ err: error }, 'Luồng SSE bị gián đoạn bất ngờ');
   } finally {
     if (!reply.raw.writableEnded && !reply.raw.destroyed) reply.raw.end();
   }
@@ -207,6 +207,6 @@ function headerValue(request: FastifyRequest, name: string): string | null {
 function assertOwnership(rowApiKeyId: string | null, requesterApiKeyId: string | null): void {
   // Mỗi API Key chỉ được xem response của chính mình
   if (rowApiKeyId !== null && requesterApiKeyId !== null && rowApiKeyId !== requesterApiKeyId) {
-    throw ApiError.notFound('response 不存在');
+    throw ApiError.notFound('response không tồn tại');
   }
 }

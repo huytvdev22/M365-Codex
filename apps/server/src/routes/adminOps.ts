@@ -21,7 +21,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, payload: unknown): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
     const issue = result.error.issues[0];
-    throw ApiError.badRequest(issue?.message ?? '请求体不合法', issue?.path.join('.') || undefined);
+    throw ApiError.badRequest(issue?.message ?? 'Nội dung yêu cầu không hợp lệ', issue?.path.join('.') || undefined);
   }
   return result.data;
 }
@@ -124,7 +124,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
 
   app.get<{ Params: { id: string } }>('/admin/requests/:id', { preHandler: adminGuard }, async (request) => {
     const row = context.responseRepo.findById(request.params.id);
-    if (row === undefined) throw ApiError.notFound('请求记录不存在');
+    if (row === undefined) throw ApiError.notFound('Bản ghi yêu cầu không tồn tại');
     const toolCalls = context.toolCalls.listByResponse(row.id).map((call) => ({
       call_id: call.call_id,
       name: call.name,
@@ -164,7 +164,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   app.patch('/admin/settings', { preHandler: adminGuard }, async (request) => {
     const body = parseOrThrow(settingsPatchSchema, request.body);
     if (!isSettingGroup(body.group)) {
-      throw ApiError.badRequest(`未知的设置分组：${body.group}`, 'group');
+      throw ApiError.badRequest(`Nhóm cài đặt không xác định: ${body.group}`, 'group');
     }
     const updated = context.settings.patchGroup(body.group, body.values);
     context.auditLogs.record({
@@ -194,7 +194,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
       priority: z.number().int().optional(),
       enabled: z.boolean().optional(),
     })
-    .refine((v) => Object.keys(v).length > 0, { message: '至少需要提供一个待更新字段' });
+    .refine((v) => Object.keys(v).length > 0, { message: 'Cần cung cấp ít nhất một trường để cập nhật' });
   const bulkImportSchema = z.object({ urls: z.string().min(1) });
 
   function toView(row: ProxyNodeRow) {
@@ -226,11 +226,11 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
     let failed = 0;
     lines.forEach((line, index) => {
       const commaIndex = line.indexOf(',');
-      const name = commaIndex > 0 ? line.slice(0, commaIndex).trim() : `导入节点 ${index + 1}`;
+      const name = commaIndex > 0 ? line.slice(0, commaIndex).trim() : `Node nhập ${index + 1}`;
       const url = commaIndex > 0 ? line.slice(commaIndex + 1).trim() : line;
       // Kiểm tra tính hợp lệ của URL, tránh việc mã hóa và lưu vào DB chuỗi rõ ràng không mở được
       if (!isValidUrl(url)) {
-        results.push({ line, ok: false, error: 'url 不是合法的 URL' });
+        results.push({ line, ok: false, error: 'url không phải là URL hợp lệ' });
         failed += 1;
         return;
       }
@@ -255,17 +255,17 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   app.patch<{ Params: { id: string } }>('/admin/proxies/:id', { preHandler: adminGuard }, async (request) => {
     const body = parseOrThrow(updateProxySchema, request.body);
     if (body.url !== undefined && !isValidUrl(body.url)) {
-      throw ApiError.badRequest('url 不是合法的 URL', 'url');
+      throw ApiError.badRequest('url không phải là URL hợp lệ', 'url');
     }
     const row = context.proxyNodes.update(request.params.id, body);
-    if (row === undefined) throw ApiError.notFound('代理节点不存在');
+    if (row === undefined) throw ApiError.notFound('Node proxy không tồn tại');
     context.auditLogs.record({ actor: 'admin', action: 'proxy.update', target: row.id });
     return toView(row);
   });
 
   app.delete<{ Params: { id: string } }>('/admin/proxies/:id', { preHandler: adminGuard }, async (request) => {
     const row = context.proxyNodes.findById(request.params.id);
-    if (row === undefined) throw ApiError.notFound('代理节点不存在');
+    if (row === undefined) throw ApiError.notFound('Node proxy không tồn tại');
     context.proxyNodes.remove(request.params.id);
     context.auditLogs.record({ actor: 'admin', action: 'proxy.delete', target: request.params.id });
     return { deleted: true, id: request.params.id };
@@ -276,7 +276,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
     { preHandler: adminGuard },
     async (request) => {
       const row = context.proxyNodes.findById(request.params.id);
-      if (row === undefined) throw ApiError.notFound('代理节点不存在');
+      if (row === undefined) throw ApiError.notFound('Node proxy không tồn tại');
       const url = context.proxyNodes.decryptUrl(row);
       const result = await context.proxyChecker(url, context.config.proxyCheckTimeoutMs);
 
@@ -304,10 +304,10 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
       let baseUrl = context.config.publicApiBaseUrl;
       if (baseUrl === null) {
         baseUrl = `http://localhost:${context.config.port}/v1`;
-        notes.push('未设置 PUBLIC_API_BASE_URL，此处用本机地址兜底，请按你的实际对外地址修改');
+        notes.push('Chưa thiết lập PUBLIC_API_BASE_URL, tạm thời dùng địa chỉ cục bộ làm dự phòng, vui lòng sửa lại theo địa chỉ công khai thực tế của bạn');
       }
-      notes.push(`请把环境变量 ${envKey} 设为你的 sk- API Key`);
-      notes.push('model 与 model_reasoning_effort 由 Codex 端自行选择，本文件不代填');
+      notes.push(`Vui lòng đặt biến môi trường ${envKey} thành sk- API Key của bạn`);
+      notes.push('model và model_reasoning_effort do phía Codex tự chọn, tệp này không điền thay');
 
       const toml = [
         'model_provider = "m365-codex"',
@@ -355,7 +355,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
 
   app.delete<{ Params: { id: string } }>('/admin/files/:id', { preHandler: adminGuard }, async (request) => {
     const row = context.fileRepo.adminSoftDelete(request.params.id);
-    if (row === undefined) throw ApiError.notFound('文件不存在');
+    if (row === undefined) throw ApiError.notFound('Tệp không tồn tại');
     context.fileStorage.deleteFile(row.id);
     context.auditLogs.record({ actor: 'admin', action: 'file.delete', target: row.id });
     return { deleted: true, id: row.id };
@@ -383,7 +383,7 @@ export function registerAdminOpsRoutes(app: FastifyInstance, context: AppContext
   // 2.7 Model và ma trận năng lực
   // ---------------------------------------------------------------------
   app.get('/admin/capabilities', { preHandler: adminGuard }, async () => {
-    const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, '模型目录降级')).data.map(
+    const models = loadModels(undefined, (reason) => context.logger.warn({ reason }, 'Hạ cấp danh mục mô hình')).data.map(
       (m) => ({ id: m.id, source: m.owned_by }),
     );
     return { models, matrix: buildCapabilityMatrix(context) };
@@ -451,42 +451,42 @@ function buildCapabilityMatrix(context: AppContext): { feature: string; status: 
 
   return [
     // §24.1 Khung thực thi cục bộ hoặc theo giao thức Responses đã hoàn thành, nhưng end-to-end có thực sự thông suốt hay không phụ thuộc vào M0 chưa chạy
-    upstream('文本对话/代码生成', '走 /v1/responses，转发到 Copilot 上游，尚未经真实上游验收'),
-    upstream('流式输出（SSE）', '事件序列已实现，真实上游的分片行为待 M0 校准'),
-    upstream('多轮上下文（previous_response_id）', '续接机制已实现，真实上游会话保持能力待验证'),
-    upstream('模型 ID 透传', '原样透传不新造别名；上游是否按该模型作答不可控（§5.4）'),
-    upstream('思考等级（reasoning.effort）透传', '原样透传；上游是否真正分级待 M0 确认'),
-    upstream('工具调用与代理循环', `当前 TOOLS_MODE=${context.config.tools.mode}；真实上游工具协议待 M0 校准`),
-    local('自定义 Base URL + sk- 密钥登录 Codex', '网关自身能力，与上游无关'),
-    local('本机文件读写 / apply_patch / Shell / Git', 'Codex 客户端本地执行，网关不参与'),
-    local('本地/自建 MCP、只调本地工具的插件', 'Codex 客户端本地执行'),
-    local('AGENTS.md 项目指令', '作为 instructions 注入，纯提示词'),
-    local('多 API Key、独立限额与有效期', '网关自身实现（§10）'),
-    local('自定义公开地址 / 反向代理', '网关自身实现（§12）'),
+    upstream('Đối thoại văn bản / Sinh mã nguồn', 'Đi qua /v1/responses, chuyển tiếp tới Copilot upstream, chưa qua nghiệm thu với upstream thực tế'),
+    upstream('Đầu ra dạng luồng (SSE)', 'Trình tự sự kiện đã triển khai, hành vi phân đoạn của upstream thực tế chờ probe M0 hiệu chuẩn'),
+    upstream('Ngữ cảnh nhiều lượt (previous_response_id)', 'Cơ chế nối tiếp đã triển khai, khả năng duy trì phiên của upstream thực tế cần kiểm chứng'),
+    upstream('Chuyển tiếp nguyên trạng ID mô hình', 'Chuyển tiếp nguyên trạng không tạo alias mới; việc upstream có phản hồi theo đúng model hay không nằm ngoài tầm kiểm soát (§5.4)'),
+    upstream('Chuyển tiếp mức độ tư duy (reasoning.effort)', 'Chuyển tiếp nguyên trạng; việc upstream có thực sự phân cấp tư duy hay không chờ probe M0 xác nhận'),
+    upstream('Gọi công cụ và vòng lặp Agent', `Hiện tại TOOLS_MODE=${context.config.tools.mode}; giao thức công cụ của upstream thực tế chờ probe M0 hiệu chuẩn`),
+    local('Base URL tùy chỉnh + khóa sk- đăng nhập Codex', 'Năng lực nội tại của cổng gateway, độc lập với upstream'),
+    local('Đọc ghi tệp máy cục bộ / apply_patch / Shell / Git', 'Codex client thực thi cục bộ, cổng gateway không can thiệp'),
+    local('MCP cục bộ / tự dựng, plugin chỉ gọi công cụ cục bộ', 'Codex client thực thi cục bộ'),
+    local('Chỉ thị dự án AGENTS.md', 'Được chèn vào dưới dạng instructions, thuần túy là câu lệnh nhắc (prompt)'),
+    local('Nhiều API Key, hạn ngạch và thời hạn độc lập', 'Cổng gateway tự triển khai (§10)'),
+    local('Địa chỉ công khai tùy chỉnh / Reverse proxy', 'Cổng gateway tự triển khai (§12)'),
     {
-      feature: '提示词模拟工具调用（TOOLS_MODE=prompt）',
+      feature: 'Giả lập gọi công cụ bằng prompt (TOOLS_MODE=prompt)',
       status: 'experimental',
-      detail: '未确认上游原生支持时的兜底方案，命中率门槛需 M0 真实账号测得（§3.5）',
+      detail: 'Phương án dự phòng khi chưa xác nhận upstream hỗ trợ native, ngưỡng tỷ lệ trúng cần đo bằng tài khoản thật M0 (§3.5)',
     },
     // §24.2 Phụ thuộc vào việc thăm dò upstream
     context.config.upstreamImageInput
-      ? upstream('图片输入（input_image）', '当前已放行转发给上游，真实支持程度未经 M0 确认')
-      : unsupported('图片输入（input_image）', 'UPSTREAM_IMAGE_INPUT=false，明确返回 unsupported_feature，不假装支持'),
-    upstream('PDF / Office 附件', '服务端已提取文本，上游对提取内容的理解效果未经确认'),
-    upstream('长上下文上限', '由上游实际承载能力决定，当前只做本地字符数截断兜底'),
-    upstream('严格结构化 JSON 输出', '可能需要约束输出适配，真实可靠性未经确认'),
-    upstream('并行工具调用', '取决于上游能否一次产出多个工具调用'),
-    upstream('思考等级是否真正分级', '上游可能"接受但不区分"'),
-    upstream('精确 Token 用量', '当前 usage 为 null，上游可能只给估算值'),
-    upstream('引用/来源信息', '已映射 Copilot citation 结构，来源数据真实性取决于上游'),
-    upstream('请求取消及时性', '取决于上游 WebSocket 取消行为'),
-    // §24.3 Không thể thực hiện
-    unsupported('Codex Cloud / 云端任务委派', '云端执行环境由 OpenAI 后端提供'),
-    unsupported('云端代码审查 / 云端 GitHub 集成', '依赖 OpenAI 云服务；本地命令行 review 可用'),
-    unsupported('OpenAI 托管内置工具（web_search/file_search/code_interpreter/computer_use/image_generation）', '需 OpenAI 托管后端执行'),
-    unsupported('ChatGPT 工作区 RBAC / 企业保留', '属 ChatGPT 账号管理特权'),
-    unsupported('依赖 OpenAI OAuth 的插件/MCP', '其后端指向 OpenAI，无法用 Copilot 替代'),
-    unsupported('Embeddings / Realtime / Batch / Fine-tuning', 'Copilot 上游无对应能力'),
-    unsupported('官方用量/计费面板', '属 OpenAI 平台账户体系'),
+      ? upstream('Đầu vào hình ảnh (input_image)', 'Hiện đã cho phép chuyển tiếp tới upstream, mức độ hỗ trợ thực tế chưa qua probe M0 xác nhận')
+      : unsupported('Đầu vào hình ảnh (input_image)', 'UPSTREAM_IMAGE_INPUT=false, trả về lỗi unsupported_feature rõ ràng, không giả vờ hỗ trợ'),
+    upstream('Tệp đính kèm PDF / Office', 'Server đã trích xuất văn bản thô, hiệu quả hiểu nội dung trích xuất của upstream chưa được xác nhận'),
+    upstream('Giới hạn trần ngữ cảnh dài', 'Phụ thuộc vào khả năng chịu tải thực tế của upstream, hiện tại chỉ cắt ngắn ký tự cục bộ làm phương án dự phòng'),
+    upstream('Đầu ra JSON có cấu trúc nghiêm ngặt', 'Có thể cần điều chỉnh ràng buộc đầu ra, độ tin cậy thực tế chưa được xác nhận'),
+    upstream('Gọi công cụ song song (Parallel Tool Calls)', 'Phụ thuộc vào việc upstream có thể tạo ra nhiều lệnh gọi công cụ cùng lúc hay không'),
+    upstream('Mức độ tư duy có thực sự phân cấp hay không', 'Upstream có thể "chấp nhận nhưng không phân biệt"'),
+    upstream('Mức tiêu thụ Token chính xác', 'Hiện tại usage trả về null, upstream có thể chỉ cung cấp giá trị ước lượng'),
+    upstream('Thông tin trích dẫn / Nguồn tham chiếu (Citations)', 'Đã ánh xạ cấu trúc citation của Copilot, tính xác thực của dữ liệu nguồn phụ thuộc vào upstream'),
+    upstream('Tính kịp thời khi hủy yêu cầu', 'Phụ thuộc vào hành vi ngắt kết nối WebSocket của upstream'),
+    // §24.3 Không khả thi
+    unsupported('Codex Cloud / Ủy quyền tác vụ trên đám mây', 'Môi trường thực thi đám mây do backend của OpenAI cung cấp'),
+    unsupported('Đánh giá mã đám mây / Tích hợp GitHub trên đám mây', 'Phụ thuộc vào dịch vụ đám mây của OpenAI; review dòng lệnh cục bộ vẫn hoạt động bình thường'),
+    unsupported('Công cụ tích hợp do OpenAI lưu trữ (web_search/file_search/code_interpreter/computer_use/image_generation)', 'Cần backend lưu trữ của OpenAI để thực thi'),
+    unsupported('ChatGPT Workspace RBAC / Enterprise Retention', 'Thuộc đặc quyền quản trị tài khoản ChatGPT'),
+    unsupported('Plugin / MCP phụ thuộc vào OpenAI OAuth', 'Backend trỏ về OpenAI, không thể thay thế bằng Copilot'),
+    unsupported('Embeddings / Realtime / Batch / Fine-tuning', 'Copilot upstream không có các năng lực tương ứng này'),
+    unsupported('Bảng điều khiển thanh toán / mức dùng chính thức', 'Thuộc hệ thống tài khoản nền tảng của OpenAI'),
   ];
 }

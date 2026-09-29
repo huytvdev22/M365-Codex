@@ -211,7 +211,7 @@ describe('POST /admin/restore', () => {
     const body = res.json() as { restored: boolean; requires_restart: boolean; message: string };
     expect(body.restored).toBe(true);
     expect(body.requires_restart).toBe(true);
-    expect(body.message).toContain('重启');
+    expect(body.message).toContain('khởi động lại');
   });
 
   it('不合法的备份包返回明确错误，不假装恢复成功', async () => {
